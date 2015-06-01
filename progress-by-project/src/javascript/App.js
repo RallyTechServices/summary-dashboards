@@ -5,8 +5,8 @@ Ext.define('CustomApp', {
     launch: function() {
         //Write app code here
         //API Docs: https://help.rallydev.com/apps/2.0/doc/
-        var release = "Release 1";
-        var iteration = null;
+        var release = null;
+        var iteration = this.getTimeboxScope();
 
         var that = this;
         console.log(that.getContext(),that.getContext().getProject());
@@ -35,6 +35,17 @@ Ext.define('CustomApp', {
         });
 
     },
+
+    getTimeboxScope : function() {
+        var timeboxScope = this.getContext().getTimeboxScope();
+        if ((timeboxScope) && (timeboxScope.getType() === 'iteration')) {
+            var record = timeboxScope.getRecord();
+            var name = record.get('Name');
+            return name;
+        }
+        return null;
+    },
+
 
     readProjects : function(callback) {
 

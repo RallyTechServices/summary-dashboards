@@ -1,11 +1,11 @@
 {
-   "name": "progress-by-project",
+   "name": "wip-limits-chart",
    "className": "CustomApp",
-   "server": "https://rally1.rallydev.com",
+   "server": "https://10.32.16.145",
    "sdk": "2.0rc2",
    "javascript": [
       "src/javascript/App.js",
-      "src/javascript/_bm-chart.js",
+      "src/javascript/_wip-chart.js",
       "https://cdnjs.cloudflare.com/ajax/libs/async/1.22/async.min.js"
    ],
    "css": [

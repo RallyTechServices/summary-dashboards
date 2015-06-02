@@ -3,8 +3,7 @@ Ext.define('CustomApp', {
     componentCls: 'app',
 
     launch: function() {
-        //Write app code here
-        //API Docs: https://help.rallydev.com/apps/2.0/doc/
+
         var release = null;
         var iteration = "Iteration 1"; // this.getTimeboxScope();
 
@@ -15,6 +14,7 @@ Ext.define('CustomApp', {
             iteration = tbs.type === "iteration" ? tbs.name : null;
         }
         that.run(release,iteration);
+
     },
 
     run : function(releaseName,iterationName) {
@@ -28,8 +28,8 @@ Ext.define('CustomApp', {
             that.readStates.bind(that),
             that.readProjects.bind(that),
             that.getReportProjects.bind(that),
-            that.readWorkItems.bind(that),
-            that.groupWorkItems.bind(that),
+            that.readWipValues.bind(that),
+            that.readStories.bind(that),
             that.prepareChartData.bind(that),
             that.createChart.bind(that)
         ];
@@ -101,76 +101,81 @@ Ext.define('CustomApp', {
 
         // if no children add self
         if (that.reportProjects.length ===0) {
-            that.reportProjects.push( _.find(that.projects,function(project){
+            that.reportProjects.push(_.find(that.projects,function(project) {
                 return project.get("ObjectID") === that.getContext().getProject().ObjectID;
-            }))
+            }));
         }
 
-        console.log("report:",_.map(that.reportProjects,function(p){return p.get("Name");}));
+        callback(null,that.reportProjects);
+    },
 
-        callback(null);
+
+    // project-wip:IA-Program > IM FT Client outcomes > CAP DELIVERY 2 Scrum Team:DefinedWIP
+    // "project-wip:IA-Program > Big Data Analytics & Shared Services > BDASS:CompletedWIP"
+    readWipValues : function(reportProjects,callback) {
+
+    	var that = this;
+
+		var projectKeys = _.map( reportProjects, function(p) { return p.get("Name"); });
+
+		var states = ["In-Progress","Completed"];
+
+		var keys = _.flatten(_.map(projectKeys,function(pKey) {
+			return _.map(states,function(state) {
+				return "project-wip:" + pKey + ":" + state + "WIP";
+			});
+		}));
+		console.log("keys",keys);
+
+		var configs = _.map(keys,function(key) {
+			return {
+				model : "Preference",
+				filters : [{property:"Name",operator:"=",value:key}],
+				fetch : true
+			};
+		});
+
+		async.map(configs, that._wsapiQuery, function(error,results){
+			console.log("prefernece results",_.flatten(results));
+			that.wipLimits = _.flatten(results);
+			// callback(null,_.flatten(results));
+			callback(null,reportProjects,that.wipLimits);
+		});
 
     },
 
-    readWorkItems : function(callback) {
+    readStories : function(reportProjects, wipLimits, callback) {
 
-        var that = this;
+    	var that = this;
 
-        var configs = _.map(["HierarchicalRequirement","Defect"],function(model){
-            return {
-                model : model,
-                filters : [that.workItemFilter],
-                fetch : ["ObjectID","ScheduleState","PlanEstimate","Project"]
-            };
-        });
-        console.log("configs",configs);
+    	var configs = _.map(reportProjects,function(project) {
+    		return {
+    			model : "HierarchicalRequirement",
+    			filters : [that.workItemFilter],
+    			fetch : ["ObjectID","ScheduleState","PlanEstimate","Project"],
+    			context : {
+    				project: project.get("_ref"),
+        			projectScopeUp: false,
+        			projectScopeDown: true
+    			}
+    		}
+    	});
 
-        async.map( configs, that._wsapiQuery, function(error,results) {
-            var allItems = [];
-            _.each(results,function(result){
-                allItems = allItems.concat(result);
-            });
-            // console.log("work items",results);
-            callback(null,allItems);
-        });
-
-    },
-
-    groupWorkItems : function(workItems, callback) {
-
-        var that = this;
-
-        // work items are either directly in the parent item or in a child project.
-        var groupedByParent = _.groupBy( workItems, function (workItem) {
-
-            // first get the full project object (so we can get it's parent)
-            var p = _.find(that.projects,function(allProject) { 
-                return workItem.get("Project").ObjectID === allProject.get("ObjectID");
-            });
-
-            // then find the report project for this item
-            var reportProject = _.find(that.reportProjects,function(reportP) {
-                // console.log(p.get("Parent")._ref,reportP.get("_ref"));
-                if ( reportP.get("_ref") === p.get("_ref")) {
-                    return true;
-                }
-                if ( ( !_.isNull(p.get("Parent")) && p.get("Parent")._ref === reportP.get("_ref"))) {
-                    return true;
-                }
-                return false;
-            });
-            return (!_.isUndefined(reportProject) && !_.isNull(reportProject)) ? reportProject.get("Name") : "None";
-
-        });
-        callback(null,groupedByParent);
+    	// read stories for each reporting project
+    	async.map(configs,that._wsapiQuery,function(error,results) {
+    		console.log("stories",results);
+    		callback(null,reportProjects,wipLimits,results)
+    	});
 
     },
 
-    prepareChartData : function(groupedWorkItems,callback) {
+    prepareChartData : function(reportProjects,wipLimits,stories,callback) {
 
         var that = this;
 
-        var projectKeys = _.compact(_.map(_.keys(groupedWorkItems),function(k) { return k !== "None" ? k : null; }));
+        var categories = _.map(reportProjects,function(p) { return p.get("Name"); });
+
+        var states = ["In-Progress","Completed"];
 
         var pointsValue = function(value) {
             return !_.isUndefined(value) && !_.isNull(value) ? value : 0;
@@ -178,43 +183,46 @@ Ext.define('CustomApp', {
 
         // totals points for a set of work items based on if they are in a set of states
         var summarize = function( workItems, states ) {
-
-            // calc total points
-            var total = _.reduce(workItems,
-                function(memo,workItem) {
-                    return memo + pointsValue(workItem.get("PlanEstimate"));
-                },0
-            );
-
-            var stateTotal = _.reduce( 
-                workItems, 
-                function(memo,workItem) {
-
-                    return memo + 
-                        ( _.indexOf(states,workItem.get("ScheduleState")) > -1 ? 
-                            pointsValue(workItem.get("PlanEstimate")) :
-                            0);
-                },0
-            );
-
-            var p = ( total > 0 ? ((stateTotal/total)*100) : 0);
-
-            return Math.round(p);
-            
+            var stateTotal = _.reduce(  workItems, function(memo,workItem) {
+                    return memo + ( _.indexOf(states,workItem.get("ScheduleState")) > -1 ? 
+                        	1 : 0);
+                },0);
+            return stateTotal;
         };
 
-        var summary = that.createSummaryRecord();
+        var wipForProjectAndState = function( project, state ) {
+            var wip = _.find( wipLimits, function( limit ) {
+                return limit.get("Name").indexOf(project.get("Name"))!==-1 &&
+                    limit.get("Name").indexOf(state)!==-1;
+            })
+            if (!_.isUndefined(wip) && !_.isNull(wip)) {
+                var val = wip.get("Value").replace(/"/g,"");
+                return parseInt(val);
+            } else {
+                return 0;
+            };
+        }
 
-        var categories = projectKeys;
+        var seriesData = _.map( states, function( state ) {
 
-        var seriesData = _.map( _.keys(summary), function( summaryKey ) {
+            var counts = _.map( categories, function( project, index ) {
+                return summarize( stories[index], [state]);
+            });
+            var wips = _.map( categories, function( project, index) {
+                return wipForProjectAndState( reportProjects[index], state);
+            });
+
+            console.log("counts",counts,"wips",wips);
+
             return {
-                name : summaryKey,
-                data : _.map( projectKeys, function( projectKey ) {
-                    return summarize( groupedWorkItems[projectKey], summary[summaryKey]);
+                name : state,
+                data : _.map( categories, function( project, index) {
+                    return counts[index] - wips[index]
                 })
             };
         });
+
+        console.log("seriesData",seriesData);
 
         callback(null,categories,seriesData);
 
@@ -228,12 +236,10 @@ Ext.define('CustomApp', {
             that.remove(that.chart);
         }
 
-        that.chart = Ext.create('Rally.technicalservices.bmChart', {
-         // xtype: 'tskickbackchart',
+        that.chart = Ext.create('Rally.technicalservices.wipChart', {
             itemId: 'rally-chart',
             chartData: { series : seriesData, categories : categories },
-            // chartColors : [],
-            title: 'Progress By Project'
+            title: 'WIP Limits by Projecgt'
         });
 
         that.add(that.chart);
@@ -244,32 +250,6 @@ Ext.define('CustomApp', {
         _.each(elems, function(e) { e.remove(); });
         var elems = p.query("div.x-mask-msg");
         _.each(elems, function(e) { e.remove(); });
-    },
-
-
-    // utilities below here ... 
-
-    createSummaryRecord : function() { 
-
-        var that = this;
-      
-        var summary = {
-            "Backlog" : ["Defined"],
-            "In-Progress" : ["In-Progress"],
-            "Completed/Accepted" : ["Completed","Accepted"]
-        };
-
-        // add initial and last states if necessary
-        var first = _.first(that.scheduleStates);
-        var last = _.last(that.scheduleStates);
-        if (_.indexOf(summary[_.first(_.keys(summary))],first)===-1)
-            summary[_.first(_.keys(summary))].push(_.first(that.scheduleStates));
-        if (_.indexOf(summary[_.last(_.keys(summary))],last)===-1)
-            summary[_.last(_.keys(summary))].push(_.last(that.scheduleStates));
-
-        console.log("summary",summary);
-        return summary;
-
     },
 
     // create a filter based on a combination of release and/or iteration
@@ -303,8 +283,8 @@ Ext.define('CustomApp', {
 
     // generic function to perform a web services query    
     _wsapiQuery : function( config , callback ) {
-        
-        Ext.create('Rally.data.WsapiDataStore', {
+
+    	var storeConfig = {
             autoLoad : true,
             limit : "Infinity",
             model : config.model,
@@ -316,7 +296,13 @@ Ext.define('CustomApp', {
                     callback(null,data);
                 }
             }
-        });
+        };
+
+        if (!_.isUndefined(config.context)) {
+        	storeConfig["context"] = config.context;
+        }
+        
+        Ext.create('Rally.data.WsapiDataStore', storeConfig);
     }
 
 });

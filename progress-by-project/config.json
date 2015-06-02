@@ -1,7 +1,7 @@
 {
    "name": "progress-by-project",
    "className": "CustomApp",
-   "server": "https://rally1.rallydev.com",
+   "server": "https://10.32.16.145",
    "sdk": "2.0rc2",
    "javascript": [
       "src/javascript/App.js",

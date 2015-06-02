@@ -9,7 +9,11 @@ Ext.define('CustomApp', {
         var iteration = "Iteration 1"; // this.getTimeboxScope();
 
         var that = this;
-        console.log(that.getContext(),that.getContext().getProject());
+        var tbs = that.getTimeboxScope();
+        if (!_.isNull(tbs)) {
+            release = tbs.type === "release" ? tbs.name : null;
+            iteration = tbs.type === "iteration" ? tbs.name : null;
+        }
         that.run(release,iteration);
     },
 
@@ -41,11 +45,31 @@ Ext.define('CustomApp', {
         if ((timeboxScope) && (timeboxScope.getType() === 'iteration')) {
             var record = timeboxScope.getRecord();
             var name = record.get('Name');
-            return name;
+            return { type : 'iteration', name : name };
+        } else {
+            if ((timeboxScope) && (timeboxScope.getType() === 'release')) {
+                var record = timeboxScope.getRecord();
+                var name = record.get('Name');
+                return { type : 'release', name : name };
+            }
         }
         return null;
     },
 
+    onTimeboxScopeChange: function(newTimeboxScope) {
+        this.callParent(arguments);
+        if ((newTimeboxScope) && (newTimeboxScope.getType() === 'iteration')) {
+            var record = newTimeboxScope.getRecord();
+            var name = record.get('Name');
+            this.run(null,name);
+        } else {
+            if ((newTimeboxScope) && (newTimeboxScope.getType() === 'release')) {
+                var record = newTimeboxScope.getRecord();
+                var name = record.get('Name');
+                this.run(name,null);
+            }
+        }
+    },
 
     readProjects : function(callback) {
 
@@ -157,7 +181,7 @@ Ext.define('CustomApp', {
 
             var p = ( total > 0 ? ((stateTotal/total)*100) : 0);
 
-            return Math.round(p * 100) / 100;
+            return Math.round(p);
             
         };
 
@@ -186,7 +210,11 @@ Ext.define('CustomApp', {
 
         var that = this;
 
-        var chart = Ext.create('Rally.technicalservices.bmChart', {
+        if (!_.isUndefined(that.chart)) {
+            that.remove(that.chart);
+        }
+
+        that.chart = Ext.create('Rally.technicalservices.bmChart', {
          // xtype: 'tskickbackchart',
             itemId: 'rally-chart',
             chartData: { series : seriesData, categories : categories },
@@ -194,7 +222,14 @@ Ext.define('CustomApp', {
             title: 'Kickbacks and Deletions'
         });
 
-        that.add(chart);
+        that.add(that.chart);
+
+        var chart = this.down("#rally-chart");
+        var p = Ext.get(chart.id);
+        elems = p.query("div.x-mask");
+        _.each(elems, function(e) { e.remove(); });
+        var elems = p.query("div.x-mask-msg");
+        _.each(elems, function(e) { e.remove(); });
     },
 
 

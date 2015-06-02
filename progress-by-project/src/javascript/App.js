@@ -116,11 +116,10 @@ Ext.define('CustomApp', {
                 }
                 if ( ( !_.isNull(p.get("Parent")) && p.get("Parent")._ref === reportP.get("_ref"))) {
                     return true;
-                };
+                }
                 return false;
             });
-            console.log("reportProject:",reportProject.get("Name"));
-            return reportProject ? reportProject.get("Name") : "None";
+            return (!_.isUndefined(reportProject) && !_.isNull(reportProject)) ? reportProject.get("Name") : "None";
 
         });
         callback(null,groupedByParent);

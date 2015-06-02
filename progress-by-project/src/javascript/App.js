@@ -6,7 +6,7 @@ Ext.define('CustomApp', {
         //Write app code here
         //API Docs: https://help.rallydev.com/apps/2.0/doc/
         var release = null;
-        var iteration = this.getTimeboxScope();
+        var iteration = "Iteration 1"; // this.getTimeboxScope();
 
         var that = this;
         console.log(that.getContext(),that.getContext().getProject());
@@ -66,6 +66,7 @@ Ext.define('CustomApp', {
         that.reportProjects = _.filter(projects, function(project) {
             return that._isChildOf( project, that.getContext().getProject() );
         });
+        console.log("report:",_.map(that.reportProjects,function(p){return p.get("Name");}));
 
         callback(null);
 
@@ -109,10 +110,16 @@ Ext.define('CustomApp', {
 
             // then find the report project for this item
             var reportProject = _.find(that.reportProjects,function(reportP) {
-                return ( reportP.get("_ref") === p.get("_ref") || 
-                    ( !_.isNull(p.get("Parent")) && p.get("Parent").ObjectID === reportP.get("ObjectID")));
+                // console.log(p.get("Parent")._ref,reportP.get("_ref"));
+                if ( reportP.get("_ref") === p.get("_ref")) {
+                    return true;
+                }
+                if ( ( !_.isNull(p.get("Parent")) && p.get("Parent")._ref === reportP.get("_ref"))) {
+                    return true;
+                };
+                return false;
             });
-
+            console.log("reportProject:",reportProject.get("Name"));
             return reportProject ? reportProject.get("Name") : "None";
 
         });

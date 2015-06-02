@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Countdown</title>
+    <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
+    <!--  Build Date: Mon Jun 01 2015 14:35:40 GMT-0700 (PDT) -->
+    
+    <script type="text/javascript">
+        var APP_BUILD_DATE = "Mon Jun 01 2015 14:35:40 GMT-0700 (PDT)";
+        var CHECKSUM = 1576707041;
+    </script>
+    
+    <script type="text/javascript" src="/apps/2.0rc3/sdk.js"></script>
+
+    <script type="text/javascript">
+        Rally.onReady(function() {
+             
+/**
+ * A link that pops up a version dialog box
+ */
+
+Ext.define('Rally.technicalservices.InfoLink',{
+    extend: 'Ext.Component',
+    alias: 'widget.tsinfolink',
+    
+    /**
+     * @cfg {String} informationHtml
+     * Additional text to be displayed on the popup dialog (for exmaple,
+     * to add a description of the app's use or functionality)
+     */
+    informationHtml: null,
+    
+    /**
+     * 
+     * cfg {String} title
+     * The title for the dialog box
+     */
+     title: "Build Information",
+    
+    renderTpl: "<div id='{id}-infolinkWrap' class='tsinfolink'>i</div>",
+
+    initComponent: function() {
+        this.callParent(arguments);
+       
+    },
+    
+    onRender: function() {
+        this.callParent(arguments);
+        this.mon(this.el,'click',this.onClick,this);
+    },
+    _generateChecksum: function(string){
+        var chk = 0x12345678,
+            i;
+        string = string.replace(/var CHECKSUM = .*;/,"");
+        string = string.replace(/\s/g,"");  //Remove all whitespace from the string.
+        
+        for (i = 0; i < string.length; i++) {
+            chk += (string.charCodeAt(i) * i);
+        }
+    
+        return chk;
+    },
+    _checkChecksum: function(container) {
+        var me = this;
+        Ext.Ajax.request({
+            url: document.URL,
+            params: {
+                id: 1
+            },
+            success: function (response) {
+                text = response.responseText;
+                if ( CHECKSUM ) {
+                    if ( CHECKSUM !== me._generateChecksum(text) ) {
+                        console.log("Checksums don't match!");
+                        if ( me.dialog ) {
+                            me.dialog.add({xtype:'container',html:'Checksums do not match'});
+                        }
+                    }
+                }
+            }
+        });
+    },
+    onClick: function(e) {
+        var me = this;
+        this._checkChecksum(this);
+        
+        var dialog_items = [];
+        
+        if ( this.informationHtml ) {
+            dialog_items.push({
+                xtype:'container',
+                html: this.informationHtml
+            });
+        }
+                
+        dialog_items.push({
+            xtype:'container',
+            html:"This app was created by the Rally Technical Services Team."
+        });
+        
+        if ( APP_BUILD_DATE ) {
+            dialog_items.push({
+                xtype:'container',
+                html:'Build date/time: ' + APP_BUILD_DATE
+            });
+        }
+        
+        if (this.dialog){this.dialog.destroy();}
+        this.dialog = Ext.create('Rally.ui.dialog.Dialog',{
+            defaults: { padding: 5, margin: 5 },
+            closable: true,
+            draggable: true,
+            title: me.title,
+            items: dialog_items
+        });
+        this.dialog.show();
+    }
+});
+
+/*
+ */
+Ext.define('Rally.technicalservices.Logger',{
+    constructor: function(config){
+        Ext.apply(this,config);
+    },
+    log: function(args){
+        var timestamp = "[ " + Ext.util.Format.date(new Date(), "Y-m-d H:i:s.u") + " ]";
+        //var output_args = arguments;
+        //output_args.unshift( [ "[ " + timestamp + " ]" ] );
+        //output_args = Ext.Array.push(output_args,arguments);
+        
+        var output_args = [];
+        output_args = Ext.Array.push(output_args,[timestamp]);
+        output_args = Ext.Array.push(output_args, Ext.Array.slice(arguments,0));
+
+        window.console && console.log.apply(console,output_args);
+    }
+
+});
+
+Ext.define('Rally.technicalservices.CountDownClock',{
+    extend: 'Ext.Container',
+    alias: 'widget.tscountdown',
+    
+    config: {
+        /**
+         * @cfg {Date} 
+         * The end date (and time) for the counter to count down to
+         */
+        endDate: new Date()
+    },
+    
+    constructor: function(config) {
+        this.mergeConfig(config);
+        this.callParent([this.config]);
+    },
+
+    initComponent: function() {
+        console.log(this.endDate);
+
+        this.items = this._buildItems();
+        this.callParent(arguments);
+        this.setLoading('...');
+
+        this.currentDate = new Date();
+        
+        this.updateCounters(this.currentDate, this.endDate);
+    },
+    
+    updateCounters: function(current_date, end_date) {
+        this.down('#days').update(this.calculateDifferences(current_date, end_date));
+    },
+    
+    // return a hash { days: 12, 
+    calculateDifferences: function(current_date, end_date){
+        var diff = {
+            days: 0,
+            hours: 0,
+            minutes: 0,
+            seconds: 0
+        }
+        
+        diff.days = Rally.util.DateTime.getDifference(end_date, current_date, 'day');
+        
+        return diff;
+    },
+    
+    _buildItems: function() {
+        var items = [];
+        
+        items.push({
+            xtype:'container',
+            layout: { type:'vbox' },
+            items: [
+                { 
+                    xtype: 'container', 
+                    itemId:'days',
+                    tpl: '{days:leftPad(3,"0")}'
+                },
+                {
+                    xtype: 'container',
+                    html: 'DAYS'
+                }
+            ]
+        });
+        
+
+        return items;
+    }
+});
+Ext.define("TSCountdown", {
+    extend: 'Rally.app.App',
+    componentCls: 'app',
+    logger: new Rally.technicalservices.Logger(),
+    defaults: { margin: 10 },
+    items: [
+        {xtype:'tscountdown',itemId:'iteration_counter'},
+        {xtype:'tscountdown',itemId:'release_counter'},
+        {xtype:'tsinfolink'}
+    ],
+    launch: function() {
+        var me = this;
+        this.setLoading("Loading stuff...");
+        
+        var model_name = 'Defect',
+            field_names = ['Name','State'];
+        
+        this._loadAStoreWithAPromise(model_name, field_names).then({
+            scope: this,
+            success: function(store) {
+                this._displayGrid(store,field_names);
+            },
+            failure: function(error_message){
+                alert(error_message);
+            }
+        }).always(function() {
+            me.setLoading(false);
+        });
+    },
+    _loadAStoreWithAPromise: function(model_name, model_fields){
+        var deferred = Ext.create('Deft.Deferred');
+        var me = this;
+        this.logger.log("Starting load:",model_name,model_fields);
+          
+        Ext.create('Rally.data.wsapi.Store', {
+            model: model_name,
+            fetch: model_fields
+        }).load({
+            callback : function(records, operation, successful) {
+                if (successful){
+                    deferred.resolve(this);
+                } else {
+                    me.logger.log("Failed: ", operation);
+                    deferred.reject('Problem loading: ' + operation.error.errors.join('. '));
+                }
+            }
+        });
+        return deferred.promise;
+    },
+    _displayGrid: function(store,field_names){
+        this.down('#display_box').add({
+            xtype: 'rallygrid',
+            store: store,
+            columnCfgs: field_names
+        });
+    }
+});
+
+            
+               Rally.launchApp('TSCountdown', {
+                   name: 'Countdown'
+               });
+        });
+    </script>
+    
+    <style type="text/css">
+
+.app {
+}
+.tsinfolink {
+    position:absolute;
+    right:0px;
+    width: 14px;
+    height: 14px;
+    border-radius: 7px;
+    text-align: center;
+    color: white;
+    background: #C0C0C0;
+    border-style: solid;
+    border-width: 1px;
+    margin-top: 25px;
+    margin-right: 5px;
+    cursor: pointer;
+}
+    </style>
+
+</head>
+<body></body>
+</html>

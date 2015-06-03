@@ -25,7 +25,7 @@ Ext.define('CustomApp', {
         console.log(that.workItemFilter.toString());
 
         var fns = [
-            // that.readStates.bind(that),
+            that.readStates.bind(that),
             that.readProjects.bind(that),
             that.getReportProjects.bind(that),
             that.readStories.bind(that),
@@ -105,76 +105,38 @@ Ext.define('CustomApp', {
             }));
         }
 
-        callback(null,that.reportProjects);
+        callback(null);
     },
 
-
-    // project-wip:IA-Program > IM FT Client outcomes > CAP DELIVERY 2 Scrum Team:DefinedWIP
-    // "project-wip:IA-Program > Big Data Analytics & Shared Services > BDASS:CompletedWIP"
-    readWipValues : function(reportProjects,callback) {
-
-    	var that = this;
-
-		var projectKeys = _.map( reportProjects, function(p) { return p.get("Name"); });
-
-		var states = ["In-Progress","Completed"];
-
-		var keys = _.flatten(_.map(projectKeys,function(pKey) {
-			return _.map(states,function(state) {
-				return "project-wip:" + pKey + ":" + state + "WIP";
-			});
-		}));
-		console.log("keys",keys);
-
-		var configs = _.map(keys,function(key) {
-			return {
-				model : "Preference",
-				filters : [{property:"Name",operator:"=",value:key}],
-				fetch : true
-			};
-		});
-
-		async.map(configs, that._wsapiQuery, function(error,results){
-			console.log("prefernece results",_.flatten(results));
-			that.wipLimits = _.flatten(results);
-			// callback(null,_.flatten(results));
-			callback(null,reportProjects,that.wipLimits);
-		});
-
-    },
-
-    readStories : function(reportProjects, wipLimits, callback) {
-
-    	var that = this;
-
-    	var configs = _.map(reportProjects,function(project) {
-    		return {
-    			model : "HierarchicalRequirement",
-    			filters : [that.workItemFilter],
-    			fetch : ["ObjectID","ScheduleState","PlanEstimate","Project"],
-    			context : {
-    				project: project.get("_ref"),
-        			projectScopeUp: false,
-        			projectScopeDown: true
-    			}
-    		}
-    	});
-
-    	// read stories for each reporting project
-    	async.map(configs,that._wsapiQuery,function(error,results) {
-    		console.log("stories",results);
-    		callback(null,reportProjects,wipLimits,results)
-    	});
-
-    },
-
-    prepareChartData : function(reportProjects,wipLimits,stories,callback) {
+    readStories : function(callback) {
 
         var that = this;
 
-        var categories = _.map(reportProjects,function(p) { return p.get("Name"); });
+        var configs = _.map(that.reportProjects,function(project) {
+            return {
+                model : "HierarchicalRequirement",
+                filters : [that.workItemFilter],
+                fetch : ["ObjectID","ScheduleState","PlanEstimate","Project"],
+                context : {
+                    project: project.get("_ref"),
+                    projectScopeUp: false,
+                    projectScopeDown: true
+                }
+            }
+        });
 
-        var states = ["In-Progress","Completed"];
+        // read stories for each reporting project
+        async.map(configs,that._wsapiQuery,function(error,results) {
+            console.log("stories",results);
+            callback(null,results)
+        });
+    },
+
+    prepareChartData : function(stories,callback) {
+
+        var that = this;
+        var categories = _.map(that.reportProjects,function(p) { return p.get("Name"); });
+        var completedStates = ["Accepted",_.last(that.scheduleStates)];
 
         var pointsValue = function(value) {
             return !_.isUndefined(value) && !_.isNull(value) ? value : 0;
@@ -184,71 +146,87 @@ Ext.define('CustomApp', {
         var summarize = function( workItems, states ) {
             var stateTotal = _.reduce(  workItems, function(memo,workItem) {
                     return memo + ( _.indexOf(states,workItem.get("ScheduleState")) > -1 ? 
-                        	1 : 0);
+                            pointsValue(workItem.get("PlanEstimate")) : 0);
                 },0);
             return stateTotal;
         };
 
-        var wipForProjectAndState = function( project, state ) {
-            var wip = _.find( wipLimits, function( limit ) {
-                return limit.get("Name").indexOf(project.get("Name"))!==-1 &&
-                    limit.get("Name").indexOf(state)!==-1;
-            })
-            if (!_.isUndefined(wip) && !_.isNull(wip)) {
-                var val = wip.get("Value").replace(/"/g,"");
-                return parseInt(val);
-            } else {
-                return 0;
-            };
-        }
-
-        var seriesData = _.map( states, function( state ) {
-
-            var counts = _.map( categories, function( project, index ) {
-                return summarize( stories[index], [state]);
-            });
-            var wips = _.map( categories, function( project, index) {
-                return wipForProjectAndState( reportProjects[index], state);
-            });
-
-            console.log("counts",counts,"wips",wips);
-
-            return {
-                name : state,
-                data : _.map( categories, function( project, index) {
-                    return counts[index] - wips[index]
-                })
-            };
+        var data = _.map(categories,function(project,index){
+            return [ project, 
+                     summarize(stories[index],that.scheduleStates),
+                     summarize(stories[index],completedStates)
+                    ];
         });
+        var sortedData = data.sort(function(a,b) { return b[1] - a[1] })
+
+        var seriesData = [{
+            name : 'Project Scope',
+            data : sortedData,
+            completedData : _.map(sortedData,function(d) { return d[2];})
+        }];
 
         console.log("seriesData",seriesData);
 
         callback(null,categories,seriesData);
-
     },
 
     createChart : function(categories,seriesData,callback) {
 
         var that = this;
 
-        if (!_.isUndefined(that.chart)) {
-            that.remove(that.chart);
+        var chartConfig = {
+            colors : ["#3498db","#f1c40f","#c0392b","#9b59b6","#2ecc71"],
+             chart: {
+                type: 'pyramid',
+                marginRight : 100
+            },
+            title: {
+                text: 'Success Chart'
+            },
+            plotOptions: {
+                pyramid : {
+                    allowPointSelect : true
+                },
+                series: {
+                    dataLabels: {
+                        enabled: true,
+                        formatter : function() {
+                            console.log(this);
+                            var scope = this.point.y;
+                            var completed = this.point.series.options.completedData[this.point.index];
+                            var pct = Math.round( scope > 0 ? (completed/scope)*100 : 0);
+                            return " [" + completed + "/" + scope + "] ("+pct+"%) " + 
+                                _.last(this.point.name.split(">"));
+                        },
+                        softConnector: true,
+                        distance : 10
+                    }
+                }
+            },
+            legend : {
+                enabled : false
+            },
+            series: seriesData
         }
 
-        that.chart = Ext.create('Rally.technicalservices.wipChart', {
-            itemId: 'rally-chart',
-            chartData: { series : seriesData, categories : categories },
-            title: 'WIP Limits by Projecgt'
+        if (!_.isUndefined(that.x)) {
+            that.remove(that.x);
+        }
+
+        that.x = Ext.widget('container',{
+            autoShow: true ,shadow: false,title: "",resizable: false,margin: 10,
+            html: '<div id="chart-container" class="chart-container"></div>',
+            listeners: {
+                resize: function(panel) {
+                },
+                afterrender : function(panel) {
+                    $('#chart-container').highcharts(chartConfig);
+                }
+            }
         });
+        that.add(that.x);
 
-        that.add(that.chart);
 
-        var chart = this.down("#rally-chart");
-        var p = Ext.get(chart.id);
-        elems = p.query("div.x-mask");
-        _.each(elems, function(e) { e.remove(); });
-        var elems = p.query("div.x-mask-msg");
-        _.each(elems, function(e) { e.remove(); });
     },
 
     // create a filter based on a combination of release and/or iteration
@@ -283,7 +261,7 @@ Ext.define('CustomApp', {
     // generic function to perform a web services query    
     _wsapiQuery : function( config , callback ) {
 
-    	var storeConfig = {
+        var storeConfig = {
             autoLoad : true,
             limit : "Infinity",
             model : config.model,
@@ -298,7 +276,7 @@ Ext.define('CustomApp', {
         };
 
         if (!_.isUndefined(config.context)) {
-        	storeConfig["context"] = config.context;
+            storeConfig["context"] = config.context;
         }
         
         Ext.create('Rally.data.WsapiDataStore', storeConfig);

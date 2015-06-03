@@ -1,42 +1,35 @@
-Ext.define('Rally.technicalservices.wipChart',{
+Ext.define('Rally.technicalservices.pyrChart',{
     extend: 'Rally.ui.chart.Chart',
-    alias: 'widget.wipchart',
+    alias: 'widget.pyrchart',
 
     itemId: 'rally-chart',
     chartData: {},
     loadMask: false,
     chartColors : [],
+    initAnimAfterLoad: false,
     chartConfig: {
         colors : [/*"#E0E0E0",*/"#00a9e0","#8dc63f"],
         chart: {
-            type: 'bar'
+            type: 'pyramid',
+            marginRight : 100
         },
         title: {
-            text: 'WIP Limits Chart'
+            text: 'Success Chart'
         },
-        xAxis: {
-            // categories: categories,
-        },        
-        yAxis: [
-            {
-                title: {
-                    text: 'Under / Over WIP Limits'
-                }
-            }
-        ],
         plotOptions: {
             series: {
                 dataLabels: {
                     enabled: true,
-                    // align: 'right',
-                    // formatter : function() {
-                    //     return " [" + Math.round(this.point.y) + "] ";
-                    // },
-                    color: '#FFFFFF'
-                },
-                stacking: 'normal'
-            }        
+                    format: '<b>{point.name}</b> ({point.y:,.0f})',
+                    color:  'black',
+                    softConnector: true
+                }
+            }
+        },
+        legend : {
+            enabled : false
         }
+
     },
     constructor: function (config) {
         this.callParent(arguments);

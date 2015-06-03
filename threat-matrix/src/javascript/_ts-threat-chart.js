@@ -3,8 +3,9 @@ Ext.define('Rally.technicalservices.ThreatChart',{
     alias: 'widget.tsthreatchart',
 
     chartData: {},
-    loadMask: false,
+
     chartConfig: {
+        loadMask: false,
         chart: {
             type: 'scatter',
             zoom: 'xy'
@@ -12,7 +13,6 @@ Ext.define('Rally.technicalservices.ThreatChart',{
         title: {
             text: 'Threat Matrix'
         },
-        loadMask: false,
         legend: {
             enabled: false
         },
@@ -34,17 +34,23 @@ Ext.define('Rally.technicalservices.ThreatChart',{
         ],
         plotOptions: {
             series: {
-                type: "scatter",
-                tooltip: {
-                    pointFormat: ''
+                dataLabels: {
+                    formatter: function(){return this.series.name;},
+                    enabled: true,
+                    inside: true
                 }
             }
         }
-    },
+
+      },
     constructor: function (config) {
         this.callParent(arguments);
         if (config.title){
             this.chartConfig.title = config.title;
         }
+    },
+    onRender: function () {
+        this.callParent(arguments);
+        this.getEl().unmask();
     }
 });

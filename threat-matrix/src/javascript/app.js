@@ -11,11 +11,12 @@ Ext.define("threat-matrix", {
         defaultSettings: {
             minAgeThreshhold:  1,
             maxAgeThreshhold: 365,
-            minPointsThreshhold: 1
+            minPointsThreshhold: 1,
+            andMinThreshholds: true
         }
     },
     storyFetchFields: ['FormattedID','c_Risk','PlanEstimate','Project','ScheduleState','InProgressDate','Blocked','Blocker','CreationDate','Feature','Name','Predecessors'],
-    featureFetchFields: ['FormattedID','Project','ActualStartDate','ActualEndDate','LeafStoryPlanEstimateTotal', 'LeafStoryCount','Name', 'c_Risk','Predecessors'],
+    featureFetchFields: ['FormattedID','Project','ActualStartDate','ActualEndDate','LeafStoryPlanEstimateTotal', 'LeafStoryCount','Name', 'c_Risk'], //,'Predecessors'],
     portfolioItemFeature: 'PortfolioItem/Feature',
     projectFetchFields: ['Name','Parent','ObjectID'],
     riskField: 'c_Risk',
@@ -93,11 +94,10 @@ Ext.define("threat-matrix", {
             Deft.Promise.all(promises).then({
                 scope: this,
                 success: function(records){
-                    this.setLoading(false);
+
                     this.logger.log('_fetchData success', records);
 
                     var calc = Ext.create('Rally.technicalservices.ThreatCalculator',{
-                        ageGranularity: this.ageGranularity,
                         riskField: this.riskField,
                         currentProjectRef: this.getContext().getProjectRef(),
                         projects: records[2],
@@ -105,21 +105,71 @@ Ext.define("threat-matrix", {
                         maxAgeThreshhold: this.getSetting('maxAgeThreshhold'),
                         minPointsThreshhold: this.getSetting('minPointsThreshhold')
                     });
-                    var chartData = calc.runCalculation(records[0],records[1]);
-                    this.getBody().add({
-                        xtype: 'tsthreatchart',
-                        itemId: 'rally-chart',
-                        chartData: chartData,
-                        title: 'Threat Matrix'
+
+                    calc.runCalculation(records[0],records[1]).then({
+                        scope: this,
+                        success: function(chartData){
+                            this.setLoading(false);
+                            this.logger.log('runCalculation success series', chartData)
+
+                            this.getBody().add({
+                                xtype: 'tsthreatchart',
+                                itemId: 'rally-chart',
+                                loadMask: false,
+                                chartData: chartData,
+                                title: 'Threat Matrix'
+
+                            });
+                            this._addLegend(calc.getProjectColorMapping());
+
+                        },
+                        failure: function(operation){
+                            this.setLoading(false);
+                            this.logger.log('failure in runCalcuation');
+                        }
                     });
-                    this.logger.log('series', chartData)
-                },
+                    },
                 failure: function(operation){
                     this.setLoading(false);
                     this.logger.log('_fetchData failure', operation);
                 }
             });
         }
+    },
+    _addLegend: function(colorMap){
+        this.logger.log('_addLegend',colorMap);
+
+        if (this.down('#ct-legend')){
+            this.down('#ct-legend').destroy();
+        }
+        var ct_legend = this.add({
+            xtype: 'container',
+            itemId: 'ct-legend',
+            layout: {type: 'vbox'}
+        });
+        console.log('--');
+
+        var color_data = [];
+        _.each(colorMap, function(color, label){
+            console.log(color,label,'map');
+            color_data.push({color: color, label: label});
+        });
+        this.logger.log('_addLegend',color_data);
+        var ct = ct_legend.add({
+            xtype: 'container',
+            padding: 10,
+            tpl: '<div class="tslegendtext">Projects:  </div><tpl for="."><div class="tslegend" style="background-color:{color}">&nbsp;&nbsp;</div><div class="tslegendtext">&nbsp;&nbsp;{label}</div><span class="tslegendspacer">&nbsp;</span></tpl>'
+        });
+        ct.update(color_data);
+
+        var ct2 = ct_legend.add({
+            xtype: 'container',
+            padding: 10,
+            html: '<div class="tslegendtext">Types:  </div><div class="tslegend-square">&nbsp;&nbsp;</div><div class="tslegendtext">&nbsp;&nbsp;Feature</div><span class="tslegendspacer">&nbsp;</span>' +
+                '<div class="tslegend-circle">&nbsp;&nbsp;</div><div class="tslegendtext">&nbsp;&nbsp;User Story</div><span class="tslegendspacer">&nbsp;</span>'
+        });
+
+
     },
     _fetchData: function(modelType, fetchFields, filters){
         this.logger.log('_fetchData',modelType, fetchFields, filters);
@@ -240,7 +290,15 @@ Ext.define("threat-matrix", {
                 labelWidth: 200,
                 labelAlign: 'right',
                  minValue: 0
+            },{
+                name: 'andMinThreshholds',
+                xtype: 'rallycheckboxfield',
+                boxLabelAlign: 'after',
+                fieldLabel: '',
+                margin: '0 0 0 200',
+                boxLabel: 'Use <b>AND</b> query to exclude items by threshold.<br/><span style="color:#999999;"><i>If checked, exclude artifacts if their age <b>AND</b> points are below the minimum threshold.<br/> If unchecked, exclude artifacts if either age <b>OR</b> points are below the minimum threshold.</i></span>'
             }
+
         ];
     },
     isExternal: function(){

@@ -8,6 +8,8 @@ Ext.define('Rally.technicalservices.ThreatCalculator', {
         '#4572A7', '#AA4643', '#89A54E', '#80699B', '#3D96AE',
         '#DB843D', '#92A8CD', '#A47D7C', '#B5CA92'],
 
+    dependencyColors: ['#FF0000','#00FF00','#0000FF','#00FFFF', '#FFFF00','#FF00FF','#FF9966','#6600FF','#996633'],
+
     config: {
         riskField: undefined,
         currentProjectRef: undefined,
@@ -15,7 +17,7 @@ Ext.define('Rally.technicalservices.ThreatCalculator', {
         maxAgeThreshhold: undefined,
         minAgeThreshhold: undefined,
         minPointsThreshhold: undefined,
-        storySizeMultiplier: 1,
+        minSize: 3,
         andMinThreshholds: true
     },
     /**
@@ -23,7 +25,8 @@ Ext.define('Rally.technicalservices.ThreatCalculator', {
      * determine which items to show (vs. which to include in the calculations)
      */
     projectTree: {},
-
+    dependencyLineWidth: 2,
+    dependencyMap: {},
     defaultColor: '#C0C0C0',
     colorMap: {},
 
@@ -46,12 +49,15 @@ Ext.define('Rally.technicalservices.ThreatCalculator', {
         this.projectTree = this._getTreeArray(config.projects, config.currentProjectRef);
         this.colorMap = this._buildColorMap(this.projectTree);
     },
-
+    getProjectColorMapping: function(){
+        return this.colorMap;
+    },
     runCalculation: function(features, stories){
+        var deferred = Ext.create('Deft.Deferred');
 
         var featureStoryHash = {},
-            series = [],
-            promises = [];
+            promises = [],
+            dependencyMap = {};
 
         _.each(stories, function(s){
 
@@ -65,8 +71,8 @@ Ext.define('Rally.technicalservices.ThreatCalculator', {
                 featureStoryHash[s.get('Feature')._ref].push(s);
             }
             if (this._includeInChart(s)){
-                //promises.push(this._getPredecessors(artifact));
-                series.push(this._getSeries(s));
+                promises.push(this._getPredecessors(s));
+                //series.push(this._getSeries(s));
             }
         }, this);
 
@@ -87,50 +93,59 @@ Ext.define('Rally.technicalservices.ThreatCalculator', {
             } else {
                 f.set('density', 0);
             }
-            if (this._includeInChart(f)){
-                //promises.push(this._getPredecessors(artifact));
-                series.unshift(this._getSeries(f));
-            }
+            f.set('predecessorFids', []);
         }, this);
 
-        //Deft.Promise.all(promises).then({
-        //    scope: this,
-        //    success: function(){
-        //        var artifacts = stories.concat(features);
-        //        var series = (artifacts, function(a){
-        //            if (this._includeInChart(a)){
-        //                series.push(this._getSeries(a));
-        //            }
-        //        }, this);
-        //    },
-        //    failure: function(operation){
-        //
-        //    }
-        //});
-
-        return {series: series};
+        Deft.Promise.all(promises).then({
+            scope: this,
+            success: function(){
+                var artifacts = features.concat(stories);
+                this.logger.log('predecessors loaded', artifacts);
+                var series = [];
+                _.each(artifacts, function(a){
+                    if (this._includeInChart(a)){
+                        series.push(this._getSeries(a));
+                    }
+                }, this);
+                this.logger.log('predecessors loaded -- series', series);
+                deferred.resolve({series: series});
+            },
+            failure: function(operation){
+                deferred.reject(operation);
+            }
+        });
+        return deferred;
+        //return {series: series};
     },
     _getPredecessors: function(artifact){
+        this.logger.log('_getPredecessors', artifact.get('Predecessors'));
         var deferred = Ext.create('Deft.Deferred');
 
         if (artifact.get('Predecessors') && artifact.get('Predecessors').Count > 0 ){
-            var predStore = artifact.getCollection('Predecessors');
-            predStore.load({
+            artifact.getCollection('Predecessors').load({
                 scope: this,
-                fetch: ['ObjectID'],
+                fetch: ['FormattedID'],
                 callback: function(records, operation, success){
+                    this.logger.log('predecessor store loaded', artifact.get('FormattedID'), success, records, operation);
                     var predecessorOids = [];
                     if (success) {
                         _.each(records, function(r){
-                            predecessorOids.push(r.get('ObjectID'));
-                        });
-                        artifact.set('predecessorOids', predecessorOids);
+                            if (!_.has(this.dependencyMap, r.get('FormattedID'))){
+                                var color_index = _.keys(this.dependencyMap).length % this.dependencyColors.length;
+                                this.dependencyMap[r.get('FormattedID')] = this.dependencyColors[color_index];
+                            }
+                            predecessorOids.push(r.get('FormattedID'));
+                        }, this);
+                        artifact.set('predecessorFids', predecessorOids);
                         deferred.resolve();
                     } else {
                         deferred.resolve(operation);
                     }
                 }
             });
+        } else {
+            artifact.set('predecessorFids');
+            deferred.resolve();
         }
         return deferred;
     },
@@ -174,29 +189,103 @@ Ext.define('Rally.technicalservices.ThreatCalculator', {
         return colorMap;
     },
     _getSeries: function(artifact){
-        this.logger.log('id, size, age, density',artifact.get('FormattedID'),artifact.get('size'),artifact.get('age'), artifact.get('density'))
+        this.logger.log('id, size, age, density',artifact.get('FormattedID'),artifact.get('size'),artifact.get('age'), artifact.get('density'),artifact.get('predecessorFids'))
 
-        var pointName = Ext.String.format("{0}<br/>Project: {1}<br/>Size: {2}<br/>Age (days): {3}", artifact.get('FormattedID'),
+        var pointName = Ext.String.format("Project: {1}<br/>Size: {2}<br/>Age (days): {3}", artifact.get('FormattedID'),
                             artifact.get('Project').Name,
                             artifact.get('size'), artifact.get('age').toFixed(1)),
-            color = this._getColor(artifact);
+            color = this._getColor(artifact),
+            hasDependency = artifact.get('predecessorFids') ? (artifact.get('predecessorFids').length > 0) : false,
+            isDependencyColor = '#FFFFFF',
+            isDependencyWidth = 0,
+            dependencies = [];
+
+        var label = '';
+        if (hasDependency){
+            pointName = Ext.String.format('{0}<br/>Dependencies [{1}]',pointName, artifact.get('predecessorFids').join(','));
+            _.each(artifact.get('predecessorFids'), function(p){
+                dependencies.push(p);
+                label += Ext.String.format('<span style="color:{0}">\u25CF</span>',this.dependencyMap[p]);
+            }, this);
+//            isDependencyColor = this.dependencyMap[artifact.get('predecessorFids')[0]];
+//            isDependencyWidth = this.dependencyLineWidth;
+        }
+        if (_.has(this.dependencyMap, artifact.get('FormattedID'))){
+            isDependencyColor = this.dependencyMap[artifact.get('FormattedID')] || '#FFFFFF';
+            isDependencyWidth = this.dependencyLineWidth;
+        }
+
 
         return {
             marker: {
                 radius: this._getRadius(artifact),
                 symbol: this._getSymbol(artifact),
-                fillColor: color
+                fillColor: color,
+                lineColor: isDependencyColor,
+                lineWidth: isDependencyWidth
             },
             color: color,
-            name: pointName,
-            project: artifact.get('Project').Name,
-            data: [[artifact.get('age'),artifact.get('density')]],
-            showInLegend: false
+            name: artifact.get('FormattedID'), //pointName,
+            tooltip: { pointFormat: pointName},
+
+            data: [{
+                x: artifact.get('age'),
+                y: artifact.get('density'),
+                dependencies: dependencies
+            }],
+                //[artifact.get('age'),artifact.get('density')]],
+            showInLegend: false,
+
+            point: {
+                events: {
+                    click: function () {
+                        console.log('this', this, this.series, this.plotX, this.plotY, this.series.chart.renderer);
+                        if (!this.clicked){
+                            this.clicked = true;
+                        } else {
+                            this.clicked = false;
+                        }
+                        //this.series.chart.get('S74').select(true);
+                        var thisX = this.series.points[0].plotX,
+                            thisY = this.series.points[0].plotY,
+                            thisName = this.series.name;
+                        var paths = [], fudgeX = 70, fudgeY = 10;
+                        _.each(this.series.chart.series, function(s){
+                            console.log('s', s.data[0].dependencies, thisName);
+                            if (Ext.Array.contains(s.data[0].dependencies, thisName)){
+                                paths.push(['M', thisX + fudgeX, thisY , 'L', s.points[0].plotX + fudgeX, s.points[0].plotY + fudgeY]);
+                            }
+                        });
+
+                        console.log(paths);
+                        var ren = this.series.chart.renderer;
+                        if (this.clicked == true ){
+                            this.paths = [];
+                        _.each(paths, function(p){
+                            console.log(p);
+                            this.paths.push(ren.path(p)
+                                .attr({
+                                    'stroke-width': 2,
+                                    stroke: isDependencyColor
+                                })
+                                .add()
+                            );
+                        },this);
+                        }
+                        else {
+                            _.each(this.paths, function(p) {
+                                p.element.remove();
+                            });
+                            }
+
+
+                    }
+                }
+            }
         };
     },
     _getRadius: function(artifact){
-        var sizeMultiplier = this.sizeMultiplierMap[artifact.get('_type')] || 1;
-        return artifact.get('size') * sizeMultiplier;
+        return Math.max(artifact.get('size') || 0, this.minSize);
     },
     _getColor: function(artifact){
         var hexColor = this.colorMap[artifact.get('Project')._ref] || this.defaultColor;

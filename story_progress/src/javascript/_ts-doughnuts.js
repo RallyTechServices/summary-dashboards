@@ -40,7 +40,21 @@
          * @cfg {String}
          * The title to put on the chart
          */
-        title: ''
+        title: '',
+        /**
+         * @cfg {Number}
+         * Colors to be applied in order (must be HSLA)
+         * We'll take them and put them into the first part of:
+         * 'hsla(235,100%,75%,1)'
+         * where 25 is the color, 100% is the saturation, 75% is the lightness (100% is white), 1 is the opacity
+         * 
+         * NICE SITE: http://hslpicker.com/
+         * 
+         */
+        colors: [235, 20, 126, 180, 50, 84 ]
+        /**
+         * 
+         */
         
     },
     
@@ -56,7 +70,6 @@
     },
     
     calculateSlices: function() {
-        console.log(this.inside_records, this.outside_records);
         var inside_series_data = [];
         var inside_series_by_id = {};
         
@@ -65,18 +78,20 @@
         // make an array of hash items for the stories
         // and a tracking array so we can see if there
         // are tasks that have a story not in the list
-        Ext.Array.each(this.inside_records, function(record) {
+        Ext.Array.each(this.inside_records, function(record,idx) {
+            var color_index = this._getColorIndex(idx);
+            
             var data_point = {
                 name: record.get('FormattedID'),
                 y: record.get(this.inside_size_field),
-                color: 'blue'
+                color: 'hsla(' + this.colors[color_index] + ',100%,40%,1)',
+                idx: color_index
             };
             
                                 
             if ( record.get('Blocked') ) {
                 data_point.color = 'red';
             }
-                    
                     
             inside_series_by_id[record.get('FormattedID')] = Ext.clone(data_point);
             inside_series_data.push(data_point);
@@ -94,16 +109,6 @@
                 var parent_id = parent.FormattedID;
                 var parent_size = parent[this.inside_size_field];
                 
-//                if ( ! Ext.Array.contains(Ext.Object.getKeys(inside_series_by_id), parent_id) ) {
-//                    var stub_parent = {
-//                        name:parent_id,
-//                        y: parent_size,
-//                        color: 'blue'
-//                    };
-//                    inside_series_by_id[parent_id] = stub_parent;
-//                    inside_data_items.push(stub_parent);
-//                }
-                
                 var parent_data = inside_series_by_id[parent_id];
                 if ( parent_data ) {
                     if ( ! parent_data.children ) { parent_data.children = []; }
@@ -116,6 +121,7 @@
         Ext.Object.each(inside_series_by_id, function(id,inside_item){            
             var children = inside_item.children || [];
             var parent_size = inside_item.y || 0;
+            var parent_index = inside_item.idx || 0;
             
             if ( parent_size > 0 ) {
                 var child_total = 0;
@@ -134,8 +140,19 @@
                     var data_point = { 
                         name: child.get("FormattedID"),
                         y:size,
-                        color: 'blue'
+                        color: 'hsla(' + this.colors[parent_index] + ',100%,40%,1)'
                     };
+                    
+                    var inner_state_lightness = {
+                        "Defined": "40%",
+                        "In-Progress": "60%",
+                        "Completed": "80%"
+                    };
+                    
+                    var state = child.get('State');
+                    if ( state ) {
+                        data_point.color = 'hsla(' + this.colors[parent_index] + ',100%,' + inner_state_lightness[state] + ',1)';
+                    }
                     
                     if ( child.get('Blocked') ) {
                         data_point.color = 'red';
@@ -154,19 +171,24 @@
             }
             
         },this);
-        
-        console.log(inside_series_by_id);
-        
+                
         return [inside_series_data, outside_series_data];
     },
     
+    _getColorIndex: function(idx) {
+        if ( idx < this.colors.length ) {
+            return idx;
+        }
+        return idx % this.colors.length;
+     },
+     
     _buildItems: function(series_data) {
         var items = [];
         
         var series = [{
             name: 'Stories',
             data: series_data[0],
-            size: '60%',
+            size: '65%',
             dataLabels: {
 //                formatter: function () {
 //                    return this.y > 5 ? this.point.name : null;
@@ -179,10 +201,10 @@
             name: 'Tasks',
             data: series_data[1],
             size: '80%',
-            innerSize: '60%',
+            innerSize: '65%',
             dataLabels: {
+                distance: 5,
                 formatter: function () {
-                    console.log('point name', this.point.name);
                     return this.point.name !== 'none' ? this.point.name : null;
                 }
             }

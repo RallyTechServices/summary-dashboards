@@ -16,10 +16,10 @@ Ext.define("TSStoryProgressPie", {
         team_story_filters.push({property:'ScheduleState',value:'In-Progress'});
 
         var team_task_filters = Ext.Array.push([],base_filter);
-
+        var task_fields = ['Estimate','FormattedID','WorkProduct','PlanEstimate','Blocked','State'];
         Deft.Chain.sequence([
             function() { return me._loadAStoreWithAPromise('UserStory', ['PlanEstimate','FormattedID','Blocked'], team_story_filters); },
-            function() { return me._loadAStoreWithAPromise('Task', ['Estimate','FormattedID','WorkProduct','PlanEstimate','Blocked'], team_task_filters); }
+            function() { return me._loadAStoreWithAPromise('Task', task_fields, team_task_filters); }
             
         ]).then({
             scope: this,
@@ -64,6 +64,7 @@ Ext.define("TSStoryProgressPie", {
         container.removeAll();
         container.add({
             xtype: 'tsdoughnut',
+            title: 'Team',
             inside_records: inside_records,
             inside_size_field: 'PlanEstimate',
             outside_records: outside_records,

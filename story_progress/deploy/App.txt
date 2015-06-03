@@ -3,11 +3,11 @@
 <head>
     <title>Story Progress Pie</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Tue Jun 02 2015 16:13:59 GMT-0700 (PDT) -->
+    <!--  Build Date: Wed Jun 03 2015 11:08:10 GMT-0700 (PDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Tue Jun 02 2015 16:13:59 GMT-0700 (PDT)";
-        var CHECKSUM = 2152779431;
+        var APP_BUILD_DATE = "Wed Jun 03 2015 11:08:10 GMT-0700 (PDT)";
+        var CHECKSUM = 4134010132;
     </script>
     
     <script type="text/javascript" src="/apps/2.0rc3/sdk.js"></script>
@@ -175,7 +175,26 @@ Ext.define('Rally.technicalservices.Logger',{
          * @cfg {String} 
          * Field on the outside records links to the inside record
          */
-        record_link_field: 'WorkProduct'
+        record_link_field: 'WorkProduct',
+        /**
+         * @cfg {String}
+         * The title to put on the chart
+         */
+        title: '',
+        /**
+         * @cfg {Number}
+         * Colors to be applied in order (must be HSLA)
+         * We'll take them and put them into the first part of:
+         * 'hsla(235,100%,75%,1)'
+         * where 25 is the color, 100% is the saturation, 75% is the lightness (100% is white), 1 is the opacity
+         * 
+         * NICE SITE: http://hslpicker.com/
+         * 
+         */
+        colors: [235, 20, 126, 180, 50, 84 ]
+        /**
+         * 
+         */
         
     },
     
@@ -185,69 +204,171 @@ Ext.define('Rally.technicalservices.Logger',{
     },
 
     initComponent: function() {
-        this.data = this._calculateSlices();
-        //this.items = this._buildItems();
+        this.data = this.calculateSlices();
+        this.items = this._buildItems(this.data);
         this.callParent(arguments);
     },
     
     calculateSlices: function() {
-        return [];
+        var inside_series_data = [];
+        var inside_series_by_id = {};
+        
+        var outside_series_data = [];
+        
+        // make an array of hash items for the stories
+        // and a tracking array so we can see if there
+        // are tasks that have a story not in the list
+        Ext.Array.each(this.inside_records, function(record,idx) {
+            var color_index = this._getColorIndex(idx);
+            
+            var data_point = {
+                name: record.get('FormattedID'),
+                y: record.get(this.inside_size_field),
+                color: 'hsla(' + this.colors[color_index] + ',100%,40%,1)',
+                idx: color_index
+            };
+            
+                                
+            if ( record.get('Blocked') ) {
+                data_point.color = 'red';
+            }
+                    
+            inside_series_by_id[record.get('FormattedID')] = Ext.clone(data_point);
+            inside_series_data.push(data_point);
+        },this);
+        
+        // find any outer rings that have a parent not in the
+        // inner list already.  Along the way, add the 
+        // child to an array on the parent so we can use it
+        // later to find the percentage.
+        Ext.Array.each(this.outside_records, function(record) {
+            var parent = record.get(this.record_link_field);
+            if ( !parent ) {
+                console.log("No parent for ", record.get('FormattedID'));
+            } else {
+                var parent_id = parent.FormattedID;
+                var parent_size = parent[this.inside_size_field];
+                
+                var parent_data = inside_series_by_id[parent_id];
+                if ( parent_data ) {
+                    if ( ! parent_data.children ) { parent_data.children = []; }
+                    parent_data.children.push(record);
+                }
+            }
+        },this);
+        
+        // make child data series
+        Ext.Object.each(inside_series_by_id, function(id,inside_item){            
+            var children = inside_item.children || [];
+            var parent_size = inside_item.y || 0;
+            var parent_index = inside_item.idx || 0;
+            
+            if ( parent_size > 0 ) {
+                var child_total = 0;
+                Ext.Array.each(children,function(child){
+                    var size = child.get(this.outside_size_field) || 0;
+                    child_total += size;
+                },this);
+                
+                Ext.Array.each(children, function(child) {
+                    
+                    var size = child.get(this.outside_size_field) || 0;
+                    if ( child_total > 0 ) {
+                        size =  ( size / child_total ) * parent_size;
+                    }
+
+                    var data_point = { 
+                        name: child.get("FormattedID"),
+                        y:size,
+                        color: 'hsla(' + this.colors[parent_index] + ',100%,40%,1)'
+                    };
+                    
+                    var inner_state_lightness = {
+                        "Defined": "40%",
+                        "In-Progress": "60%",
+                        "Completed": "80%"
+                    };
+                    
+                    var state = child.get('State');
+                    if ( state ) {
+                        data_point.color = 'hsla(' + this.colors[parent_index] + ',100%,' + inner_state_lightness[state] + ',1)';
+                    }
+                    
+                    if ( child.get('Blocked') ) {
+                        data_point.color = 'red';
+                    }
+                    
+                    outside_series_data.push(data_point);
+                },this);
+                
+                if ( ! children || children.length == 0 ) {
+                    outside_series_data.push({ 
+                        name: 'none',
+                        y:parent_size,
+                        color: 'white'
+                    });
+                }
+            }
+            
+        },this);
+                
+        return [inside_series_data, outside_series_data];
     },
     
-    _buildItems: function() {
+    _getColorIndex: function(idx) {
+        if ( idx < this.colors.length ) {
+            return idx;
+        }
+        return idx % this.colors.length;
+     },
+     
+    _buildItems: function(series_data) {
         var items = [];
         
-        items.push({ 
-            xtype: 'container', 
-            itemId:'days',
-            cellCls: 'clock-counter',
-            tpl: '{days:leftPad(3,"0")}'
-        });
-        
-        items.push({ 
-            xtype: 'container', 
-            itemId:'hours',
-            cellCls: 'clock-counter',
-            tpl: '{hours:leftPad(2,"0")}'
-        });
-        
-        items.push({ 
-            xtype: 'container', 
-            itemId:'minutes',
-            cellCls: 'clock-counter',
-            tpl: '{minutes:leftPad(2,"0")}'
-        });
-        
-        items.push( { 
-            xtype: 'container', 
-            itemId:'seconds',
-            cellCls: 'clock-counter',
-            tpl: '{seconds:leftPad(2,"0")}'
-        });
+        var series = [{
+            name: 'Stories',
+            data: series_data[0],
+            size: '65%',
+            dataLabels: {
+//                formatter: function () {
+//                    return this.y > 5 ? this.point.name : null;
+//                },
+                color: 'white',
+                distance: -30
+            }
+        },
+        {
+            name: 'Tasks',
+            data: series_data[1],
+            size: '80%',
+            innerSize: '65%',
+            dataLabels: {
+                distance: 5,
+                formatter: function () {
+                    return this.point.name !== 'none' ? this.point.name : null;
+                }
+            }
+        }];
         
         items.push({
-            xtype: 'container',
-            cellCls: 'clock-label',
-            html: 'DAYS'
-        });
-        
-        items.push({
-            xtype: 'container',
-            cellCls: 'clock-label',
-            html: 'HOURS'
-        });
-        
-        items.push({
-            xtype: 'container',
-            cellCls: 'clock-label',
-            html: 'MINUTES'
-        });
-       
-        
-        items.push({
-            xtype: 'container',
-            cellCls: 'clock-label',
-            html: 'SECONDS'
+            xtype:'rallychart',
+            chartData: {
+                series: series
+            },
+            chartConfig: {
+                chart: { type: 'pie' },
+                title: {
+                    text: this.title,
+                    align: 'center'
+                },
+               
+                plotOptions: {
+                    pie: {
+                        shadow: false,
+                        center: ['50%', '50%']
+                    }
+                }
+            }
         });
 
         
@@ -266,11 +387,16 @@ Ext.define("TSStoryProgressPie", {
     launch: function() {
         var me = this;
         
-        var team_filters = [{property:'ObjectID',operator:'>',value:0}];
+        var base_filter = [{property:'ObjectID',operator:'>',value:0}];
+        
+        var team_story_filters = Ext.Array.push([],base_filter);
+        team_story_filters.push({property:'ScheduleState',value:'In-Progress'});
 
+        var team_task_filters = Ext.Array.push([],base_filter);
+        var task_fields = ['Estimate','FormattedID','WorkProduct','PlanEstimate','Blocked','State'];
         Deft.Chain.sequence([
-            function() { return me._loadAStoreWithAPromise('UserStory', ['PlanEstimate','FormattedID'], team_filters); },
-            function() { return me._loadAStoreWithAPromise('Task', ['Estimate','FormattedID','WorkProduct','PlanEstimate'], team_filters); }
+            function() { return me._loadAStoreWithAPromise('UserStory', ['PlanEstimate','FormattedID','Blocked'], team_story_filters); },
+            function() { return me._loadAStoreWithAPromise('Task', task_fields, team_task_filters); }
             
         ]).then({
             scope: this,
@@ -315,6 +441,7 @@ Ext.define("TSStoryProgressPie", {
         container.removeAll();
         container.add({
             xtype: 'tsdoughnut',
+            title: 'Team',
             inside_records: inside_records,
             inside_size_field: 'PlanEstimate',
             outside_records: outside_records,

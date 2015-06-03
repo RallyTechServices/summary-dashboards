@@ -4,7 +4,7 @@
    "server": "https://10.32.16.145",
    "sdk": "2.0rc2",
    "javascript": [
-      "http://code.jquery.com/jquery-2.1.4.min.js",
+      "https://code.jquery.com/jquery-2.1.4.min.js",
       "src/javascript/App.js",
       "src/javascript/_pyr-chart.js",
       "https://cdnjs.cloudflare.com/ajax/libs/async/1.22/async.min.js",

@@ -106,17 +106,17 @@ Ext.define('CustomApp', {
             }));
         }
 
-        callback(null,that.reportProjects);
+        callback(null);
     },
 
 
     // project-wip:IA-Program > IM FT Client outcomes > CAP DELIVERY 2 Scrum Team:DefinedWIP
     // "project-wip:IA-Program > Big Data Analytics & Shared Services > BDASS:CompletedWIP"
-    readWipValues : function(reportProjects,callback) {
+    readWipValues : function(callback) {
 
     	var that = this;
 
-		var projectKeys = _.map( reportProjects, function(p) { return p.get("Name"); });
+		var projectKeys = _.map( that.reportProjects, function(p) { return p.get("Name"); });
 
 		var states = ["In-Progress","Completed"];
 
@@ -139,16 +139,16 @@ Ext.define('CustomApp', {
 			console.log("prefernece results",_.flatten(results));
 			that.wipLimits = _.flatten(results);
 			// callback(null,_.flatten(results));
-			callback(null,reportProjects,that.wipLimits);
+			callback(null);
 		});
 
     },
 
-    readStories : function(reportProjects, wipLimits, callback) {
+    readStories : function(callback) {
 
     	var that = this;
 
-    	var configs = _.map(reportProjects,function(project) {
+    	var configs = _.map(that.reportProjects,function(project) {
     		return {
     			model : "HierarchicalRequirement",
     			filters : [that.workItemFilter],
@@ -164,16 +164,16 @@ Ext.define('CustomApp', {
     	// read stories for each reporting project
     	async.map(configs,that._wsapiQuery,function(error,results) {
     		console.log("stories",results);
-    		callback(null,reportProjects,wipLimits,results)
+    		callback(null,results)
     	});
 
     },
 
-    prepareChartData : function(reportProjects,wipLimits,stories,callback) {
+    prepareChartData : function(stories,callback) {
 
         var that = this;
 
-        var categories = _.map(reportProjects,function(p) { return p.get("Name"); });
+        var categories = _.map(that.reportProjects,function(p) { return p.get("Name"); });
 
         var states = ["In-Progress","Completed"];
 
@@ -191,7 +191,7 @@ Ext.define('CustomApp', {
         };
 
         var wipForProjectAndState = function( project, state ) {
-            var wip = _.find( wipLimits, function( limit ) {
+            var wip = _.find( that.wipLimits, function( limit ) {
                 return limit.get("Name").indexOf(project.get("Name"))!==-1 &&
                     limit.get("Name").indexOf(state)!==-1;
             })
@@ -209,7 +209,7 @@ Ext.define('CustomApp', {
                 return summarize( stories[index], [state]);
             });
             var wips = _.map( categories, function( project, index) {
-                return wipForProjectAndState( reportProjects[index], state);
+                return wipForProjectAndState( that.reportProjects[index], state);
             });
 
             console.log("counts",counts,"wips",wips);

@@ -20,7 +20,7 @@ Ext.define('Rally.technicalservices.wipChart',{
         yAxis: [
             {
                 title: {
-                    text: '% of Scheduled Stories by State'
+                    text: 'Under / Over WIP Limits'
                 }
             }
         ],

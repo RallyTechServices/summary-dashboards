@@ -1,9 +1,9 @@
 Ext.define('Rally.technicalservices.CountDownClock',{
     extend: 'Ext.Container',
     alias: 'widget.tscountdown',
-    layout: { type: 'hbox' },
+    layout: { type: 'table', columns: 4 },
     padding: 5,
-    defaults: { margin: 10 },
+    defaults: { margin: '0 7 0 7' },
     
     config: {
         /**
@@ -26,12 +26,11 @@ Ext.define('Rally.technicalservices.CountDownClock',{
     initComponent: function() {
         this.items = this._buildItems();
         this.callParent(arguments);
-        this.setLoading('...');
 
         this.currentDate = new Date();
         this.on('render', this._addClickEvent, this);
         
-        Ext.TaskManager.start({ run: this.updateCounters, interval: 1000, scope: this } );
+        Ext.TaskManager.start({ run: this.updateCounters, interval: 750, scope: this } );
     },
     
     _addClickEvent: function() {
@@ -40,13 +39,13 @@ Ext.define('Rally.technicalservices.CountDownClock',{
     
     _showDescriptionDialog: function() {
         Ext.create('Rally.ui.dialog.Dialog',{
-            title: '',
+            title: 'Source',
             autoShow: true,
             draggable: true,
             width: this.width,
             height: this.height,
             closable: true,
-            items: [{xtype:'container', html: this.text}]
+            items: [{xtype:'container', html: this.text, padding: 15}]
         });
     },
     
@@ -93,68 +92,57 @@ Ext.define('Rally.technicalservices.CountDownClock',{
     _buildItems: function() {
         var items = [];
         
-        items.push({
-            xtype:'container',
-            layout: { type:'vbox' },
-            items: [
-                { 
-                    xtype: 'container', 
-                    itemId:'days',
-                    tpl: '{days:leftPad(3,"0")}'
-                },
-                {
-                    xtype: 'container',
-                    html: 'DAYS'
-                }
-            ]
+        items.push({ 
+            xtype: 'container', 
+            itemId:'days',
+            cellCls: 'clock-counter',
+            tpl: '{days:leftPad(3,"0")}'
+        });
+        
+        items.push({ 
+            xtype: 'container', 
+            itemId:'hours',
+            cellCls: 'clock-counter',
+            tpl: '{hours:leftPad(2,"0")}'
+        });
+        
+        items.push({ 
+            xtype: 'container', 
+            itemId:'minutes',
+            cellCls: 'clock-counter',
+            tpl: '{minutes:leftPad(2,"0")}'
+        });
+        
+        items.push( { 
+            xtype: 'container', 
+            itemId:'seconds',
+            cellCls: 'clock-counter',
+            tpl: '{seconds:leftPad(2,"0")}'
         });
         
         items.push({
-            xtype:'container',
-            layout: { type:'vbox' },
-            items: [
-                { 
-                    xtype: 'container', 
-                    itemId:'hours',
-                    tpl: '{hours:leftPad(2,"0")}'
-                },
-                {
-                    xtype: 'container',
-                    html: 'HOURS'
-                }
-            ]
+            xtype: 'container',
+            cellCls: 'clock-label',
+            html: 'DAYS'
         });
         
         items.push({
-            xtype:'container',
-            layout: { type:'vbox' },
-            items: [
-                { 
-                    xtype: 'container', 
-                    itemId:'minutes',
-                    tpl: '{minutes:leftPad(2,"0")}'
-                },
-                {
-                    xtype: 'container',
-                    html: 'MINUTES'
-                }
-            ]
+            xtype: 'container',
+            cellCls: 'clock-label',
+            html: 'HOURS'
         });
         
         items.push({
-            xtype:'container',
-            layout: { type:'vbox' },
-            items: [
-                { 
-                    xtype: 'container', 
-                    itemId:'seconds',
-                    tpl: '{seconds:leftPad(2,"0")}'
-                },
-                {
-                    xtype: 'container',
-                    html: 'SECONDS'
-                }
-            ]
+            xtype: 'container',
+            cellCls: 'clock-label',
+            html: 'MINUTES'
+        });
+       
+        
+        items.push({
+            xtype: 'container',
+            cellCls: 'clock-label',
+            html: 'SECONDS'
         });
 
         

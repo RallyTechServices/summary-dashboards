@@ -1,16 +1,16 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Countdown</title>
+    <title>Story Progress Pie</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Tue Jun 02 2015 14:19:28 GMT-0700 (PDT) -->
+    <!--  Build Date: Tue Jun 02 2015 16:13:59 GMT-0700 (PDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Tue Jun 02 2015 14:19:28 GMT-0700 (PDT)";
-        var CHECKSUM = 3098129549;
+        var APP_BUILD_DATE = "Tue Jun 02 2015 16:13:59 GMT-0700 (PDT)";
+        var CHECKSUM = 2152779431;
     </script>
     
-    <script type="text/javascript" src="/apps/2.0rc2/sdk.js"></script>
+    <script type="text/javascript" src="/apps/2.0rc3/sdk.js"></script>
 
     <script type="text/javascript">
         Rally.onReady(function() {
@@ -138,24 +138,45 @@ Ext.define('Rally.technicalservices.Logger',{
 
 });
 
-Ext.define('Rally.technicalservices.CountDownClock',{
+/*
+ * For pie inside of pie --
+ * 
+ * Give an array of records for the inside ring and an array for the outside,
+ * they should have a link via some field in the outer_ring record (e.g., Parent or WorkProduct
+ * 
+ * 
+ */Ext.define('Rally.technicalservices.DoughnutPie',{
     extend: 'Ext.Container',
-    alias: 'widget.tscountdown',
-    layout: { type: 'table', columns: 4 },
+    alias: 'widget.tsdoughnut',
     padding: 5,
-    defaults: { margin: '0 7 0 7' },
     
     config: {
         /**
-         * @cfg {Date} 
-         * The end date (and time) for the counter to count down to
+         * @cfg [{Ext.data.Model}] 
+         * Records that will each have a slice of the inside pie
          */
-        endDate: new Date(),
+        inside_records: [],
         /**
-         * @cfg {String}
-         * A message to show on click of the whole thing
+         * @cfg {String} 
+         * Field on the inside records that holds the size of the slice
          */
-        text: ''
+        inside_size_field: 'PlanEstimate',
+        /**
+         * @cfg [{Ext.data.Model}] 
+         * Records that will each have a slice of the outside pie
+         */
+        outside_records: [],
+        /**
+         * @cfg {String} 
+         * Field on the outside records that holds the size of the slice
+         */
+        outside_size_field: 'Estimate',
+        /**
+         * @cfg {String} 
+         * Field on the outside records links to the inside record
+         */
+        record_link_field: 'WorkProduct'
+        
     },
     
     constructor: function(config) {
@@ -164,69 +185,13 @@ Ext.define('Rally.technicalservices.CountDownClock',{
     },
 
     initComponent: function() {
-        this.items = this._buildItems();
+        this.data = this._calculateSlices();
+        //this.items = this._buildItems();
         this.callParent(arguments);
-
-        this.currentDate = new Date();
-        this.on('render', this._addClickEvent, this);
-        
-        Ext.TaskManager.start({ run: this.updateCounters, interval: 750, scope: this } );
     },
     
-    _addClickEvent: function() {
-        this.mon(this.getEl(), 'click', this._showDescriptionDialog, this);
-    },
-    
-    _showDescriptionDialog: function() {
-        Ext.create('Rally.ui.dialog.Dialog',{
-            title: 'Source',
-            autoShow: true,
-            draggable: true,
-            width: this.width,
-            height: this.height,
-            closable: true,
-            items: [{xtype:'container', html: this.text, padding: 15}]
-        });
-    },
-    
-    setEndDate: function(end_date) {
-        this.endDate = end_date;
-        this.updateCounters();
-    },
-    
-    updateCounters: function() {
-        var end_date = this.endDate;
-        current_date = new Date();
-        var diff = this.calculateDifferences(end_date, current_date);
-        this.down('#days').update(diff);
-        this.down('#hours').update(diff);
-        this.down('#minutes').update(diff);
-        this.down('#seconds').update(diff);
-    },
-    
-    // return a hash { days: 12, 
-    calculateDifferences: function(end_date, current_date){
-        var diff = {
-            days: this._getDifferenceAboveZero(end_date, current_date, 'day'),
-            hours: this._getDifferenceAboveZero(end_date,current_date, 'hour'),
-            minutes: this._getDifferenceAboveZero(end_date,current_date, 'minute'),
-            seconds: this._getDifferenceAboveZero(end_date,current_date, 'second')
-        }
-
-        return diff;
-    },
-    
-    _getDifferenceAboveZero: function(end_date,current_date,metric) {
-        var diff = Rally.util.DateTime.getDifference(end_date,current_date, metric);
-        diff > 0 ? diff = diff : diff = 0;
-        
-        metric_tops = { 'hour': 24, 'minute': 60, 'second': 60 };
-        
-        if ( metric_tops[metric] ) {
-            diff = diff % metric_tops[metric];
-        }
-
-        return diff;
+    calculateSlices: function() {
+        return [];
     },
     
     _buildItems: function() {
@@ -289,46 +254,31 @@ Ext.define('Rally.technicalservices.CountDownClock',{
         return items;
     }
 });
-Ext.define("TSCountdown", {
+Ext.define("TSStoryProgressPie", {
     extend: 'Rally.app.App',
     componentCls: 'app',
     logger: new Rally.technicalservices.Logger(),
     defaults: { margin: 10 },
     items: [
-        {xtype:'tscountdown',itemId:'release_counter',cls:'border-bottom'},
-        {xtype:'tscountdown',itemId:'iteration_counter'},
+        {xtype:'container',itemId:'display_box'},
         {xtype:'tsinfolink'}
     ],
     launch: function() {
         var me = this;
-        var today = Rally.util.DateTime.toIsoString(new Date());
         
-        var iteration_filters = [
-            {property:'StartDate',operator:'<',value: today},
-            {property:'EndDate',  operator:'>',value: today}
-        ];
-        
-        var release_filters = [
-            {property:'ReleaseStartDate',operator:'<',value: today},
-            {property:'ReleaseDate',  operator:'>',value: today}
-        ];
-        
+        var team_filters = [{property:'ObjectID',operator:'>',value:0}];
+
         Deft.Chain.sequence([
-            function() { return me._loadAStoreWithAPromise('Iteration', ['StartDate','EndDate','Name'], iteration_filters); },
-            function() { return me._loadAStoreWithAPromise('Release', ['ReleaseStartDate','ReleaseDate','Name'], release_filters); }
+            function() { return me._loadAStoreWithAPromise('UserStory', ['PlanEstimate','FormattedID'], team_filters); },
+            function() { return me._loadAStoreWithAPromise('Task', ['Estimate','FormattedID','WorkProduct','PlanEstimate'], team_filters); }
+            
         ]).then({
             scope: this,
             success: function(results) {
-                var iteration = results[0][0];
-                var release = results[1][0];
+                var stories = results[0];
+                var tasks = results[1];
                 
-                this.logger.log("iteration,release", iteration, release);
-                
-                this.down('#release_counter').setEndDate( release.get('ReleaseDate') );
-                this.down('#release_counter').text = release.get('Name') + ": " + release.get('ReleaseDate');
-                
-                this.down('#iteration_counter').setEndDate( iteration.get('EndDate') );
-                this.down('#iteration_counter').text = iteration.get('Name') + ": " + iteration.get('EndDate');
+                this._makePie(stories,tasks);
             },
             failure: function(error_message){
                 alert(error_message);
@@ -336,9 +286,8 @@ Ext.define("TSCountdown", {
         }).always(function() {
             me.setLoading(false);
         });
-
     },
-    _loadAStoreWithAPromise: function(model_name, model_fields, filters){
+    _loadAStoreWithAPromise: function(model_name, model_fields,filters){
         var deferred = Ext.create('Deft.Deferred');
         var me = this;
         this.logger.log("Starting load:",model_name,model_fields);
@@ -358,19 +307,33 @@ Ext.define("TSCountdown", {
             }
         });
         return deferred.promise;
+    },
+
+    _makePie: function(inside_records,outside_records){
+        var container =  this.down('#display_box');
+        
+        container.removeAll();
+        container.add({
+            xtype: 'tsdoughnut',
+            inside_records: inside_records,
+            inside_size_field: 'PlanEstimate',
+            outside_records: outside_records,
+            outside_size_field: 'Estimate'
+        });
     }
 });
 
             
-               Rally.launchApp('TSCountdown', {
-                   name: 'Countdown'
+               Rally.launchApp('TSStoryProgressPie', {
+                   name: 'Story Progress Pie'
                });
         });
     </script>
     
     <style type="text/css">
 
-
+.app {
+}
 .tsinfolink {
     position:absolute;
     right:0px;
@@ -385,20 +348,6 @@ Ext.define("TSCountdown", {
     margin-top: 25px;
     margin-right: 5px;
     cursor: pointer;
-}
-
-.clock-counter {
-    text-align: center;
-    font: bold 48px "Lucida Console", Monaco, monospace;
-}
-
-.clock-label {
-    text-align: center;
-    font: 8px Arial, Helvetica, sans-serif;
-}
-
-.border-bottom {
-    border-bottom: solid blue;
 }
     </style>
 

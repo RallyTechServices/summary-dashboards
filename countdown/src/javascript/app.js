@@ -4,24 +4,40 @@ Ext.define("TSCountdown", {
     logger: new Rally.technicalservices.Logger(),
     defaults: { margin: 10 },
     items: [
+        {xtype:'tscountdown',itemId:'release_counter',cls:'border-bottom'},
         {xtype:'tscountdown',itemId:'iteration_counter'},
-        {xtype:'tscountdown',itemId:'release_counter'},
         {xtype:'tsinfolink'}
     ],
     launch: function() {
         var me = this;
-        this.setLoading("Loading stuff...");
+        var today = Rally.util.DateTime.toIsoString(new Date());
         
-        this.down('#iteration_counter').setEndDate( Rally.util.DateTime.add(new Date(), 'day', 2));
-        this.down('#iteration_counter').text = "Hi";
-
-        var model_name = 'Defect',
-            field_names = ['Name','State'];
+        var iteration_filters = [
+            {property:'StartDate',operator:'<',value: today},
+            {property:'EndDate',  operator:'>',value: today}
+        ];
         
-        this._loadAStoreWithAPromise(model_name, field_names).then({
+        var release_filters = [
+            {property:'ReleaseStartDate',operator:'<',value: today},
+            {property:'ReleaseDate',  operator:'>',value: today}
+        ];
+        
+        Deft.Chain.sequence([
+            function() { return me._loadAStoreWithAPromise('Iteration', ['StartDate','EndDate','Name'], iteration_filters); },
+            function() { return me._loadAStoreWithAPromise('Release', ['ReleaseStartDate','ReleaseDate','Name'], release_filters); }
+        ]).then({
             scope: this,
-            success: function(store) {
-                this._displayGrid(store,field_names);
+            success: function(results) {
+                var iteration = results[0][0];
+                var release = results[1][0];
+                
+                this.logger.log("iteration,release", iteration, release);
+                
+                this.down('#release_counter').setEndDate( release.get('ReleaseDate') );
+                this.down('#release_counter').text = release.get('Name') + ": " + release.get('ReleaseDate');
+                
+                this.down('#iteration_counter').setEndDate( iteration.get('EndDate') );
+                this.down('#iteration_counter').text = iteration.get('Name') + ": " + iteration.get('EndDate');
             },
             failure: function(error_message){
                 alert(error_message);
@@ -29,19 +45,21 @@ Ext.define("TSCountdown", {
         }).always(function() {
             me.setLoading(false);
         });
+
     },
-    _loadAStoreWithAPromise: function(model_name, model_fields){
+    _loadAStoreWithAPromise: function(model_name, model_fields, filters){
         var deferred = Ext.create('Deft.Deferred');
         var me = this;
         this.logger.log("Starting load:",model_name,model_fields);
           
         Ext.create('Rally.data.wsapi.Store', {
             model: model_name,
-            fetch: model_fields
+            fetch: model_fields,
+            filters: filters
         }).load({
             callback : function(records, operation, successful) {
                 if (successful){
-                    deferred.resolve(this);
+                    deferred.resolve(records);
                 } else {
                     me.logger.log("Failed: ", operation);
                     deferred.reject('Problem loading: ' + operation.error.errors.join('. '));
@@ -49,12 +67,5 @@ Ext.define("TSCountdown", {
             }
         });
         return deferred.promise;
-    },
-    _displayGrid: function(store,field_names){
-        this.down('#display_box').add({
-            xtype: 'rallygrid',
-            store: store,
-            columnCfgs: field_names
-        });
     }
 });

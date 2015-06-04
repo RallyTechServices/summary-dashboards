@@ -18,7 +18,12 @@ Ext.define('Rally.technicalservices.ThreatCalculator', {
         minAgeThreshhold: undefined,
         minPointsThreshhold: undefined,
         minSize: 3,
-        andMinThreshholds: true
+        andMinThreshholds: true,
+        storySizeMultiplier: undefined,
+        riskMultiplier: undefined,
+        iterationDays: undefined,
+        releaseDays: undefined,
+        showDataLabels: false
     },
     /**
      * projectTree is used to show the hierarchy of the projects so that we can
@@ -49,9 +54,6 @@ Ext.define('Rally.technicalservices.ThreatCalculator', {
         this.projectTree = this._getTreeArray(config.projects, config.currentProjectRef);
         this.colorMap = this._buildColorMap(this.projectTree);
     },
-    getProjectColorMapping: function(){
-        return this.colorMap;
-    },
     runCalculation: function(features, stories){
         var deferred = Ext.create('Deft.Deferred');
 
@@ -64,8 +66,8 @@ Ext.define('Rally.technicalservices.ThreatCalculator', {
             s.set('riskCount', this._getRiskScore(s));
             s.set('totalCount', 1);
             s.set('size', s.get('PlanEstimate') );
-            s.set('density', this._getRiskScore(s) * 100);
-            s.set('age', this._getAge(s, 'InProgressDate', this.maxAgeThreshhold));
+            s.set('density', this._getStoryDensity(s));
+            s.set('age', this._getAge(s, 'InProgressDate', this.iterationDays));
             if (s.get('Feature')){
                 featureStoryHash[s.get('Feature')._ref] = featureStoryHash[s.get('Feature')._ref] || [];
                 featureStoryHash[s.get('Feature')._ref].push(s);
@@ -78,7 +80,7 @@ Ext.define('Rally.technicalservices.ThreatCalculator', {
 
         _.each(features, function(f){
             var riskCount = 0, totalCount = 0;
-            f.set('age', this._getAge(f, 'ActualStartDate', this.maxAgeThreshhold));
+            f.set('age', this._getAge(f, 'ActualStartDate', this.releaseDays));
             _.each(featureStoryHash[f.get('_ref')], function(s){
                 totalCount ++;
                 riskCount+= s.get('riskCount');
@@ -178,14 +180,18 @@ Ext.define('Rally.technicalservices.ThreatCalculator', {
     },
     _buildColorMap: function(projectTree){
         var colorMap = {},
+            projectLabelColorMap = {},
             i=0;
 
         //We only need to do this for the current and child projects since we are only looking at one
         //level of hierarchy at a time.
         colorMap[projectTree.get('_ref')] = this.chartColors[i++];
+        projectLabelColorMap[projectTree.get('Name')] = colorMap[projectTree.get('_ref')];
         _.each(projectTree.get('Children'), function(child){
             colorMap[child.get('_ref')] = this.chartColors[i++];
+            projectLabelColorMap[child.get('Name')] = colorMap[child.get('_ref')];
         }, this);
+        this.projectLabelColorMap = projectLabelColorMap;
         return colorMap;
     },
     _getSeries: function(artifact){
@@ -207,8 +213,6 @@ Ext.define('Rally.technicalservices.ThreatCalculator', {
                 dependencies.push(p);
                 label += Ext.String.format('<span style="color:{0}">\u25CF</span>',this.dependencyMap[p]);
             }, this);
-//            isDependencyColor = this.dependencyMap[artifact.get('predecessorFids')[0]];
-//            isDependencyWidth = this.dependencyLineWidth;
         }
         if (_.has(this.dependencyMap, artifact.get('FormattedID'))){
             isDependencyColor = this.dependencyMap[artifact.get('FormattedID')] || '#FFFFFF';
@@ -225,17 +229,17 @@ Ext.define('Rally.technicalservices.ThreatCalculator', {
                 lineWidth: isDependencyWidth
             },
             color: color,
-            name: artifact.get('FormattedID'), //pointName,
+            name: artifact.get('FormattedID'),
             tooltip: { pointFormat: pointName},
-
+            dataLabels: {
+                enabled: this.showDataLabels
+            },
             data: [{
                 x: artifact.get('age'),
                 y: artifact.get('density'),
                 dependencies: dependencies
             }],
-                //[artifact.get('age'),artifact.get('density')]],
             showInLegend: false,
-
             point: {
                 events: {
                     click: function () {
@@ -245,11 +249,11 @@ Ext.define('Rally.technicalservices.ThreatCalculator', {
                         } else {
                             this.clicked = false;
                         }
-                        //this.series.chart.get('S74').select(true);
+
                         var thisX = this.series.points[0].plotX,
                             thisY = this.series.points[0].plotY,
                             thisName = this.series.name;
-                        var paths = [], fudgeX = 70, fudgeY = 10;
+                        var paths = [], fudgeX = this.series.chart.plotLeft, fudgeY = this.series.chart.plotTop;
                         _.each(this.series.chart.series, function(s){
                             console.log('s', s.data[0].dependencies, thisName);
                             if (Ext.Array.contains(s.data[0].dependencies, thisName)){
@@ -257,7 +261,6 @@ Ext.define('Rally.technicalservices.ThreatCalculator', {
                             }
                         });
 
-                        console.log(paths);
                         var ren = this.series.chart.renderer;
                         if (this.clicked == true ){
                             this.paths = [];
@@ -265,7 +268,7 @@ Ext.define('Rally.technicalservices.ThreatCalculator', {
                             console.log(p);
                             this.paths.push(ren.path(p)
                                 .attr({
-                                    'stroke-width': 2,
+                                    'stroke-width': 1,
                                     stroke: isDependencyColor
                                 })
                                 .add()
@@ -276,16 +279,15 @@ Ext.define('Rally.technicalservices.ThreatCalculator', {
                             _.each(this.paths, function(p) {
                                 p.element.remove();
                             });
-                            }
-
-
+                        }
                     }
                 }
             }
         };
     },
     _getRadius: function(artifact){
-        return Math.max(artifact.get('size') || 0, this.minSize);
+        var multiplier = artifact.get('_type') == 'hierarchicalrequirement' ? this.storySizeMultiplier || 1 : 1;
+        return Math.max(artifact.get('size') * multiplier || 0, this.minSize);
     },
     _getColor: function(artifact){
         var hexColor = this.colorMap[artifact.get('Project')._ref] || this.defaultColor;
@@ -294,17 +296,22 @@ Ext.define('Rally.technicalservices.ThreatCalculator', {
     _getSymbol: function(artifact){
         return this.symbolMap[artifact.get('_type')] || "square";
     },
+    _getStoryDensity: function(story){
+        var multiplier = this._getRiskScore(story) > 0 ? this.riskMultiplier || 1 : 1;
+        return story.get('PlanEstimate') * multiplier;
+     },
     _getRiskScore: function(story){
-        return story.get(this.riskField) ? 1 : 0;
+        return story.get(this.riskField) > 0 ? 1 : 0;
     },
-    _getAge: function(artifact, ageField, maxAgeThreshhold){
+    _getAge: function(artifact, ageField, daysInTimebox){
        var ageInHours = Rally.util.DateTime.getDifference(new Date(), Rally.util.DateTime.fromIsoString(artifact.get(ageField)), 'hour') || 0,
            ageInDays = ageInHours / 24;
+        return ageInDays/daysInTimebox * 100;
 
-        if (maxAgeThreshhold){
-           return Math.min(ageInDays, maxAgeThreshhold);
-       }
-       return ageInDays;
+       //if (maxAgeThreshhold){
+       //    return Math.min(ageInDays, maxAgeThreshhold);
+       //}
+       //return ageInDays;
 
     },
     _hexToRGBAColorString: function(hex, alpha) {

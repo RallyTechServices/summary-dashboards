@@ -12,7 +12,10 @@ Ext.define("threat-matrix", {
             minAgeThreshhold:  1,
             maxAgeThreshhold: 365,
             minPointsThreshhold: 1,
-            andMinThreshholds: true
+            andMinThreshholds: true,
+            storySizeMultiplier: 1,
+            riskMultiplier: 2,
+            showDataLabels: true
         }
     },
     storyFetchFields: ['FormattedID','c_Risk','PlanEstimate','Project','ScheduleState','InProgressDate','Blocked','Blocker','CreationDate','Feature','Name','Predecessors'],
@@ -85,6 +88,9 @@ Ext.define("threat-matrix", {
             this.getBody().removeAll();
             this.setLoading(true);
 
+            var days_in_iteration = Rally.util.DateTime.getDifference(new Date(iteration.get('EndDate')),new Date(iteration.get('StartDate')), 'hour')/24;
+            var days_in_release = Rally.util.DateTime.getDifference(new Date(release.get('ReleaseDate')),new Date(release.get('ReleaseStartDate')), 'hour')/24;
+
             var promises = [
                 this._fetchData(this.portfolioItemFeature, this.featureFetchFields, this.getReleaseFilters(release)),
                 this._fetchData('HierarchicalRequirement', this.storyFetchFields, this.getStoryFilters(release, iteration)),
@@ -103,7 +109,12 @@ Ext.define("threat-matrix", {
                         projects: records[2],
                         minAgeThreshhold: this.getSetting('minAgeThreshhold'),
                         maxAgeThreshhold: this.getSetting('maxAgeThreshhold'),
-                        minPointsThreshhold: this.getSetting('minPointsThreshhold')
+                        minPointsThreshhold: this.getSetting('minPointsThreshhold'),
+                        storySizeMultiplier: this.getSetting('storySizeMultiplier'),
+                        riskMultiplier: this.getSetting('riskMultiplier'),
+                        iterationDays: days_in_iteration,
+                        releaseDays: days_in_release,
+                        showDataLabels: this.getSetting('showDataLabels')
                     });
 
                     calc.runCalculation(records[0],records[1]).then({
@@ -120,7 +131,7 @@ Ext.define("threat-matrix", {
                                 title: 'Threat Matrix'
 
                             });
-                            this._addLegend(calc.getProjectColorMapping());
+                            this._addLegend(calc.projectLabelColorMap);
 
                         },
                         failure: function(operation){
@@ -290,6 +301,27 @@ Ext.define("threat-matrix", {
                 labelWidth: 200,
                 labelAlign: 'right',
                  minValue: 0
+            },{
+                name: 'storySizeMultiplier',
+                xtype: 'rallynumberfield',
+                fieldLabel: 'Story Size Multiplier',
+                labelWidth: 200,
+                labelAlign: 'right',
+                minValue: 0
+            },{
+                name: 'riskMultiplier',
+                xtype: 'rallynumberfield',
+                fieldLabel: 'Risk Multiplier for User Stories',
+                labelWidth: 200,
+                labelAlign: 'right',
+                minValue: 0
+            },{
+                name: 'showDataLabels',
+                xtype: 'rallycheckboxfield',
+                boxLabelAlign: 'after',
+                fieldLabel: '',
+                margin: '0 0 0 200',
+                boxLabel: 'Show data labels'
             },{
                 name: 'andMinThreshholds',
                 xtype: 'rallycheckboxfield',

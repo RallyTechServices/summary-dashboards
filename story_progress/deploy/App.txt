@@ -3,11 +3,11 @@
 <head>
     <title>Story Progress Pie</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Wed Jun 03 2015 20:04:38 GMT-0700 (PDT) -->
+    <!--  Build Date: Wed Jun 03 2015 20:18:55 GMT-0700 (PDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Wed Jun 03 2015 20:04:38 GMT-0700 (PDT)";
-        var CHECKSUM = 7494861497;
+        var APP_BUILD_DATE = "Wed Jun 03 2015 20:18:55 GMT-0700 (PDT)";
+        var CHECKSUM = 7664599110;
     </script>
     
     <script type="text/javascript" src="/apps/2.0rc3/sdk.js"></script>
@@ -407,6 +407,10 @@ Ext.define('Rally.technicalservices.Logger',{
             name: 'Stories',
             data: series_data[0],
             size: '65%',
+            tooltip: {
+                headerFormat: '',
+                pointFormat: '<b>{point.name}</b>.'
+            },
             dataLabels: {
 //                formatter: function () {
 //                    return this.y > 5 ? this.point.name : null;
@@ -420,6 +424,10 @@ Ext.define('Rally.technicalservices.Logger',{
             data: series_data[1],
             size: '80%',
             innerSize: '65%',
+            tooltip: {
+                headerFormat: '',
+                pointFormat: '<b>{point.name}</b>.'
+            },
             dataLabels: {
                 distance: 5,
                 formatter: function () {
@@ -440,7 +448,9 @@ Ext.define('Rally.technicalservices.Logger',{
                     text: this.title,
                     align: 'center'
                 },
-               
+                tooltip: {
+                    enabled: false
+                },
                 plotOptions: {
                     pie: {
                         shadow: false,

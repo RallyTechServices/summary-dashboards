@@ -267,6 +267,10 @@
             name: 'Stories',
             data: series_data[0],
             size: '65%',
+            tooltip: {
+                headerFormat: '',
+                pointFormat: '<b>{point.name}</b>.'
+            },
             dataLabels: {
 //                formatter: function () {
 //                    return this.y > 5 ? this.point.name : null;
@@ -280,6 +284,10 @@
             data: series_data[1],
             size: '80%',
             innerSize: '65%',
+            tooltip: {
+                headerFormat: '',
+                pointFormat: '<b>{point.name}</b>.'
+            },
             dataLabels: {
                 distance: 5,
                 formatter: function () {
@@ -300,7 +308,9 @@
                     text: this.title,
                     align: 'center'
                 },
-               
+                tooltip: {
+                    enabled: false
+                },
                 plotOptions: {
                     pie: {
                         shadow: false,

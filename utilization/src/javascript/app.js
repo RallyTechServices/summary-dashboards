@@ -4,25 +4,35 @@ Ext.define("TSUtilization", {
     logger: new Rally.technicalservices.Logger(),
     defaults: { margin: 10 },
     items: [
+    {xtype:'container',itemId:'selector_box'},
         {xtype:'container',itemId:'display_box'},
         {xtype:'tsinfolink'}
     ],
     launch: function() {
         var me = this;
-        var iteration_name = 'Iteration 1';
         
-        var filter = [{property:'Name',value:iteration_name}];
+        this.down('#selector_box').add({
+            xtype:'rallyiterationcombobox',
+            listeners: {
+                change: function(combo) {
+                    var iteration_name = combo.getRecord().get('Name');
         
-        this._loadAStoreWithAPromise('Iteration', ['StartDate','EndDate','Name'], filter ).then({
-            scope: this,
-            success: function(iterations) {
-                if (iterations.length == 0) {
-                    this.down('#display_box').add({ xtype:'container', html:'No iterations in scope'});
-                } else {
-                    this._gatherData(iterations[0]);
+                    var filter = [{property:'Name',value:iteration_name}];
+                    
+                    me._loadAStoreWithAPromise('Iteration', ['StartDate','EndDate','Name'], filter ).then({
+                        scope: me,
+                        success: function(iterations) {
+                            if (iterations.length == 0) {
+                                me.down('#display_box').add({ xtype:'container', html:'No iterations in scope'});
+                            } else {
+                                me._gatherData(iterations[0]);
+                            }
+                        }
+                    });
                 }
             }
         });
+        
     },
     _gatherData: function(iteration) {
         var me = this;
@@ -57,12 +67,12 @@ Ext.define("TSUtilization", {
                 
                 var chart_series = [
                     this._getSeriesFromDailyHash('Total / Stability', total_each_day ),
-                    this._getSeriesFromDailyHash('Actual Burn', remaining_each_day ),
-                    this._getSeriesFromDailyHash('Ideal Burn', ideal_each_day)
+                    this._getSeriesFromDailyHash('Ideal Burn', ideal_each_day),
+                    this._getSeriesFromDailyHash('Actual Burn', remaining_each_day )
                 ];
                 
                 var chart_categories = Ext.Array.map(array_of_days, function(day,idx) {
-                    return idx;
+                    return idx+1;
                 });
                 this._makeChart(chart_categories, chart_series);
             },
@@ -130,12 +140,12 @@ Ext.define("TSUtilization", {
     },
     
     _getArrayOfDaysFromRange: function(startJS,endJS) {
-        var array_of_days = [startJS];
+        var array_of_days = [];
         
         var new_day = startJS;
         while ( new_day < endJS ) {
-            new_day = Rally.util.DateTime.add(new_day,'day',1);
             array_of_days.push(new_day);
+            new_day = Rally.util.DateTime.add(new_day,'day',1);
         }
         
         return array_of_days;
@@ -218,9 +228,11 @@ Ext.define("TSUtilization", {
     },
     
     _makeChart: function(categories, chart_series) {
+        this.down('#display_box').removeAll();
         
         this.down('#display_box').add({
             xtype:'rallychart',
+            loadMask: false,
             chartData: {
                 series: chart_series
             },
@@ -242,9 +254,9 @@ Ext.define("TSUtilization", {
                     min: 0
                 }],
                 plotOptions: {
-                    series: {
-                        stacking: 'normal'
-                    }
+//                    series: {
+//                        stacking: 'normal'
+//                    }
                 }
             }
         });

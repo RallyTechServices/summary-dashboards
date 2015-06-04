@@ -2,7 +2,8 @@
 
 ## Development Notes
 
-A set of lines representing burn/scope/ideal
+A set of lines representing burn/scope/ideal for the
+current project and DIRECT CHILDREN ONLY.
 
 ### First Load
 

@@ -15,9 +15,10 @@ Ext.define("TSUtilization", {
             xtype:'rallyiterationcombobox',
             listeners: {
                 change: function(combo) {
-                    var iteration_name = combo.getRecord().get('Name');
+                    me.down('#display_box').removeAll();
+                    var name = combo.getRecord().get('Name');
         
-                    var filter = [{property:'Name',value:iteration_name}];
+                    var filter = [{property:'Name',value: name}];
                     
                     me._loadAStoreWithAPromise('Iteration', ['StartDate','EndDate','Name'], filter ).then({
                         scope: me,
@@ -32,56 +33,83 @@ Ext.define("TSUtilization", {
                 }
             }
         });
-        
+//        this.down('#selector_box').add({
+//            xtype:'rallyreleasecombobox',
+//            listeners: {
+//                change: function(combo) {
+//                me.down('#display_box').removeAll();
+//                    var name = combo.getRecord().get('Name');
+//        
+//                    var filter = [{property:'Name',value:name}];
+//                    
+//                    me._loadAStoreWithAPromise('Release', ['ReleaseStartDate','ReleaseDate','Name'], filter ).then({
+//                        scope: me,
+//                        success: function(releases) {
+//                            if (releases.length == 0) {
+//                                me.down('#display_box').add({ xtype:'container', html:'No releases in scope'});
+//                            } else {
+//                                me._gatherData(releases[0]);
+//                            }
+//                        }
+//                    });
+//                }
+//            }
+//        });
     },
-    _gatherData: function(iteration) {
+    _gatherData: function(timebox) {
         var me = this;
-        var project_filter = Ext.create('Rally.data.wsapi.Filter',
-            {property:'ObjectID',value:this.getContext().getProject().ObjectID}).or( 
-            Ext.create('Rally.data.wsapi.Filter',
-                {property:'Parent.ObjectID',value:this.getContext().getProject().ObjectID})
-        );
-        
-        var iteration_filter = [{property:'Name', value:iteration.get('Name')}];
-        
-        Deft.Chain.pipeline([
-            function() { return me._loadAStoreWithAPromise('Project', ['ObjectID','Name'], project_filter) ; },
-            function(projects) { return me._getIterations(projects, iteration_filter); },
-            function(iterations) { return me._getIterationCumulativeFlowData(iterations); }
-        ]).then({
-            scope: this,
-            success: function(cfd) {
-                me.logger.log('cfd:', cfd);
-                
-                var array_of_days = this._getArrayOfDaysFromRange(iteration.get("StartDate"),iteration.get("EndDate"));
-                this.logger.log("For days in Sprint:", array_of_days);
 
-                var total_each_day = this._getTotalsFromCFD(array_of_days,cfd);
-                this.logger.log("Total each day:", total_each_day);
+        if (timebox.get('_type') == 'iteration' ) {
+            var end_field_name = 'EndDate',
+                start_field_name = 'StartDate';
                 
-                var ideal_each_day = this._getIdealFromDailyHash(total_each_day);
-                this.logger.log("Ideal each day:", ideal_each_day);
-                
-                var remaining_each_day = this._getTotalsFromCFD(array_of_days,cfd,["Accepted"]);
-                this.logger.log("Remaining each day:", remaining_each_day);
-                
-                var chart_series = [
-                    this._getSeriesFromDailyHash('Total / Stability', total_each_day ),
-                    this._getSeriesFromDailyHash('Ideal Burn', ideal_each_day),
-                    this._getSeriesFromDailyHash('Actual Burn', remaining_each_day )
-                ];
-                
-                var chart_categories = Ext.Array.map(array_of_days, function(day,idx) {
-                    return idx+1;
-                });
-                this._makeChart(chart_categories, chart_series);
-            },
-            failure: function(error_message){
-                alert(error_message);
-            }
-        }).always(function() {
-            me.setLoading(false);
-        });
+            var project_filter = Ext.create('Rally.data.wsapi.Filter',
+                {property:'ObjectID',value:this.getContext().getProject().ObjectID}).or( 
+                Ext.create('Rally.data.wsapi.Filter',
+                    {property:'Parent.ObjectID',value:this.getContext().getProject().ObjectID})
+            );
+            
+            var iteration_filter = [{property:'Name', value:timebox.get('Name')}];
+            
+            Deft.Chain.pipeline([
+                function() { return me._loadAStoreWithAPromise('Project', ['ObjectID','Name'], project_filter) ; },
+                function(projects) { return me._getIterations(projects, iteration_filter); },
+                function(iterations) { return me._getIterationCumulativeFlowData(iterations); }
+            ]).then({
+                scope: this,
+                success: function(cfd) {
+                    me.logger.log('cfd:', cfd);
+                    
+                    var array_of_days = this._getArrayOfDaysFromRange(timebox.get(end_field_name),timebox.get(start_field_name));
+                    this.logger.log("For days in Sprint:", array_of_days);
+    
+                    var total_each_day = this._getTotalsFromCFD(array_of_days,cfd);
+                    this.logger.log("Total each day:", total_each_day);
+                    
+                    var ideal_each_day = this._getIdealFromDailyHash(total_each_day);
+                    this.logger.log("Ideal each day:", ideal_each_day);
+                    
+                    var remaining_each_day = this._getTotalsFromCFD(array_of_days,cfd,["Accepted"]);
+                    this.logger.log("Remaining each day:", remaining_each_day);
+                    
+                    var chart_series = [
+                        this._getSeriesFromDailyHash('Total / Stability', total_each_day ),
+                        this._getSeriesFromDailyHash('Ideal Burn', ideal_each_day),
+                        this._getSeriesFromDailyHash('Actual Burn', remaining_each_day )
+                    ];
+                    
+                    var chart_categories = Ext.Array.map(array_of_days, function(day,idx) {
+                        return idx+1;
+                    });
+                    this._makeChart(chart_categories, chart_series);
+                },
+                failure: function(error_message){
+                    alert(error_message);
+                }
+            }).always(function() {
+                me.setLoading(false);
+            });
+        }
     },
     
     _getIdealFromDailyHash: function(total_each_day) {

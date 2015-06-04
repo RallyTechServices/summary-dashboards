@@ -3,11 +3,11 @@
 <head>
     <title>Story Progress Pie</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Wed Jun 03 2015 11:08:10 GMT-0700 (PDT) -->
+    <!--  Build Date: Wed Jun 03 2015 19:52:24 GMT-0700 (PDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Wed Jun 03 2015 11:08:10 GMT-0700 (PDT)";
-        var CHECKSUM = 4134010132;
+        var APP_BUILD_DATE = "Wed Jun 03 2015 19:52:24 GMT-0700 (PDT)";
+        var CHECKSUM = 6782691940;
     </script>
     
     <script type="text/javascript" src="/apps/2.0rc3/sdk.js"></script>
@@ -191,10 +191,32 @@ Ext.define('Rally.technicalservices.Logger',{
          * NICE SITE: http://hslpicker.com/
          * 
          */
-        colors: [235, 20, 126, 180, 50, 84 ]
+        colors: [235, 20, 126, 180, 50, 84 ],
+        /**
+         * @cfg {Number}
+         * The object id of the owner we care about showing items for
+         */
+        highlight_owner: null,
         /**
          * 
+         * @cfg Boolean
+         * Set to true to keep the pie from showing items that are not highlighted (when
+         * highlight_owner is not null).  Defaults to false
          */
+        remove_non_highlighted: false,
+        /**
+         * 
+         * @cfg String
+         * The color to use for items on the pie not owned by the user in highlight_owner
+         * (assuming highlight_owner !== null)
+         * 
+         */
+        non_owned_color: '#F8F8FF',
+        /**
+         * @cfg String
+         * The color to use for task elements that hold a spot for stories without tasks
+         */
+        missing_color: 'white'
         
     },
     
@@ -212,20 +234,23 @@ Ext.define('Rally.technicalservices.Logger',{
     calculateSlices: function() {
         var inside_series_data = [];
         var inside_series_by_id = {};
-        
-        var outside_series_data = [];
-        
+                
         // make an array of hash items for the stories
         // and a tracking array so we can see if there
         // are tasks that have a story not in the list
         Ext.Array.each(this.inside_records, function(record,idx) {
             var color_index = this._getColorIndex(idx);
-            
+            var owner = record.get('Owner');
+            var owner_id = null;
+            if ( owner ) { 
+                owner_id = owner.ObjectID;
+            }
             var data_point = {
                 name: record.get('FormattedID'),
                 y: record.get(this.inside_size_field),
                 color: 'hsla(' + this.colors[color_index] + ',100%,40%,1)',
-                idx: color_index
+                idx: color_index,
+                owner: owner_id
             };
             
                                 
@@ -233,7 +258,7 @@ Ext.define('Rally.technicalservices.Logger',{
                 data_point.color = 'red';
             }
                     
-            inside_series_by_id[record.get('FormattedID')] = Ext.clone(data_point);
+            inside_series_by_id[record.get('FormattedID')] = data_point;
             inside_series_data.push(data_point);
         },this);
         
@@ -262,6 +287,8 @@ Ext.define('Rally.technicalservices.Logger',{
             var children = inside_item.children || [];
             var parent_size = inside_item.y || 0;
             var parent_index = inside_item.idx || 0;
+            inside_item.highlight_owner = false; // mark if one of the kids belongs to the this.highlight_owner
+            inside_item.child_data = [];
             
             if ( parent_size > 0 ) {
                 var child_total = 0;
@@ -298,21 +325,72 @@ Ext.define('Rally.technicalservices.Logger',{
                         data_point.color = 'red';
                     }
                     
-                    outside_series_data.push(data_point);
+                    
+                    if ( this.highlight_owner ) {
+                        if ( child.get('Owner') && child.get('Owner').ObjectID != this.highlight_owner ) {
+                            data_point.color = this.non_owned_color;
+                        } else if ( !child.get('Owner') ) {
+                            data_point.color = this.non_owned_color;
+                        } else {
+                            inside_item.highlight_owner = true;
+                        }
+                        
+                    }
+                    inside_item.child_data.push(data_point);
                 },this);
                 
+                if ( this.highlight_owner && inside_item.color != "red" ) {
+                    if ( inside_item.owner != this.highlight_owner && ! inside_item.highlight_owner ) {
+                        inside_item.color = this.non_owned_color;
+                    }
+                }
+                
                 if ( ! children || children.length == 0 ) {
-                    outside_series_data.push({ 
+                    inside_item.child_data.push({ 
                         name: 'none',
                         y:parent_size,
-                        color: 'white'
+                        color: this.missing_color
                     });
                 }
+                
+                // check for all the children are zero
+                if ( children && children.length > 0 ) {
+                    var total_points = 0;
+                    Ext.Array.each(inside_item.child_data, function(child){
+                        total_points += child.y;
+                    });
+                    if ( total_points == 0 ) {
+                        Ext.Array.each(inside_item.child_data, function(child) {
+                            child.y = parent_size / children.length;
+                        });
+                    }
+                }
+                
             }
             
         },this);
-                
-        return [inside_series_data, outside_series_data];
+        
+
+        var filtered_inside_series = [];
+        var filtered_outside_series = [];
+        
+        // remove non-highlighted parents
+        if ( this.remove_non_highlighted && this.highlight_owner ) {
+            Ext.Array.each(inside_series_data, function(inside_data_point){
+                if ( inside_data_point.color !== this.non_owned_color ) {
+                    filtered_inside_series.push(inside_data_point);
+                }
+            }, this);
+            
+        } else {
+            filtered_inside_series = inside_series_data;
+        }
+        
+        Ext.Array.each(filtered_inside_series, function(inside_data_point) {
+            filtered_outside_series = Ext.Array.push(filtered_outside_series,inside_data_point.child_data);
+        });
+        
+        return [filtered_inside_series, filtered_outside_series];
     },
     
     _getColorIndex: function(idx) {
@@ -324,7 +402,7 @@ Ext.define('Rally.technicalservices.Logger',{
      
     _buildItems: function(series_data) {
         var items = [];
-        
+                
         var series = [{
             name: 'Stories',
             data: series_data[0],
@@ -333,7 +411,7 @@ Ext.define('Rally.technicalservices.Logger',{
 //                formatter: function () {
 //                    return this.y > 5 ? this.point.name : null;
 //                },
-                color: 'white',
+                color: this.missing_color,
                 distance: -30
             }
         },
@@ -352,6 +430,7 @@ Ext.define('Rally.technicalservices.Logger',{
         
         items.push({
             xtype:'rallychart',
+            loadMask: false,
             chartData: {
                 series: series
             },
@@ -365,7 +444,7 @@ Ext.define('Rally.technicalservices.Logger',{
                 plotOptions: {
                     pie: {
                         shadow: false,
-                        center: ['50%', '50%']
+                        center: ['50%', '30%']
                     }
                 }
             }
@@ -380,22 +459,28 @@ Ext.define("TSStoryProgressPie", {
     componentCls: 'app',
     logger: new Rally.technicalservices.Logger(),
     defaults: { margin: 10 },
-    items: [
-        {xtype:'container',itemId:'display_box'},
+    items: [        
+        {xtype:'container',itemId:'display_box', layout: { type: 'hbox' }, items: [
+            { xtype: 'container', itemId: 'self_chart' },
+            { xtype: 'container', itemId: 'team_chart' }
+        ] },
         {xtype:'tsinfolink'}
     ],
     launch: function() {
         var me = this;
-        
+        this._setInfo(); 
+                
         var base_filter = [{property:'ObjectID',operator:'>',value:0}];
         
         var team_story_filters = Ext.Array.push([],base_filter);
         team_story_filters.push({property:'ScheduleState',value:'In-Progress'});
 
         var team_task_filters = Ext.Array.push([],base_filter);
-        var task_fields = ['Estimate','FormattedID','WorkProduct','PlanEstimate','Blocked','State'];
+        var task_fields = ['Estimate','FormattedID','WorkProduct','PlanEstimate','Blocked','State','Owner','ObjectID'];
+        var story_fields = ['PlanEstimate','FormattedID','Blocked','Owner','ObjectID'];
+        
         Deft.Chain.sequence([
-            function() { return me._loadAStoreWithAPromise('UserStory', ['PlanEstimate','FormattedID','Blocked'], team_story_filters); },
+            function() { return me._loadAStoreWithAPromise('UserStory', story_fields, team_story_filters); },
             function() { return me._loadAStoreWithAPromise('Task', task_fields, team_task_filters); }
             
         ]).then({
@@ -404,7 +489,7 @@ Ext.define("TSStoryProgressPie", {
                 var stories = results[0];
                 var tasks = results[1];
                 
-                this._makePie(stories,tasks);
+                this._makePies(stories,tasks);
             },
             failure: function(error_message){
                 alert(error_message);
@@ -416,14 +501,16 @@ Ext.define("TSStoryProgressPie", {
     _loadAStoreWithAPromise: function(model_name, model_fields,filters){
         var deferred = Ext.create('Deft.Deferred');
         var me = this;
-        this.logger.log("Starting load:",model_name,model_fields);
-          
+        this.setLoading("Finding " + model_name + " records");
+                  
         Ext.create('Rally.data.wsapi.Store', {
             model: model_name,
             fetch: model_fields,
             filters: filters
         }).load({
             callback : function(records, operation, successful) {
+                me.setLoading(false);
+                
                 if (successful){
                     deferred.resolve(records);
                 } else {
@@ -435,19 +522,42 @@ Ext.define("TSStoryProgressPie", {
         return deferred.promise;
     },
 
-    _makePie: function(inside_records,outside_records){
+    _makePies: function(inside_records,outside_records){
         var container =  this.down('#display_box');
+
+        container.down('#self_chart').removeAll();
+        container.down('#team_chart').removeAll();
         
-        container.removeAll();
-        container.add({
+        container.down('#self_chart').add({
             xtype: 'tsdoughnut',
-            title: 'Team',
+            title: 'Self',
+            itemId: 'selfie',
+            width: 300,
+            highlight_owner: this.getContext().getUser().ObjectID,
+            remove_non_highlighted: true,
             inside_records: inside_records,
             inside_size_field: 'PlanEstimate',
             outside_records: outside_records,
             outside_size_field: 'Estimate'
         });
+        container.down('#team_chart').add( {
+            xtype: 'tsdoughnut',
+            title: 'Team',
+            width: 300,
+            itemId: 'team',
+            inside_records: inside_records,
+            inside_size_field: 'PlanEstimate',
+            outside_records: outside_records,
+            outside_size_field: 'Estimate'
+        });
+
+    },
+    
+    _setInfo: function() {
+        this.down('tsinfolink').informationHtml = "Hi";
     }
+
+            
 });
 
             
@@ -461,6 +571,12 @@ Ext.define("TSStoryProgressPie", {
 
 .app {
 }
+
+.story-progress-titlebar{
+    text-align: center;
+    font: bold 16px arial,sans-serif;
+}
+
 .tsinfolink {
     position:absolute;
     right:0px;
@@ -472,8 +588,8 @@ Ext.define("TSStoryProgressPie", {
     background: #C0C0C0;
     border-style: solid;
     border-width: 1px;
-    margin-top: 25px;
-    margin-right: 5px;
+    margin-top: 0px;
+    margin-right: 15px;
     cursor: pointer;
 }
     </style>

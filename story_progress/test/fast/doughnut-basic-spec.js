@@ -13,12 +13,17 @@ describe("When given a set of stories and tasks", function() {
         donut.outside_records = [task];
         
         var series = donut.calculateSlices();
-        expect(series[0]).toEqual([
-            { name: 'US1', y: 13, color: 'hsla(235,100%,40%,1)', idx: 0 }
-        ]);
-        expect(series[1]).toEqual([
-            { name: 'TA37', y: 13, color: 'hsla(235,100%,40%,1)' }
-        ]);
+        
+        var story_data = series[0];
+        var task_data  = series[1];
+        
+        expect(story_data[0].name).toEqual('US1');
+        expect(story_data[0].y).toEqual(13);
+        expect(story_data[0].color).toEqual('hsla(235,100%,40%,1)');
+        
+        expect(task_data[0].name).toEqual('TA37');
+        expect(task_data[0].y).toEqual(13);
+        expect(task_data[0].color).toEqual('hsla(235,100%,40%,1)');
         
     });
     

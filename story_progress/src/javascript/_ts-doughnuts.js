@@ -51,10 +51,32 @@
          * NICE SITE: http://hslpicker.com/
          * 
          */
-        colors: [235, 20, 126, 180, 50, 84 ]
+        colors: [235, 20, 126, 180, 50, 84 ],
+        /**
+         * @cfg {Number}
+         * The object id of the owner we care about showing items for
+         */
+        highlight_owner: null,
         /**
          * 
+         * @cfg Boolean
+         * Set to true to keep the pie from showing items that are not highlighted (when
+         * highlight_owner is not null).  Defaults to false
          */
+        remove_non_highlighted: false,
+        /**
+         * 
+         * @cfg String
+         * The color to use for items on the pie not owned by the user in highlight_owner
+         * (assuming highlight_owner !== null)
+         * 
+         */
+        non_owned_color: '#F8F8FF',
+        /**
+         * @cfg String
+         * The color to use for task elements that hold a spot for stories without tasks
+         */
+        missing_color: 'white'
         
     },
     
@@ -72,20 +94,23 @@
     calculateSlices: function() {
         var inside_series_data = [];
         var inside_series_by_id = {};
-        
-        var outside_series_data = [];
-        
+                
         // make an array of hash items for the stories
         // and a tracking array so we can see if there
         // are tasks that have a story not in the list
         Ext.Array.each(this.inside_records, function(record,idx) {
             var color_index = this._getColorIndex(idx);
-            
+            var owner = record.get('Owner');
+            var owner_id = null;
+            if ( owner ) { 
+                owner_id = owner.ObjectID;
+            }
             var data_point = {
                 name: record.get('FormattedID'),
                 y: record.get(this.inside_size_field),
                 color: 'hsla(' + this.colors[color_index] + ',100%,40%,1)',
-                idx: color_index
+                idx: color_index,
+                owner: owner_id
             };
             
                                 
@@ -93,7 +118,7 @@
                 data_point.color = 'red';
             }
                     
-            inside_series_by_id[record.get('FormattedID')] = Ext.clone(data_point);
+            inside_series_by_id[record.get('FormattedID')] = data_point;
             inside_series_data.push(data_point);
         },this);
         
@@ -122,6 +147,8 @@
             var children = inside_item.children || [];
             var parent_size = inside_item.y || 0;
             var parent_index = inside_item.idx || 0;
+            inside_item.highlight_owner = false; // mark if one of the kids belongs to the this.highlight_owner
+            inside_item.child_data = [];
             
             if ( parent_size > 0 ) {
                 var child_total = 0;
@@ -158,21 +185,72 @@
                         data_point.color = 'red';
                     }
                     
-                    outside_series_data.push(data_point);
+                    
+                    if ( this.highlight_owner ) {
+                        if ( child.get('Owner') && child.get('Owner').ObjectID != this.highlight_owner ) {
+                            data_point.color = this.non_owned_color;
+                        } else if ( !child.get('Owner') ) {
+                            data_point.color = this.non_owned_color;
+                        } else {
+                            inside_item.highlight_owner = true;
+                        }
+                        
+                    }
+                    inside_item.child_data.push(data_point);
                 },this);
                 
+                if ( this.highlight_owner && inside_item.color != "red" ) {
+                    if ( inside_item.owner != this.highlight_owner && ! inside_item.highlight_owner ) {
+                        inside_item.color = this.non_owned_color;
+                    }
+                }
+                
                 if ( ! children || children.length == 0 ) {
-                    outside_series_data.push({ 
+                    inside_item.child_data.push({ 
                         name: 'none',
                         y:parent_size,
-                        color: 'white'
+                        color: this.missing_color
                     });
                 }
+                
+                // check for all the children are zero
+                if ( children && children.length > 0 ) {
+                    var total_points = 0;
+                    Ext.Array.each(inside_item.child_data, function(child){
+                        total_points += child.y;
+                    });
+                    if ( total_points == 0 ) {
+                        Ext.Array.each(inside_item.child_data, function(child) {
+                            child.y = parent_size / children.length;
+                        });
+                    }
+                }
+                
             }
             
         },this);
-                
-        return [inside_series_data, outside_series_data];
+        
+
+        var filtered_inside_series = [];
+        var filtered_outside_series = [];
+        
+        // remove non-highlighted parents
+        if ( this.remove_non_highlighted && this.highlight_owner ) {
+            Ext.Array.each(inside_series_data, function(inside_data_point){
+                if ( inside_data_point.color !== this.non_owned_color ) {
+                    filtered_inside_series.push(inside_data_point);
+                }
+            }, this);
+            
+        } else {
+            filtered_inside_series = inside_series_data;
+        }
+        
+        Ext.Array.each(filtered_inside_series, function(inside_data_point) {
+            filtered_outside_series = Ext.Array.push(filtered_outside_series,inside_data_point.child_data);
+        });
+        
+        return [filtered_inside_series, filtered_outside_series];
     },
     
     _getColorIndex: function(idx) {
@@ -184,7 +262,7 @@
      
     _buildItems: function(series_data) {
         var items = [];
-        
+                
         var series = [{
             name: 'Stories',
             data: series_data[0],
@@ -193,7 +271,7 @@
 //                formatter: function () {
 //                    return this.y > 5 ? this.point.name : null;
 //                },
-                color: 'white',
+                color: this.missing_color,
                 distance: -30
             }
         },
@@ -212,6 +290,7 @@
         
         items.push({
             xtype:'rallychart',
+            loadMask: false,
             chartData: {
                 series: series
             },
@@ -225,7 +304,7 @@
                 plotOptions: {
                     pie: {
                         shadow: false,
-                        center: ['50%', '50%']
+                        center: ['50%', '30%']
                     }
                 }
             }

@@ -3,12 +3,12 @@ Ext.define("TSStoryProgressPie", {
     componentCls: 'app',
     logger: new Rally.technicalservices.Logger(),
     defaults: { margin: 10 },
-    items: [        
+    items: [ 
+        {xtype:'tsinfolink', minHeight: 18},
         {xtype:'container',itemId:'display_box', layout: { type: 'hbox' }, items: [
             { xtype: 'container', itemId: 'self_chart' },
             { xtype: 'container', itemId: 'team_chart' }
-        ] },
-        {xtype:'tsinfolink'}
+        ] }
     ],
     launch: function() {
         var me = this;
@@ -98,7 +98,16 @@ Ext.define("TSStoryProgressPie", {
     },
     
     _setInfo: function() {
-        this.down('tsinfolink').informationHtml = "Hi";
+        var chart_info = [];
+        
+        chart_info.push("These charts show stories in the In Progress state with their tasks.");
+        chart_info.push("Gray tasks on the Self chart represent tasks that belong to someone other than the current user");
+        chart_info.push("The 'lightness' of tasks represents progress from Defined (darkest) to Completed (brightest)");
+        chart_info.push("White tasks on either chart represent a story not having any tasks");
+        chart_info.push("Size of story slices is based upon Plan Estimate");
+        chart_info.push("Size of task slices is based on Estimate. (If none of the tasks on a story have Estimates, they are distributed evenly across the story.)")
+        
+        this.down('tsinfolink').informationHtml = chart_info.join('<br/>');
     }
 
             

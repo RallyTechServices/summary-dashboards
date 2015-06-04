@@ -4,6 +4,8 @@
    "server": "https://10.32.16.145",
    "sdk": "2.0rc2",
    "javascript": [
+      "../common/src/javascript/rally-functions.js",
+      "../common/src/javascript/project-stories.js",
       "src/javascript/App.js",
       "src/javascript/_wip-chart.js",
       "https://cdnjs.cloudflare.com/ajax/libs/async/1.22/async.min.js"

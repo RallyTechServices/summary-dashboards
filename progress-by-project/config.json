@@ -4,8 +4,10 @@
    "server": "https://rally1.rallydev.com",
    "sdk": "2.0rc2",
    "javascript": [
+      "../common/src/javascript/rally-functions.js",
+      "../common/src/javascript/project-stories.js",
       "src/javascript/App.js",
-      "src/javascript/_bm-chart.js",
+      "src/javascript/_progress-chart.js",
       "https://cdnjs.cloudflare.com/ajax/libs/async/1.22/async.min.js"
    ],
    "css": [

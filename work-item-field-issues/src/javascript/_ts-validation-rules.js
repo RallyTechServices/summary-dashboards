@@ -19,49 +19,49 @@ Ext.define('Rally.technicalservices.ValidationRules',{
         }
         return ruleFns;
     },
-    ruleFn_missingFields: function(r) {
-        var missingFields = [];
-
-        _.each(this.requiredFields, function (f) {
-            if (!r.get(f)) {
-                missingFields.push(f);
-            }
-        });
-        if (missingFields.length === 0) {
-            return null;
-        }
-        return Ext.String.format('Missing fields: {0}', missingFields.join(','));
-    },
+    //ruleFn_missingFields: function(r) {
+    //    var missingFields = [];
+    //
+    //    _.each(this.requiredFields, function (f) {
+    //        if (!r.get(f)) {
+    //            missingFields.push(f);
+    //        }
+    //    });
+    //    if (missingFields.length === 0) {
+    //        return null;
+    //    }
+    //    return Ext.String.format('Missing fields: {0}', missingFields.join(','));
+    //},
 
     statics: {
         getUserFriendlyRuleLabel: function(ruleName){
             switch(ruleName){
                 case 'ruleFn_missingFields':
                     return 'Required Fields are missing';
-
-                case 'ruleFn_stateSynchronization':
-                    return '[Feature] State is not aligned with story states';
-
-                case 'ruleFn_featureTargetSprintMatchesRelease':
-                    return '[Feature] Target Sprint not aligned with Release';
-
-                case 'ruleFn_storiesPlannedByFeatureTargetSprint':
-                    return '[Feature] child stories are planned after Feature Target Sprint';
-
-                case 'ruleFn_featureStateShouldMatchTargetSprint':
-                    return '[Feature] State not aligned with Target Sprint';
-
                 case 'ruleFn_unscheduledIterationScheduleState':
-                    return '[User Story] is In-Progress with unscheduled Iteration';
-
-                case 'ruleFn_blockedFieldsPopulated':
-                    return '[User Story] Blocked fields not populated';
-
+                    return 'Story is In-Progress with unscheduled Iteration';
                 case 'ruleFn_blockedNotInProgress':
-                    return '[User Story] is Blocked but not In-Progress';
-
+                    return 'Story is Blocked but not In-Progress';
                 case 'ruleFn_sprintCompleteNotAccepted':
-                    return '[User Story] in past Iteration not complete';
+                    return 'Story in past Iteration not complete';
+                case 'ruleFn_noStoriesForFeature':
+                    return 'Feature has no Stories';
+                case 'ruleFn_FeatureHasNotBeenStarted':
+                    return 'Feature not started.';
+                case 'ruleFn_featureMissingFields':
+                    return 'Feature fields Missing';
+                case 'ruleFn_storyMissingFields':
+                    return 'Story fields Missing';
+                case 'ruleFn_FeatureHasNoParent':
+                    return 'Feature has no parent.';
+                case 'ruleFn_storyHasNoFeature':
+                    return 'Story has no parent Feature';
+                case 'ruleFn_storyHasIterationWithoutRelease':
+                    return 'Story has Iteration without Release';
+                case 'ruleFn_storyBlockedWithoutReason':
+                    return 'Story Blocked without Reason';
+                case 'ruleFn_storyRelaseDoesNotMatchFeatureRelease':
+                    return 'Story Release is not Feature Release';
             }
             return ruleName;
         }

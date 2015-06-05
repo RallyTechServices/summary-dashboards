@@ -1,6 +1,19 @@
 Ext.define('Rally.technicalservices.ThreatCalculator', {
     logger: new Rally.technicalservices.Logger(),
 
+    /**
+     * @cfg {Number}
+     * Colors to be applied in order (must be HSLA)
+     * We'll take them and put them into the first part of:
+     * 'hsla(235,100%,75%,1)'
+     * where 25 is the color, 100% is the saturation, 75% is the lightness (100% is white), 1 is the opacity
+     *
+     * NICE SITE: http://hslpicker.com/
+     *
+     */
+    colors: [209, 235, 20, 126, 180, 50, 84 ],
+
+
     chartColors: [ '#2f7ed8', '#8bbc21', '#910000',
         '#492970', '#f28f43', '#145499','#77a1e5', '#c42525', '#a6c96a',
         '#7cb5ec', '#434348', '#90ed7d', '#f7a35c', '#8085e9','#aa1925',
@@ -9,21 +22,26 @@ Ext.define('Rally.technicalservices.ThreatCalculator', {
         '#DB843D', '#92A8CD', '#A47D7C', '#B5CA92'],
 
     dependencyColors: ['#FF0000','#00FF00','#0000FF','#00FFFF', '#FFFF00','#FF00FF','#FF9966','#6600FF','#996633'],
+    genericDependencyColor: '#000000',
+    noDependencyColor: '#FFFFFF',
 
     config: {
         riskField: undefined,
         currentProjectRef: undefined,
         projects: undefined,
-        maxAgeThreshhold: undefined,
+        maxFeatureAgeThreshhold: undefined,
+        maxStoryAgeThreshhold: undefined,
         minAgeThreshhold: undefined,
         minPointsThreshhold: undefined,
         minSize: 3,
         andMinThreshholds: true,
+        featureSizeMultiplier: undefined,
         storySizeMultiplier: undefined,
         riskMultiplier: undefined,
         iterationDays: undefined,
         releaseDays: undefined,
-        showDataLabels: false
+        showDataLabels: false,
+        showDependencyColors: false
     },
     /**
      * projectTree is used to show the hierarchy of the projects so that we can
@@ -58,8 +76,7 @@ Ext.define('Rally.technicalservices.ThreatCalculator', {
         var deferred = Ext.create('Deft.Deferred');
 
         var featureStoryHash = {},
-            promises = [],
-            dependencyMap = {};
+            promises = [];
 
         _.each(stories, function(s){
 
@@ -67,20 +84,19 @@ Ext.define('Rally.technicalservices.ThreatCalculator', {
             s.set('totalCount', 1);
             s.set('size', s.get('PlanEstimate') );
             s.set('density', this._getStoryDensity(s));
-            s.set('age', this._getAge(s, 'InProgressDate', this.iterationDays));
+            s.set('age', this._getAge(s, 'InProgressDate', this.maxStoryAgeThreshhold));
             if (s.get('Feature')){
                 featureStoryHash[s.get('Feature')._ref] = featureStoryHash[s.get('Feature')._ref] || [];
                 featureStoryHash[s.get('Feature')._ref].push(s);
             }
             if (this._includeInChart(s)){
                 promises.push(this._getPredecessors(s));
-                //series.push(this._getSeries(s));
             }
         }, this);
 
         _.each(features, function(f){
             var riskCount = 0, totalCount = 0;
-            f.set('age', this._getAge(f, 'ActualStartDate', this.releaseDays));
+            f.set('age', this._getAge(f, 'ActualStartDate', this.maxFeatureAgeThreshhold));
             _.each(featureStoryHash[f.get('_ref')], function(s){
                 totalCount ++;
                 riskCount+= s.get('riskCount');
@@ -146,7 +162,7 @@ Ext.define('Rally.technicalservices.ThreatCalculator', {
                 }
             });
         } else {
-            artifact.set('predecessorFids');
+            artifact.set('predecessorFids',[]);
             deferred.resolve();
         }
         return deferred;
@@ -197,25 +213,25 @@ Ext.define('Rally.technicalservices.ThreatCalculator', {
     _getSeries: function(artifact){
         this.logger.log('id, size, age, density',artifact.get('FormattedID'),artifact.get('size'),artifact.get('age'), artifact.get('density'),artifact.get('predecessorFids'))
 
-        var pointName = Ext.String.format("Project: {1}<br/>Size: {2}<br/>Age (days): {3}", artifact.get('FormattedID'),
-                            artifact.get('Project').Name,
-                            artifact.get('size'), artifact.get('age').toFixed(1)),
+        var isUserStory = this._isArtifactUserStory(artifact),
             color = this._getColor(artifact),
             hasDependency = artifact.get('predecessorFids') ? (artifact.get('predecessorFids').length > 0) : false,
-            isDependencyColor = '#FFFFFF',
+            isDependencyColor = this.noDependencyColor,
             isDependencyWidth = 0,
             dependencies = [];
 
-        var label = '';
+
+        var pointName = Ext.String.format("Project: {1}<br/>Size: {2}<br/>Age (days): {3}", artifact.get('FormattedID'),
+                artifact.get('Project').Name,
+                artifact.get('size'), artifact.get('age').toFixed(1));
+
+
         if (hasDependency){
-            pointName = Ext.String.format('{0}<br/>Dependencies [{1}]',pointName, artifact.get('predecessorFids').join(','));
-            _.each(artifact.get('predecessorFids'), function(p){
-                dependencies.push(p);
-                label += Ext.String.format('<span style="color:{0}">\u25CF</span>',this.dependencyMap[p]);
-            }, this);
+            dependencies = artifact.get('predecessorFids').slice();
+            pointName = Ext.String.format('{0}<br/>Dependencies [{1}]',pointName, dependencies.join(','));
         }
         if (_.has(this.dependencyMap, artifact.get('FormattedID'))){
-            isDependencyColor = this.dependencyMap[artifact.get('FormattedID')] || '#FFFFFF';
+            isDependencyColor = this.showDependencyColors ? this.dependencyMap[artifact.get('FormattedID')] || this.genericDependencyColor : this.genericDependencyColor;
             isDependencyWidth = this.dependencyLineWidth;
         }
 
@@ -226,7 +242,14 @@ Ext.define('Rally.technicalservices.ThreatCalculator', {
                 symbol: this._getSymbol(artifact),
                 fillColor: color,
                 lineColor: isDependencyColor,
-                lineWidth: isDependencyWidth
+                lineWidth: isDependencyWidth,
+                states: {
+                    select: {
+                        fillColor: color,
+                        lineColor: isDependencyColor,
+                        lineWidth: isDependencyWidth
+                    }
+                }
             },
             color: color,
             name: artifact.get('FormattedID'),
@@ -240,61 +263,85 @@ Ext.define('Rally.technicalservices.ThreatCalculator', {
                 dependencies: dependencies
             }],
             showInLegend: false,
+            allowPointSelect: true,
+            yAxis: isUserStory ? 1 : 0,
+            xAxis: isUserStory ? 1 : 0,
             point: {
                 events: {
-                    click: function () {
-                        console.log('this', this, this.series, this.plotX, this.plotY, this.series.chart.renderer);
-                        if (!this.clicked){
-                            this.clicked = true;
-                        } else {
-                            this.clicked = false;
-                        }
-
-                        var thisX = this.series.points[0].plotX,
-                            thisY = this.series.points[0].plotY,
-                            thisName = this.series.name;
-                        var paths = [], fudgeX = this.series.chart.plotLeft, fudgeY = this.series.chart.plotTop;
-                        _.each(this.series.chart.series, function(s){
-                            console.log('s', s.data[0].dependencies, thisName);
-                            if (Ext.Array.contains(s.data[0].dependencies, thisName)){
-                                paths.push(['M', thisX + fudgeX, thisY , 'L', s.points[0].plotX + fudgeX, s.points[0].plotY + fudgeY]);
-                            }
-                        });
-
-                        var ren = this.series.chart.renderer;
-                        if (this.clicked == true ){
-                            this.paths = [];
-                        _.each(paths, function(p){
-                            console.log(p);
-                            this.paths.push(ren.path(p)
-                                .attr({
-                                    'stroke-width': 1,
-                                    stroke: isDependencyColor
-                                })
-                                .add()
-                            );
-                        },this);
-                        }
-                        else {
-                            _.each(this.paths, function(p) {
-                                p.element.remove();
-                            });
-                        }
-                    }
+                    select: this._drawDependency,
+                    unselect: this._drawDependency
                 }
             }
         };
     },
+    _drawDependency: function(evt, point){
+        if (!point){
+            point = this;
+        }
+        console.log('evt', evt.type);
+        this.paths = this.paths || [];
+
+       if (evt.type == 'select' && this.paths.length == 0){
+
+           var ren = this.series.chart.renderer;
+           var plotLeft = point.series.chart.plotLeft,
+                plotTop = point.series.chart.plotTop,
+                x1 = point.series.points[0].plotX + plotLeft,
+                y1 = point.series.points[0].plotY + plotTop,
+                thisName = point.series.name,
+                thisColor = point.series.options.marker.lineColor,
+                thisRadius = point.series.options.marker.radius,
+                    pointPaths = [];
+
+                _.each(point.series.chart.series, function(s){
+                    if (Ext.Array.contains(s.data[0].dependencies, thisName)){
+
+                        var delta_y = y1 - (s.points[0].plotY + plotTop),
+                            delta_x = x1 - (s.points[0].plotX + plotLeft),
+                            dist = Math.sqrt(Math.pow((delta_x),2) + Math.pow((delta_y),2));
+
+                        var ratio1 =  -thisRadius/dist,
+                            dep_x = ratio1 * (delta_x) + x1,
+                            dep_y = ratio1 * (delta_y) + y1;
+
+                        var rad = s.options.marker.radius;
+                        var ratio2 = (rad-dist)/dist,
+                            pred_x = ratio2 * delta_x + x1,
+                            pred_y = ratio2 * delta_y + y1;
+
+                        pointPaths.push(ren.path(['M',dep_x, dep_y , 'L', pred_x, pred_y]) //s.points[0].plotX + plotLeft, s.points[0].plotY + plotTop])
+                            .attr({
+                                'stroke-width': 1,
+                                stroke: thisColor,
+                                'stroke-opacity': 0.5
+                            })
+                            .add());
+                    }
+                }, this);
+                this.paths = pointPaths;
+            }
+
+            if (evt.type == 'unselect'){
+                _.each(this.paths, function(p) {
+                    p.element.remove();
+                });
+                this.paths = [];
+            }
+    },
     _getRadius: function(artifact){
-        var multiplier = artifact.get('_type') == 'hierarchicalrequirement' ? this.storySizeMultiplier || 1 : 1;
+        var multiplier = this._isArtifactUserStory(artifact) ? this.storySizeMultiplier || 1 : this.featureSizeMultiplier || 1;
         return Math.max(artifact.get('size') * multiplier || 0, this.minSize);
     },
     _getColor: function(artifact){
         var hexColor = this.colorMap[artifact.get('Project')._ref] || this.defaultColor;
-        return this._hexToRGBAColorString(hexColor, '.5');
+        var alpha = 1;
+        if (this._isArtifactUserStory(artifact)){
+            alpha = .5;
+        }
+        return this._hexToRGBAColorString(hexColor, alpha);
     },
     _getSymbol: function(artifact){
-        return this.symbolMap[artifact.get('_type')] || "square";
+        return "circle"; //this.symbolMap[artifact.get('_type')] || "square";
     },
     _getStoryDensity: function(story){
         var multiplier = this._getRiskScore(story) > 0 ? this.riskMultiplier || 1 : 1;
@@ -303,17 +350,11 @@ Ext.define('Rally.technicalservices.ThreatCalculator', {
     _getRiskScore: function(story){
         return story.get(this.riskField) > 0 ? 1 : 0;
     },
-    _getAge: function(artifact, ageField, daysInTimebox){
+    _getAge: function(artifact, ageField, maxThreshhold){
        var ageInHours = Rally.util.DateTime.getDifference(new Date(), Rally.util.DateTime.fromIsoString(artifact.get(ageField)), 'hour') || 0,
            ageInDays = ageInHours / 24;
-        return ageInDays/daysInTimebox * 100;
-
-       //if (maxAgeThreshhold){
-       //    return Math.min(ageInDays, maxAgeThreshhold);
-       //}
-       //return ageInDays;
-
-    },
+        return Math.min(ageInDays, maxThreshhold);
+   },
     _hexToRGBAColorString: function(hex, alpha) {
         var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
 
@@ -326,6 +367,9 @@ Ext.define('Rally.technicalservices.ThreatCalculator', {
             );
         }
         return hex;
+    },
+    _isArtifactUserStory: function(artifact){
+        return artifact.get('_type') == 'hierarchicalrequirement';
     },
     _getTreeArray:function(records, currentProjectRef) {
 
@@ -366,76 +410,5 @@ Ext.define('Rally.technicalservices.ThreatCalculator', {
         },this);
 
         return current_root;
-    },
-    _getSampleSeries: function(){
-        return [{
-            marker: {
-                radius: 15
-            },
-
-            name: 'Feature 1',
-            color: 'rgba(223, 83, 83, .5)',
-            data: [
-                [61.2, 51.6],
-                [67.5, 59.0],
-                [59.5, 49.2],
-                [57.0, 63.0],
-                [55.8, 53.6],
-                [70.0, 59.0],
-                [59.1, 47.6]
-            ]
-
-        }, {
-            marker: {
-                radius: 25
-            },
-
-            name: 'Feature 2',
-            color: 'rgba(255, 255, 0, .5)',
-            data: [
-                [31.2, 51.6],
-                [57.5, 59.0],
-                [49.5, 49.2],
-                [87.0, 63.0],
-                [95.8, 53.6],
-                [20.0, 59.0],
-                [19.1, 47.6]
-            ]
-
-        }, {
-            marker: {
-                radius: 5
-            },
-
-            name: 'Feature 3',
-            color: 'rgba(119, 152, 191, .5)',
-            data: [
-                [74.0, 65.6],
-                [75.3, 71.8],
-                [93.5, 80.7],
-                [86.5, 72.6],
-                [87.2, 78.8],
-                [81.5, 74.8],
-                [84.0, 86.4],
-                [73.5, 81.8]
-            ]
-        },  {
-            marker: {
-                radius: 20
-            },
-
-            name: 'Feature 4',
-            color: 'rgba(255, 0, 100, .5)',
-            data: [
-                [34.0, 55.6],
-                [85.3, 51.8],
-                [43.5, 30.7],
-                [66.5, 82.6],
-                [57.2, 38.8],
-                [21.5, 24.8],
-                [44.0, 56.4],
-                [33.5, 41.8]
-            ]
-        }];
     }
 });

@@ -10,12 +10,15 @@ Ext.define("threat-matrix", {
     config: {
         defaultSettings: {
             minAgeThreshhold:  1,
-            maxAgeThreshhold: 365,
+            maxFeatureAgeThreshhold: 56,
+            maxStoryAgeThreshhold: 14,
             minPointsThreshhold: 1,
             andMinThreshholds: true,
+            featureSizeMultiplier: 1,
             storySizeMultiplier: 1,
             riskMultiplier: 2,
-            showDataLabels: true
+            showDataLabels: true,
+            showDependencyColors: false
         }
     },
     storyFetchFields: ['FormattedID','c_Risk','PlanEstimate','Project','ScheduleState','InProgressDate','Blocked','Blocker','CreationDate','Feature','Name','Predecessors'],
@@ -108,13 +111,16 @@ Ext.define("threat-matrix", {
                         currentProjectRef: this.getContext().getProjectRef(),
                         projects: records[2],
                         minAgeThreshhold: this.getSetting('minAgeThreshhold'),
-                        maxAgeThreshhold: this.getSetting('maxAgeThreshhold'),
+                        maxFeatureAgeThreshhold: this.getSetting('maxFeatureAgeThreshhold'),
+                        maxStoryAgeThreshhold: this.getSetting('maxStoryAgeThreshhold'),
                         minPointsThreshhold: this.getSetting('minPointsThreshhold'),
+                        featureSizeMultiplier: this.getSetting('featureSizeMultiplier'),
                         storySizeMultiplier: this.getSetting('storySizeMultiplier'),
                         riskMultiplier: this.getSetting('riskMultiplier'),
                         iterationDays: days_in_iteration,
                         releaseDays: days_in_release,
-                        showDataLabels: this.getSetting('showDataLabels')
+                        showDataLabels: this.getSetting('showDataLabels'),
+                        showDependencyColors: this.getSetting('showDependencyColors')
                     });
 
                     calc.runCalculation(records[0],records[1]).then({
@@ -129,7 +135,6 @@ Ext.define("threat-matrix", {
                                 loadMask: false,
                                 chartData: chartData,
                                 title: 'Threat Matrix'
-
                             });
                             this._addLegend(calc.projectLabelColorMap);
 
@@ -158,11 +163,9 @@ Ext.define("threat-matrix", {
             itemId: 'ct-legend',
             layout: {type: 'vbox'}
         });
-        console.log('--');
 
         var color_data = [];
         _.each(colorMap, function(color, label){
-            console.log(color,label,'map');
             color_data.push({color: color, label: label});
         });
         this.logger.log('_addLegend',color_data);
@@ -177,7 +180,7 @@ Ext.define("threat-matrix", {
             xtype: 'container',
             padding: 10,
             html: '<div class="tslegendtext">Types:  </div><div class="tslegend-square">&nbsp;&nbsp;</div><div class="tslegendtext">&nbsp;&nbsp;Feature</div><span class="tslegendspacer">&nbsp;</span>' +
-                '<div class="tslegend-circle">&nbsp;&nbsp;</div><div class="tslegendtext">&nbsp;&nbsp;User Story</div><span class="tslegendspacer">&nbsp;</span>'
+                '<div class="tslegend-circle">&nbsp;&nbsp;</div><div class="tslegendtext">&nbsp;&nbsp;User Story (50% Opacity)</div><span class="tslegendspacer">&nbsp;</span>'
         });
 
 
@@ -231,8 +234,40 @@ Ext.define("threat-matrix", {
             width: '300'
         });
         cb.on('change', this.onTimeboxUpdated,this);
-    },
 
+        this.getHeader().add({
+            xtype: 'rallybutton',
+            itemId: 'bt-dependency',
+            cls: 'small-icon secondary rly-small',
+            width: 35,
+            iconCls: 'icon-predecessor',
+           // icon: 'icon-predecessor',
+            scope: this,
+            handler: this._toggleDependencies,
+            tooltip: 'Show first level dependency relationships'
+        });
+    },
+    _toggleDependencies: function(btn){
+        this.logger.log('_toggleDependencies', btn.cls.toString(), btn.cls.indexOf("primary"));
+        var hideDependencies = btn.cls.indexOf("primary") > -1;
+
+        if (hideDependencies){
+            btn.cls = 'small-icon secondary rly-small';
+            btn.removeCls('primary');
+            btn.addCls('secondary');
+            btn.tooltip = 'Show first level dependency relationships';
+        } else {
+            btn.removeCls('secondary');
+            btn.addCls('primary');
+            btn.cls = 'small-icon primary rly-small';
+            btn.tooltip = 'Hide first level dependency relationships';
+        }
+
+        var chart = this.down('#rally-chart').items.items[1].items.items[0];
+        _.each(chart.chart.series, function(s){
+            s.data[0].select(hideDependencies != true, hideDependencies != true);
+        });
+    },
     getIterationRecord: function(){
         if (this.down('#cb-iteration')){
             return this.down('#cb-iteration').getRecord();
@@ -280,14 +315,21 @@ Ext.define("threat-matrix", {
 
         return [
             {
-                name: 'maxAgeThreshhold',
+                name: 'maxFeatureAgeThreshhold',
                 xtype: 'rallynumberfield',
-                fieldLabel: 'Max age threshold (days)',
+                fieldLabel: 'Max Feature age threshold (days)',
                 labelWidth: 200,
                 labelAlign: 'right',
                 minValue: 0
-            },
-            {
+            },            {
+                name: 'maxStoryAgeThreshhold',
+                xtype: 'rallynumberfield',
+                fieldLabel: 'Max User Story age threshold (days)',
+                labelWidth: 200,
+                labelAlign: 'right',
+                minValue: 0,
+                margin: '0 0 20 0'
+            },{
                 name: 'minAgeThreshhold',
                 xtype: 'rallynumberfield',
                 fieldLabel: 'Min age threshold (days)',
@@ -298,6 +340,20 @@ Ext.define("threat-matrix", {
                 name: 'minPointsThreshhold',
                 xtype: 'rallynumberfield',
                 fieldLabel: 'Min points threshold',
+                labelWidth: 200,
+                labelAlign: 'right',
+                 minValue: 0
+            },{
+                name: 'andMinThreshholds',
+                xtype: 'rallycheckboxfield',
+                boxLabelAlign: 'after',
+                fieldLabel: '',
+                margin: '0 0 25 200',
+                boxLabel: 'Use <b>AND</b> query to exclude items by threshold.<br/><span style="color:#999999;"><i>If checked, exclude artifacts if their age <b>AND</b> points are below the minimum threshold.<br/> If unchecked, exclude artifacts if either age <b>OR</b> points are below the minimum threshold.</i></span>'
+            },{
+                name: 'featureSizeMultiplier',
+                xtype: 'rallynumberfield',
+                fieldLabel: 'Feature Size Multiplier',
                 labelWidth: 200,
                 labelAlign: 'right',
                  minValue: 0
@@ -314,7 +370,8 @@ Ext.define("threat-matrix", {
                 fieldLabel: 'Risk Multiplier for User Stories',
                 labelWidth: 200,
                 labelAlign: 'right',
-                minValue: 0
+                 minValue: 0,
+                 margin: '0 0 20 0'
             },{
                 name: 'showDataLabels',
                 xtype: 'rallycheckboxfield',
@@ -323,12 +380,12 @@ Ext.define("threat-matrix", {
                 margin: '0 0 0 200',
                 boxLabel: 'Show data labels'
             },{
-                name: 'andMinThreshholds',
+                name: 'showDependencyColors',
                 xtype: 'rallycheckboxfield',
                 boxLabelAlign: 'after',
                 fieldLabel: '',
                 margin: '0 0 0 200',
-                boxLabel: 'Use <b>AND</b> query to exclude items by threshold.<br/><span style="color:#999999;"><i>If checked, exclude artifacts if their age <b>AND</b> points are below the minimum threshold.<br/> If unchecked, exclude artifacts if either age <b>OR</b> points are below the minimum threshold.</i></span>'
+                boxLabel: 'Show colored dependencies'
             }
 
         ];

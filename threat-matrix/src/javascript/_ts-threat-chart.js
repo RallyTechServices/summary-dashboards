@@ -16,20 +16,38 @@ Ext.define('Rally.technicalservices.ThreatChart',{
         legend: {
             enabled: false
         },
-        xAxis: {
+        xAxis: [{
             min: 0,
             title: {
-                text: 'Age (days)'
+                text: 'Feature Age (Days)'
             },
+            opposite: true,
             startOnTick: true,
             endOnTick: true,
             showLastLabel: true
-        },
+        },{
+            title: {
+                text: 'User Story Age (Days)'
+            },
+            min: 0,
+            startOnTick: true,
+            endOnTick: true,
+            showLastLabel: true
+        }],
         yAxis: [
             {
+                max: 110,
+                min: 0,
                 title: {
-                    text: '%Density'
-                }
+                    text: '%Density (Feature)'
+                },
+                opposite: true
+            },
+            {
+                title: {
+                    text: 'Weighted Risk (User Story)'
+                },
+                min: 0
             }
         ],
         plotOptions: {

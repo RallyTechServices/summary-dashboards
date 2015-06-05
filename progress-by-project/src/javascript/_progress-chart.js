@@ -17,7 +17,7 @@ Ext.define('Rally.technicalservices.progressChart',{
         xAxis: {
             tickInterval: 1,
             title: {
-                text: '%'
+                text: ''
             }
         },
         yAxis: [

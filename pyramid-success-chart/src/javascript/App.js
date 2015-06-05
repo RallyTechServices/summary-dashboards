@@ -149,10 +149,10 @@ Ext.define('CustomApp', {
             return [ project, 
                 summarize(features[index],false),
                 summarize(features[index],true),
-                _.map(features[index],function(feature){ return feature.get("Name") /* ("c_ValueMetricKPI") */; })
+                _.map(features[index],function(feature){ return feature.get("FormattedID") + " " + feature.get("c_ValueMetricKPI") /* ("c_ValueMetricKPI") */; })
             ];
         });
-        var sortedData = data.sort(function(a,b) { return b[1] - a[1]; });
+        var sortedData = data.sort(function(a,b) { return b[1] - a[1]; }) ;
 
         var seriesData = [{
             name : 'Project Scope',
@@ -190,37 +190,26 @@ Ext.define('CustomApp', {
                 var featureWords = series.options.featureWords[index].slice(0,4);
                 var y = point.plotY - (( featureWords.length * wordHeight)/2);
                 _.each(featureWords,function(fw,x) {
-                    var word = fw.split(' ').slice(0,2).join(' ');
+                    // var word = fw.split(' ').slice(0,2).join(' ');
+                    var word = fw;
                     ren.label(word, 5, y + (x*wordHeight))
                     .css({
                         fontWeight: 'normal',
-                        fontSize: '75%'
+                        fontSize: '75%',
+                    })
+                    .attr({
+                        zIndex : 9
                     })
                     .add();
                 });
             });
 
-            ren.label("Only first 3 features are shown", 5, 285)
+            ren.label("Only first 3 top ranked features are shown", 5, 285)
             .css({
                 fontWeight: 'normal',
                 fontSize: '60%'
             })
             .add();
-
-            // Separator, client from service
-            // ren.path(['M', 120, 40, 'L', 120, 330])
-            //     .attr({
-            //         'stroke-width': 2,
-            //         stroke: 'silver',
-            //         dashstyle: 'dash'
-            //     })
-            //     .add();
-            // // Headers
-            // ren.label('Web client', 20, 40)
-            //     .css({
-            //         fontWeight: 'bold'
-            //     })
-            //     .add();
         };
 
         var chartConfig = {

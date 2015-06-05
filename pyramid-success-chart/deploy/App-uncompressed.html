@@ -1,10 +1,13 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>progress-by-project</title>
+    <title>pyramid-success-chart</title>
 
     <script type="text/javascript" src="/apps/2.0rc2/sdk.js"></script>
+    <script type="text/javascript" src="https://code.jquery.com/jquery-2.1.4.min.js"></script>
     <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/async/1.22/async.min.js"></script>
+    <script type="text/javascript" src="https://code.highcharts.com/highcharts.js"></script>
+    <script type="text/javascript" src="https://code.highcharts.com/modules/funnel.js"></script>
 
     <script type="text/javascript">
         Rally.onReady(function () {
@@ -211,12 +214,14 @@ Ext.define("ProjectStories", function() {
         var iteration = "Iteration 1"; // this.getTimeboxScope();
 
         that.rallyFunctions = Ext.create("RallyFunctions");
-
+        
         var tbs = that.getTimeboxScope();
+
         if (!_.isNull(tbs)) {
             release = tbs.type === "release" ? tbs.name : null;
             iteration = tbs.type === "iteration" ? tbs.name : null;
         }
+
         that.run(release,iteration);
     },
 
@@ -226,19 +231,18 @@ Ext.define("ProjectStories", function() {
 
         var pr = Ext.create( "ProjectStories", {
             ctx : that.getContext(),
-            filter : that.rallyFunctions.createFilter(releaseName,iterationName)
+            filter : that.rallyFunctions.createFilter(releaseName, iterationName)
         });
 
-        pr.readProjectStories(function(error, stories, projects, states) {
-            that.prepareChartData( stories, projects, state, function(error, categories, series) {
-              that.createChart( categories, series );
+        pr.readProjectStories(function(error, stories, projects, states){
+            that.prepareChartData( stories, projects, states, function(error,series,categories) {
+                that.createChart(series,categories);    
             });
+            
         });
-
     },
 
     getTimeboxScope : function() {
-
         var timeboxScope = this.getContext().getTimeboxScope();
         if (timeboxScope) {
             return { type : timeboxScope.getType(), name : timeboxScope.getRecord().get("Name") };
@@ -247,7 +251,7 @@ Ext.define("ProjectStories", function() {
     },
 
     onTimeboxScopeChange: function(newTimeboxScope) {
-
+        
         this.callParent(arguments);
         if ((newTimeboxScope) && (newTimeboxScope.getType() === 'iteration')) {
             this.run(null,newTimeboxScope.getRecord().get("Name"));
@@ -261,8 +265,8 @@ Ext.define("ProjectStories", function() {
     prepareChartData : function(stories, projects, states, callback) {
 
         var that = this;
-
-        var projectKeys = _.map(projects,function(project) { return project.get("Name"); });
+        var categories = _.map( projects, function(p) { return p.get("Name"); });
+        var completedStates = ["Accepted",_.last(states)];
 
         var pointsValue = function(value) {
             return !_.isUndefined(value) && !_.isNull(value) ? value : 0;
@@ -270,34 +274,28 @@ Ext.define("ProjectStories", function() {
 
         // totals points for a set of work items based on if they are in a set of states
         var summarize = function( workItems, states ) {
-
-            // calc total points
-            var total = _.reduce(workItems, function(memo,workItem) {
-                    return memo + pointsValue(workItem.get("PlanEstimate"));
-            },0);
-
-            // totals points for a set of work items based on if they are in a set of states
             var stateTotal = _.reduce(  workItems, function(memo,workItem) {
-                return memo + ( _.indexOf(states,workItem.get("ScheduleState")) > -1 ? 
+                    return memo + ( _.indexOf(states,workItem.get("ScheduleState")) > -1 ? 
                             pointsValue(workItem.get("PlanEstimate")) : 0);
-            },0);
-
-            var p = ( total > 0 ? ((stateTotal/total)*100) : 0);
-            return Math.round(p);
+                },0);
+            return stateTotal;
         };
 
-        var summary = that.createSummaryRecord();
-
-        var seriesData = _.map( _.keys(summary), function( summaryKey ) {
-            return {
-                name : summaryKey,
-                data : _.map( projectKeys, function( projectKey ) {
-                    return summarize( groupedWorkItems[projectKey], summary[summaryKey]);
-                })
-            };
+        var data = _.map(categories,function(project,index){
+            return [ project, 
+                summarize(stories[index],states),
+                summarize(stories[index],completedStates)
+            ];
         });
+        var sortedData = data.sort(function(a,b) { return b[1] - a[1]; });
 
-        callback(null, projectKeys, seriesData );
+        var seriesData = [{
+            name : 'Project Scope',
+            data : sortedData,
+            completedData : _.map(sortedData,function(d) { return d[2];})
+        }];
+
+        callback(null,categories,seriesData);
 
     },
 
@@ -305,107 +303,64 @@ Ext.define("ProjectStories", function() {
 
         var that = this;
 
-        if (!_.isUndefined(that.chart)) {
-            that.remove(that.chart);
-        }
-
-        that.chart = Ext.create('Rally.technicalservices.progressChart', {
-            itemId: 'rally-chart',
-            chartData: { series : seriesData, categories : categories },
-            title: 'Progress By Project'
-        });
-
-        that.add(that.chart);
-
-        var chart = this.down("#rally-chart");
-        var p = Ext.get(chart.id);
-        elems = p.query("div.x-mask");
-        _.each(elems, function(e) { e.remove(); });
-        var elems = p.query("div.x-mask-msg");
-        _.each(elems, function(e) { e.remove(); });
-
-    },
-
-    // utilities below here ... 
-    createSummaryRecord : function() { 
-
-        var that = this;
-      
-        var summary = {
-            "Backlog" : ["Defined"],
-            "In-Progress" : ["In-Progress"],
-            "Completed/Accepted" : ["Completed","Accepted"]
+        var chartConfig = {
+            colors : ["#3498db","#f1c40f","#c0392b","#9b59b6","#2ecc71"],
+             chart: {
+                type: 'pyramid',
+                marginRight : 100
+            },
+            title: {
+                text: 'Success Chart'
+            },
+            plotOptions: {
+                pyramid : {
+                    allowPointSelect : true
+                },
+                series: {
+                    dataLabels: {
+                        enabled: true,
+                        formatter : function() {
+                            console.log(this);
+                            var scope = this.point.y;
+                            var completed = this.point.series.options.completedData[this.point.index];
+                            var pct = Math.round( scope > 0 ? (completed/scope)*100 : 0);
+                            return " [" + completed + "/" + scope + "] ("+pct+"%) " + 
+                                _.last(this.point.name.split(">"));
+                        },
+                        softConnector: true,
+                        distance : 10
+                    }
+                }
+            },
+            legend : {
+                enabled : false
+            },
+            series: seriesData
         };
 
-        // add initial and last states if necessary
-        var first = _.first(that.scheduleStates);
-        var last = _.last(that.scheduleStates);
-        if (_.indexOf(summary[_.first(_.keys(summary))],first)===-1)
-            summary[_.first(_.keys(summary))].push(_.first(that.scheduleStates));
-        if (_.indexOf(summary[_.last(_.keys(summary))],last)===-1)
-            summary[_.last(_.keys(summary))].push(_.last(that.scheduleStates));
+        if (!_.isUndefined(that.x)) {
+            that.remove(that.x);
+        }
 
-        console.log("summary",summary);
-        return summary;
-    }
-
-});
-
-                Ext.define('Rally.technicalservices.progressChart',{
-    extend: 'Rally.ui.chart.Chart',
-    alias: 'widget.progresschart',
-
-    itemId: 'rally-chart',
-    chartData: {},
-    loadMask: false,
-    chartColors : [],
-    chartConfig: {
-        colors : ["#E0E0E0","#00a9e0","#8dc63f"],
-        chart: {
-            type: 'bar'
-        },
-        title: {
-            text: 'Progress by Project'
-        },
-        xAxis: {
-            tickInterval: 1,
-            title: {
-                text: '%'
-            }
-        },
-        yAxis: [
-            {
-                min: 0,
-                max: 100,
-                title: {
-                    text: '% of Scheduled Stories by State'
+        that.x = Ext.widget('container',{
+            autoShow: true ,shadow: false,title: "",resizable: false,margin: 10,
+            html: '<div id="chart-container" class="chart-container"></div>',
+            listeners: {
+                resize: function(panel) {
+                },
+                afterrender : function(panel) {
+                    $('#chart-container').highcharts(chartConfig);
                 }
             }
-        ],
-        plotOptions: {
-            series: {
-                dataLabels: {
-                    enabled: true,
-                    align: 'center',
-                    formatter : function() {
-                        return Math.round(this.percentage) + " %";
-                    },
-                    color: '#FFFFFF'
-                },
-                stacking: 'normal'
-            }        
-        }
-    },
-    constructor: function (config) {
-        this.callParent(arguments);
-        if (config.title){
-            this.chartConfig.title = config.title;
-        }
+        });
+        that.add(that.x);
     }
+
 });
 
+
             Rally.launchApp('CustomApp', {
-                name:"progress-by-project",
+                name:"pyramid-success-chart",
 	            parentRepos:""
             });
 
@@ -417,6 +372,10 @@ Ext.define("ProjectStories", function() {
     <style type="text/css">
         .app {
   /* Add app styles here */
+}
+.chart-container {
+  width: 600px;
+  height: 400px;
 }
 
     </style>

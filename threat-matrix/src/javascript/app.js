@@ -217,7 +217,7 @@ Ext.define("threat-matrix", {
             xtype: 'container',
             padding: 10,
             html: '<div class="tslegendtext">Types:  </div><div class="tslegend-square">&nbsp;&nbsp;</div><div class="tslegendtext">&nbsp;&nbsp;Feature</div><span class="tslegendspacer">&nbsp;</span>' +
-                '<div class="tslegend-circle">&nbsp;&nbsp;</div><div class="tslegendtext">&nbsp;&nbsp;User Story (50% Opacity)</div><span class="tslegendspacer">&nbsp;</span>'
+                '<div class="tslegend-circle">&nbsp;&nbsp;</div><div class="tslegendtext">&nbsp;&nbsp;Story (more transparent)</div><span class="tslegendspacer">&nbsp;</span>'
         });
 
 

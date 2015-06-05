@@ -3,11 +3,11 @@
 <head>
     <title>Threat Matrix</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Fri Jun 05 2015 13:07:00 GMT-0600 (MDT) -->
+    <!--  Build Date: Fri Jun 05 2015 15:01:12 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Fri Jun 05 2015 13:07:00 GMT-0600 (MDT)";
-        var CHECKSUM = 43012420175;
+        var APP_BUILD_DATE = "Fri Jun 05 2015 15:01:12 GMT-0600 (MDT)";
+        var CHECKSUM = 42959563049;
     </script>
 
    <script type="text/javascript" src="/apps/2.0rc3/sdk.js"></script>
@@ -676,8 +676,7 @@ Ext.define("threat-matrix", {
     selectedRelease: undefined,
 
     launch: function() {
-        console.log('launch');
-        if (this.isExternal()){
+         if (this.isExternal()){
             this.showSettings(this.config);
         } else {
             this.onSettingsUpdate(this.getSettings());
@@ -860,7 +859,7 @@ Ext.define("threat-matrix", {
             xtype: 'container',
             padding: 10,
             html: '<div class="tslegendtext">Types:  </div><div class="tslegend-square">&nbsp;&nbsp;</div><div class="tslegendtext">&nbsp;&nbsp;Feature</div><span class="tslegendspacer">&nbsp;</span>' +
-                '<div class="tslegend-circle">&nbsp;&nbsp;</div><div class="tslegendtext">&nbsp;&nbsp;User Story (50% Opacity)</div><span class="tslegendspacer">&nbsp;</span>'
+                '<div class="tslegend-circle">&nbsp;&nbsp;</div><div class="tslegendtext">&nbsp;&nbsp;Story (more transparent)</div><span class="tslegendspacer">&nbsp;</span>'
         });
 
 

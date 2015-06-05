@@ -2,6 +2,6 @@
     "name": "Countdown",
     "className": "TSCountdown",
     "server": "https://rally1.rallydev.com",
-    "sdk": "2.0rc2",
+    "sdk": "2.0rc3",
     "apiKey": "_PUT_APIKEY_HERE_"
 }

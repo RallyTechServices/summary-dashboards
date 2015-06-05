@@ -6,7 +6,6 @@ Ext.define("TSCountdown", {
     items: [
         {xtype:'container',itemId:'settings_box'},
         {xtype:'container', itemId:'selector_box' },
-
         {xtype:'tscountdown',itemId:'release_counter',cls:'border-bottom'},
         {xtype:'tscountdown',itemId:'iteration_counter'},
         {xtype:'tsinfolink'}

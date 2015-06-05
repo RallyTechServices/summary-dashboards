@@ -3,18 +3,127 @@
 <head>
     <title>Countdown</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Fri Jun 05 2015 09:43:48 GMT-0600 (MDT) -->
+    <!--  Build Date: Fri Jun 05 2015 11:25:11 GMT-0700 (PDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Fri Jun 05 2015 09:43:48 GMT-0600 (MDT)";
-        var CHECKSUM = 8184141403;
+        var APP_BUILD_DATE = "Fri Jun 05 2015 11:25:11 GMT-0700 (PDT)";
+        var CHECKSUM = 7189976270;
     </script>
     
-    <script type="text/javascript" src="/apps/2.0rc2/sdk.js"></script>
+    <script type="text/javascript" src="/apps/2.0rc3/sdk.js"></script>
 
     <script type="text/javascript">
+        if (!window.location.origin) {
+            window.location.origin = window.location.protocol + "//" + window.location.hostname + (window.location.port ? ':' + window.location.port: '');
+        }
+
         Rally.onReady(function() {
              
+Ext.define('timebox-selector', {
+    extend : 'Ext.Container',
+    componentCls : 'app',
+    alias : 'widget.timebox-selector',
+    cls : 'timebox-selector',
+    layout : 'hbox',
+    width : '100%',
+    mixins : [
+        'Rally.Messageable'
+    ],
+    constructor : function()
+    {
+        this.stateId = Rally.environment.getContext().getScopedStateId('timebox-filter');
+        this.callParent(arguments);
+    },
+    initComponent : function()
+    {
+        this.callParent(arguments);
+        this._createReleaseCombo();
+        this.addEvents('releasechange','iterationchange')
+    },
+    _createReleaseCombo : function()
+    {
+        this._releaseCombo = this.add({
+            xtype : 'rallyreleasecombobox',
+            fieldLabel : 'Program Increment',
+            hideLabel : false,
+            labelPad : 5,
+            labelSeparator : ':',
+            labelWidth : 130,
+            width : 280,
+            labelAlign : 'right',
+            stateful : false,
+            stateId : 'releasecombo',
+            padding : 5,
+            context : Rally.environment.getContext(),
+            showArrows : false,
+            growToLongestValue : true,
+            defaultToCurrentTimebox : true,
+            listeners : {
+                change : function(t, newVal, oldVal, eOpts)
+                {
+                    var release = t.getRecord();
+                    this.fireEvent('releasechange',release);
+                    this.publish('timeboxReleaseChanged', release);
+                    this._updateIterationCombo(release);
+                },
+                scope : this
+            }
+        });
+    },
+    _updateIterationCombo : function(release)
+    {
+        this.remove('globaliterationpicker');
+        var endFilter = Ext.create('Rally.data.wsapi.Filter', {
+            property : "EndDate",
+            operator : "<=",
+            value : Rally.util.DateTime.toIsoString(release.get('ReleaseDate'))
+        });
+        var startFilter = Ext.create('Rally.data.wsapi.Filter', {
+            property : "StartDate",
+            operator : ">=",
+            value : Rally.util.DateTime.toIsoString(release.get('ReleaseStartDate'))
+        });
+        var filters = endFilter.and(startFilter);
+
+        this._iterationCombo = this.add({
+            xtype : 'rallyiterationcombobox',
+            itemId : 'globaliterationpicker',
+            fieldLabel : 'Sprint/Iteration',
+            hideLabel : false,
+            labelPad : 5,
+            labelSeparator : ':',
+            labelWidth : 100,
+            labelAlign : 'right',
+            stateful : false,
+            padding : 5,
+            context : Rally.environment.getContext(),
+            showArrows : false,
+            growToLongestValue : true,
+            stateId : 'iterationcombo',
+            allowBlank : true,
+            allowClear : true,
+            allowNoEntry : true,
+            noEntryText : 'PI Scope',
+            emptyText : 'PI Scope',
+            noEntryValue : null,
+            defaultToCurrentTimebox : false,
+            defaultSelectPosition : 'first',
+            storeConfig : {
+                remoteFilter : true,
+                filters : filters
+            },
+            listeners : {
+                change : function(t, newVal, oldVal, eOpts)
+                {
+                    var iteration = t.getRecord();
+                    this.fireEvent('iterationchange',iteration);
+                    this.publish('timeboxIterationChanged', iteration);
+                },
+                scope : this
+            }
+        });
+    }
+});
 /**
  * A link that pops up a version dialog box
  */
@@ -190,6 +299,8 @@ Ext.define('Rally.technicalservices.CountDownClock',{
     },
     
     setEndDate: function(end_date) {
+        console.log("setEndDate",end_date);
+        
         this.endDate = end_date;
         this.updateCounters();
     },
@@ -297,7 +408,6 @@ Ext.define("TSCountdown", {
     items: [
         {xtype:'container',itemId:'settings_box'},
         {xtype:'container', itemId:'selector_box' },
-
         {xtype:'tscountdown',itemId:'release_counter',cls:'border-bottom'},
         {xtype:'tscountdown',itemId:'iteration_counter'},
         {xtype:'tsinfolink'}
@@ -319,7 +429,7 @@ Ext.define("TSCountdown", {
     _launch: function(settings) {
         var me = this;
 
-        if ( settings.showScopeSelector || settings.showScopeSelector == "true" ) {
+        if ( settings.showScopeSelector == true || settings.showScopeSelector == "true" ) {
             this.down('#selector_box').add({
                 xtype : 'timebox-selector',
                 context : this.getContext(),
@@ -340,50 +450,7 @@ Ext.define("TSCountdown", {
 
             this.publish('requestTimebox', this);
         }
-
-        //var today = Rally.util.DateTime.toIsoString(new Date());
-        //
-        //var iteration_filters = [
-        //    {property:'StartDate',operator:'<',value: today},
-        //    {property:'EndDate',  operator:'>',value: today}
-        //];
-        //
-        //var release_filters = [
-        //    {property:'ReleaseStartDate',operator:'<',value: today},
-        //    {property:'ReleaseDate',  operator:'>',value: today}
-        //];
-        //
-        //Deft.Chain.sequence([
-        //    function() { return me._loadAStoreWithAPromise('Iteration', ['StartDate','EndDate','Name'], iteration_filters); },
-        //    function() { return me._loadAStoreWithAPromise('Release', ['ReleaseStartDate','ReleaseDate','Name'], release_filters); }
-        //]).then({
-        //    scope: this,
-        //    success: function(results) {
-        //        var iteration = results[0][0];
-        //        var release = results[1][0];
-        //
-        //        this.logger.log("iteration,release", iteration, release);
-        //
-        //        this.down('#release_counter').setEndDate( release.get('ReleaseDate') );
-        //        this.down('#release_counter').text = release.get('Name') + ": " + release.get('ReleaseDate');
-        //
-        //        this.down('#iteration_counter').setEndDate( iteration.get('EndDate') );
-        //        this.down('#iteration_counter').text = iteration.get('Name') + ": " + iteration.get('EndDate');
-        //
-        //        // subscribe and request status
-        //        this.subscribe(this, 'timeboxReleaseChanged', this._changeRelease, this);
-        //        this.subscribe(this, 'timeboxIterationChanged', this._changeIteration, this);
-        //
-        //        this.publish('requestTimebox', this);
-        //    },
-        //    failure: function(error_message){
-        //        alert(error_message);
-        //    }
-        //}).always(function() {
-        //    me.setLoading(false);
-        //});
-
-    },
+   },
     _changeRelease: function(timebox) {
         this.logger.log("_changeRelease", timebox);
 
@@ -491,113 +558,7 @@ Ext.define("TSCountdown", {
         this._launch(settings);
     }
 });
-Ext.define('timebox-selector', {
-    extend : 'Ext.Container',
-    componentCls : 'app',
-    alias : 'widget.timebox-selector',
-    cls : 'timebox-selector',
-    layout : 'hbox',
-    width : '100%',
-    mixins : [
-        'Rally.Messageable'
-    ],
-    constructor : function()
-    {
-        this.stateId = Rally.environment.getContext().getScopedStateId('timebox-filter');
-        this.callParent(arguments);
-    },
-    initComponent : function()
-    {
-        this.callParent(arguments);
-        this._createReleaseCombo();
-        this.addEvents('releasechange','iterationchange')
-    },
-    _createReleaseCombo : function()
-    {
-        console.log("Creating release combo...");
-        this._releaseCombo = this.add({
-            xtype : 'rallyreleasecombobox',
-            fieldLabel : 'Program Increment',
-            hideLabel : false,
-            labelPad : 5,
-            labelSeparator : ':',
-            labelWidth : 130,
-            width : 280,
-            labelAlign : 'right',
-            stateful : false,
-            stateId : 'releasecombo',
-            padding : 5,
-            context : Rally.environment.getContext(),
-            showArrows : false,
-            growToLongestValue : true,
-            defaultToCurrentTimebox : true,
-            listeners : {
-                change : function(t, newVal, oldVal, eOpts)
-                {
-                    var release = t.getRecord();
-                    this.fireEvent('releasechange',release);
-                    this.publish('timeboxReleaseChanged', release);
-                    this._updateIterationCombo(release);
-                },
-                scope : this
-            }
-        });
-    },
-    _updateIterationCombo : function(release)
-    {
-        console.log("Creating iteration combo...");
-        this.remove('globaliterationpicker');
-        var endFilter = Ext.create('Rally.data.wsapi.Filter', {
-            property : "EndDate",
-            operator : "<=",
-            value : Rally.util.DateTime.toIsoString(release.get('ReleaseDate'))
-        });
-        var startFilter = Ext.create('Rally.data.wsapi.Filter', {
-            property : "StartDate",
-            operator : ">=",
-            value : Rally.util.DateTime.toIsoString(release.get('ReleaseStartDate'))
-        });
-        var filters = endFilter.and(startFilter);
-        console.log("Filters: ", filters);
-        this._iterationCombo = this.add({
-            xtype : 'rallyiterationcombobox',
-            itemId : 'globaliterationpicker',
-            fieldLabel : 'Sprint/Iteration',
-            hideLabel : false,
-            labelPad : 5,
-            labelSeparator : ':',
-            labelWidth : 100,
-            labelAlign : 'right',
-            stateful : false,
-            padding : 5,
-            context : Rally.environment.getContext(),
-            showArrows : false,
-            growToLongestValue : true,
-            stateId : 'iterationcombo',
-            allowBlank : true,
-            allowClear : true,
-            allowNoEntry : true,
-            noEntryText : 'PI Scope',
-            emptyText : 'PI Scope',
-            noEntryValue : null,
-            defaultToCurrentTimebox : false,
-            defaultSelectPosition : 'first',
-            storeConfig : {
-                remoteFilter : true,
-                filters : filters
-            },
-            listeners : {
-                change : function(t, newVal, oldVal, eOpts)
-                {
-                    var iteration = t.getRecord();
-                    this.fireEvent('iterationchange',iteration);
-                    this.publish('timeboxIterationChanged', iteration);
-                },
-                scope : this
-            }
-        });
-    }
-});
+
             
                Rally.launchApp('TSCountdown', {
                    name: 'Countdown'

@@ -6,7 +6,7 @@ Ext.define("TSCountdown", {
     items: [
         {xtype:'container',itemId:'settings_box'},
         {xtype:'container', itemId:'selector_box' },
-        
+
         {xtype:'tscountdown',itemId:'release_counter',cls:'border-bottom'},
         {xtype:'tscountdown',itemId:'iteration_counter'},
         {xtype:'tsinfolink'}
@@ -17,65 +17,51 @@ Ext.define("TSCountdown", {
         }
     },
     launch: function() {
-                
+
         if (this.isExternal()){
             this.showSettings(this.config);
         } else {
             this.onSettingsUpdate(this.getSettings());
         }
-    }, 
-    
+    },
+
     _launch: function(settings) {
         var me = this;
 
-        if ( settings.showScopeSelector || settings.showScopeSelector == "true" ) {
+        if ( settings.showScopeSelector == true || settings.showScopeSelector == "true" ) {
             this.down('#selector_box').add({
-                    xtype : 'timebox-selector',
-                    context : this.getContext()
-            });
-        }
-        
-        var today = Rally.util.DateTime.toIsoString(new Date());
-        
-        var iteration_filters = [
-            {property:'StartDate',operator:'<',value: today},
-            {property:'EndDate',  operator:'>',value: today}
-        ];
-        
-        var release_filters = [
-            {property:'ReleaseStartDate',operator:'<',value: today},
-            {property:'ReleaseDate',  operator:'>',value: today}
-        ];
-        
-        Deft.Chain.sequence([
-            function() { return me._loadAStoreWithAPromise('Iteration', ['StartDate','EndDate','Name'], iteration_filters); },
-            function() { return me._loadAStoreWithAPromise('Release', ['ReleaseStartDate','ReleaseDate','Name'], release_filters); }
-        ]).then({
-            scope: this,
-            success: function(results) {
-                var iteration = results[0][0];
-                var release = results[1][0];
-                
-                this.logger.log("iteration,release", iteration, release);
-                
-                this.down('#release_counter').setEndDate( release.get('ReleaseDate') );
-                this.down('#release_counter').text = release.get('Name') + ": " + release.get('ReleaseDate');
-                
-                this.down('#iteration_counter').setEndDate( iteration.get('EndDate') );
-                this.down('#iteration_counter').text = iteration.get('Name') + ": " + iteration.get('EndDate');
-                
-                // subscribe and request status
-                this.subscribe(this, 'timeboxReleaseChanged', this._changeRelease, this);
-                this.subscribe(this, 'timeboxIterationChanged', this._changeIteration, this);
+                xtype : 'timebox-selector',
+                context : this.getContext(),
+                listeners: {
+                    releasechange: function(release){
+                        this._changeRelease(release);
+                    },
+                    iterationchange: function(iteration){
+                        this._changeIteration(iteration);
+                    },
+                    scope: this
 
-                this.publish('requestTimebox', this);
-            },
-            failure: function(error_message){
-                alert(error_message);
-            }
-        }).always(function() {
-            me.setLoading(false);
-        });
+                }
+            });
+        } else {
+            this.subscribe(this, 'timeboxReleaseChanged', this._changeRelease, this);
+            this.subscribe(this, 'timeboxIterationChanged', this._changeIteration, this);
+
+            this.publish('requestTimebox', this);
+        }
+   },
+    _changeRelease: function(timebox) {
+        this.logger.log("_changeRelease", timebox);
+
+        this.down('#release_counter').setEndDate(timebox.get('ReleaseDate') );
+        this.down('#release_counter').text = timebox.get('Name') + ": " + timebox.get('ReleaseDate');
+
+    },
+    _changeIteration: function(timebox) {
+        this.logger.log("_changeIteration", timebox);
+
+        this.down('#iteration_counter').setEndDate( timebox.get('EndDate') );
+        this.down('#iteration_counter').text = timebox.get('Name') + ": " + timebox.get('EndDate');
 
     },
     _changeRelease: function(timebox) {
@@ -96,7 +82,7 @@ Ext.define("TSCountdown", {
         var deferred = Ext.create('Deft.Deferred');
         var me = this;
         this.logger.log("Starting load:",model_name,model_fields);
-          
+
         Ext.create('Rally.data.wsapi.Store', {
             model: model_name,
             fetch: model_fields,
@@ -113,8 +99,8 @@ Ext.define("TSCountdown", {
         });
         return deferred.promise;
     },
-    
-     /********************************************
+
+    /********************************************
      /* Overrides for App class
      /*
      /********************************************/
@@ -123,7 +109,7 @@ Ext.define("TSCountdown", {
         var me = this;
 
         return [
-           {
+            {
                 name: 'showScopeSelector',
                 xtype: 'rallycheckboxfield',
                 boxLabelAlign: 'after',

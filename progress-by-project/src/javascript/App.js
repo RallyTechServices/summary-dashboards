@@ -8,6 +8,7 @@ Ext.define('CustomApp', {
         var iteration = "Iteration 1"; // this.getTimeboxScope();
 
         that.rallyFunctions = Ext.create("RallyFunctions");
+        that.rallyFunctions.subscribe(that);
 
         var tbs = that.getTimeboxScope();
         if (!_.isNull(tbs)) {
@@ -27,12 +28,22 @@ Ext.define('CustomApp', {
         });
 
         pr.readProjectStories(function(error, stories, projects, states) {
-            that.prepareChartData( stories, projects, state, function(error, categories, series) {
+            that.prepareChartData( stories, projects, states, function(error, categories, series) {
               that.createChart( categories, series );
             });
         });
 
     },
+
+    _timeboxChanged : function(timebox) {
+        var that = this;
+        console.log("_timeboxChanged received");
+        if (timebox.get("_type")==='release')
+            that.run(timebox.get("Name"),null);
+        else
+            that.run(null,timebox.get("Name"));
+    },
+
 
     getTimeboxScope : function() {
 
@@ -59,7 +70,7 @@ Ext.define('CustomApp', {
 
         var that = this;
 
-        var projectKeys = _.map(projects,function(project) { return project.get("Name"); });
+        var projectKeys = _.map(projects,function(project) { return _.last(project.get("Name").split('>')); });
 
         var pointsValue = function(value) {
             return !_.isUndefined(value) && !_.isNull(value) ? value : 0;
@@ -88,8 +99,8 @@ Ext.define('CustomApp', {
         var seriesData = _.map( _.keys(summary), function( summaryKey ) {
             return {
                 name : summaryKey,
-                data : _.map( projectKeys, function( projectKey ) {
-                    return summarize( groupedWorkItems[projectKey], summary[summaryKey]);
+                data : _.map( projectKeys, function( projectKey, index ) {
+                    return summarize( stories[index] , summary[summaryKey]);
                 })
             };
         });

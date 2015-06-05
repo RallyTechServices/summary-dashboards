@@ -73,6 +73,11 @@ Ext.define("RallyFunctions", function() {
                 filter = _.isNull(filter) ? ifilter : filter.and(ifilter);              
             }
             return filter;
+        },
+
+        subscribe : function(app) {
+            app.subscribe(app, 'timeboxReleaseChanged', app._timeboxChanged, app);
+            app.subscribe(app, 'timeboxIterationChanged', app._timeboxChanged, app);
         }
        
     };
@@ -214,6 +219,7 @@ Ext.define("ProjectStories", function() {
         var iteration = "Iteration 1"; // this.getTimeboxScope();
 
         that.rallyFunctions = Ext.create("RallyFunctions");
+        that.rallyFunctions.subscribe(that);
         
         var tbs = that.getTimeboxScope();
 
@@ -241,6 +247,16 @@ Ext.define("ProjectStories", function() {
             
         });
     },
+
+    _timeboxChanged : function(timebox) {
+        var that = this;
+        console.log("_timeboxChanged received");
+        if (timebox.get("_type")==='release')
+            that.run(timebox.get("Name"),null);
+        else
+            that.run(null,timebox.get("Name"));
+    },
+
 
     getTimeboxScope : function() {
         var timeboxScope = this.getContext().getTimeboxScope();
@@ -374,8 +390,8 @@ Ext.define("ProjectStories", function() {
   /* Add app styles here */
 }
 .chart-container {
-  width: 600px;
-  height: 400px;
+  width: 500px;
+  height: 300px;
 }
 
     </style>

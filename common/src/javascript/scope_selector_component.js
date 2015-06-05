@@ -17,7 +17,12 @@ Ext.define('timebox-selector', {
     {
         this.callParent(arguments);
         this._createReleaseCombo();
-        this.addEvents('releasechange','iterationchange')
+        this.addEvents('releasechange','iterationchange');
+        
+        // configured to allow others to ask what the current selection is,
+        // in case they missed the initial message
+        this.subscribe(this, 'requestTimebox', this._requestTimebox, this);
+        
     },
     _createReleaseCombo : function()
     {
@@ -101,5 +106,31 @@ Ext.define('timebox-selector', {
                 scope : this
             }
         });
+    },
+    _requestTimebox : function(source) {
+        console.log('Got request timebox message', source);
+        var release = this.getReleaseRecord();
+        console.log('release',release);
+        if (release) {
+            this.publish('timeboxReleaseChanged', release);
+        } 
+        
+        var iteration = this.getIterationRecord();
+        console.log('iteration', iteration);
+        if (iteration) {
+            this.publish("timeboxIterationChanged",  iteration);
+        }
+    },
+    getReleaseRecord: function(){
+        if (this._releaseCombo){
+            return this._releaseCombo.getRecord() || null;
+        }
+        return null;
+    },
+    getIterationRecord: function(){
+        if (this._iterationCombo){
+            return this._iterationCombo.getRecord() || null;
+        }
+        return null;
     }
 });

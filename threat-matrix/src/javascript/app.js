@@ -163,11 +163,9 @@ Ext.define("threat-matrix", {
             itemId: 'ct-legend',
             layout: {type: 'vbox'}
         });
-        console.log('--');
 
         var color_data = [];
         _.each(colorMap, function(color, label){
-            console.log(color,label,'map');
             color_data.push({color: color, label: label});
         });
         this.logger.log('_addLegend',color_data);

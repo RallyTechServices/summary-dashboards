@@ -37,6 +37,7 @@ Ext.define('Rally.technicalservices.ThreatChart',{
         yAxis: [
             {
                 max: 110,
+                min: 0,
                 title: {
                     text: '%Density (Feature)'
                 },
@@ -45,7 +46,8 @@ Ext.define('Rally.technicalservices.ThreatChart',{
             {
                 title: {
                     text: 'Weighted Risk (User Story)'
-                }
+                },
+                min: 0
             }
         ],
         plotOptions: {

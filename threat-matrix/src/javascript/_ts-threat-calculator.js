@@ -278,18 +278,19 @@ Ext.define('Rally.technicalservices.ThreatCalculator', {
         if (!point){
             point = this;
         }
+        console.log('evt', evt.type);
+        this.paths = this.paths || [];
 
-       if (evt.type == 'select'){
+       if (evt.type == 'select' && this.paths.length == 0){
 
-            var plotLeft = point.series.chart.plotLeft,
+           var ren = this.series.chart.renderer;
+           var plotLeft = point.series.chart.plotLeft,
                 plotTop = point.series.chart.plotTop,
                 x1 = point.series.points[0].plotX + plotLeft,
                 y1 = point.series.points[0].plotY + plotTop,
                 thisName = point.series.name,
                 thisColor = point.series.options.marker.lineColor,
-                thisRadius = point.series.options.marker.radius;
-
-                var ren = this.series.chart.renderer,
+                thisRadius = point.series.options.marker.radius,
                     pointPaths = [];
 
                 _.each(point.series.chart.series, function(s){
@@ -303,13 +304,10 @@ Ext.define('Rally.technicalservices.ThreatCalculator', {
                             dep_x = ratio1 * (delta_x) + x1,
                             dep_y = ratio1 * (delta_y) + y1;
 
-                        console.log('4--');
                         var rad = s.options.marker.radius;
                         var ratio2 = (rad-dist)/dist,
                             pred_x = ratio2 * delta_x + x1,
                             pred_y = ratio2 * delta_y + y1;
-
-                        console.log('5--');
 
                         pointPaths.push(ren.path(['M',dep_x, dep_y , 'L', pred_x, pred_y]) //s.points[0].plotX + plotLeft, s.points[0].plotY + plotTop])
                             .attr({
@@ -321,16 +319,14 @@ Ext.define('Rally.technicalservices.ThreatCalculator', {
                     }
                 }, this);
                 this.paths = pointPaths;
-            } else {
-                var ren = this.series.chart.renderer;
+            }
+
+            if (evt.type == 'unselect'){
                 _.each(this.paths, function(p) {
                     p.element.remove();
                 });
+                this.paths = [];
             }
-    },
-    _getPointEdgeCoordinates: function(x1, y1, x2, y2, radius){
-        var ratio = -radius/ Math.sqrt(Math.pow((x1-x2),2) + Math.pow((y1-y2),2));
-        return {y: ratio * (y1 - y2), x: ratio * (x1 - x2)};
     },
     _getRadius: function(artifact){
         var multiplier = this._isArtifactUserStory(artifact) ? this.storySizeMultiplier || 1 : this.featureSizeMultiplier || 1;

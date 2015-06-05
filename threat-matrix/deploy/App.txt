@@ -3,16 +3,20 @@
 <head>
     <title>Threat Matrix</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Thu Jun 04 2015 19:35:02 GMT-0600 (MDT) -->
+    <!--  Build Date: Thu Jun 04 2015 21:55:28 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Thu Jun 04 2015 19:35:02 GMT-0600 (MDT)";
-        var CHECKSUM = 32158142203;
+        var APP_BUILD_DATE = "Thu Jun 04 2015 21:55:28 GMT-0600 (MDT)";
+        var CHECKSUM = 31628385998;
     </script>
-    
-    <script type="text/javascript" src="/apps/2.0rc2/sdk.js"></script>
+
+   <script type="text/javascript" src="/apps/2.0rc3/sdk.js"></script>
+
 
     <script type="text/javascript">
+        if (!window.location.origin) {
+            window.location.origin = window.location.protocol + "//" + window.location.hostname + (window.location.port ? ':' + window.location.port: '');
+        }
         Rally.onReady(function() {
              
 /**
@@ -123,17 +127,13 @@ Ext.define('Rally.technicalservices.Logger',{
     constructor: function(config){
         Ext.apply(this,config);
     },
-    log: function(args){
-        var timestamp = "[ " + Ext.util.Format.date(new Date(), "Y-m-d H:i:s.u") + " ]";
-        //var output_args = arguments;
-        //output_args.unshift( [ "[ " + timestamp + " ]" ] );
-        //output_args = Ext.Array.push(output_args,arguments);
-        
-        var output_args = [];
-        output_args = Ext.Array.push(output_args,[timestamp]);
-        output_args = Ext.Array.push(output_args, Ext.Array.slice(arguments,0));
-
-        window.console && console.log.apply(console,output_args);
+    log: function(){
+        var i = -1, l = arguments.length, args = [], fn = 'console.log(args)';
+        while(++i<l){
+            args.push('args['+i+']');
+        };
+        fn = new Function('args',fn.replace(/args/,args.join(',')));
+        fn(arguments);
     }
 
 });
@@ -418,18 +418,19 @@ Ext.define('Rally.technicalservices.ThreatCalculator', {
         if (!point){
             point = this;
         }
+        console.log('evt', evt.type);
+        this.paths = this.paths || [];
 
-       if (evt.type == 'select'){
+       if (evt.type == 'select' && this.paths.length == 0){
 
-            var plotLeft = point.series.chart.plotLeft,
+           var ren = this.series.chart.renderer;
+           var plotLeft = point.series.chart.plotLeft,
                 plotTop = point.series.chart.plotTop,
                 x1 = point.series.points[0].plotX + plotLeft,
                 y1 = point.series.points[0].plotY + plotTop,
                 thisName = point.series.name,
                 thisColor = point.series.options.marker.lineColor,
-                thisRadius = point.series.options.marker.radius;
-
-                var ren = this.series.chart.renderer,
+                thisRadius = point.series.options.marker.radius,
                     pointPaths = [];
 
                 _.each(point.series.chart.series, function(s){
@@ -443,13 +444,10 @@ Ext.define('Rally.technicalservices.ThreatCalculator', {
                             dep_x = ratio1 * (delta_x) + x1,
                             dep_y = ratio1 * (delta_y) + y1;
 
-                        console.log('4--');
                         var rad = s.options.marker.radius;
                         var ratio2 = (rad-dist)/dist,
                             pred_x = ratio2 * delta_x + x1,
                             pred_y = ratio2 * delta_y + y1;
-
-                        console.log('5--');
 
                         pointPaths.push(ren.path(['M',dep_x, dep_y , 'L', pred_x, pred_y]) //s.points[0].plotX + plotLeft, s.points[0].plotY + plotTop])
                             .attr({
@@ -461,16 +459,14 @@ Ext.define('Rally.technicalservices.ThreatCalculator', {
                     }
                 }, this);
                 this.paths = pointPaths;
-            } else {
-                var ren = this.series.chart.renderer;
+            }
+
+            if (evt.type == 'unselect'){
                 _.each(this.paths, function(p) {
                     p.element.remove();
                 });
+                this.paths = [];
             }
-    },
-    _getPointEdgeCoordinates: function(x1, y1, x2, y2, radius){
-        var ratio = -radius/ Math.sqrt(Math.pow((x1-x2),2) + Math.pow((y1-y2),2));
-        return {y: ratio * (y1 - y2), x: ratio * (x1 - x2)};
     },
     _getRadius: function(artifact){
         var multiplier = this._isArtifactUserStory(artifact) ? this.storySizeMultiplier || 1 : this.featureSizeMultiplier || 1;
@@ -595,6 +591,7 @@ Ext.define('Rally.technicalservices.ThreatChart',{
         yAxis: [
             {
                 max: 110,
+                min: 0,
                 title: {
                     text: '%Density (Feature)'
                 },
@@ -603,7 +600,8 @@ Ext.define('Rally.technicalservices.ThreatChart',{
             {
                 title: {
                     text: 'Weighted Risk (User Story)'
-                }
+                },
+                min: 0
             }
         ],
         plotOptions: {
@@ -793,11 +791,9 @@ Ext.define("threat-matrix", {
             itemId: 'ct-legend',
             layout: {type: 'vbox'}
         });
-        console.log('--');
 
         var color_data = [];
         _.each(colorMap, function(color, label){
-            console.log(color,label,'map');
             color_data.push({color: color, label: label});
         });
         this.logger.log('_addLegend',color_data);

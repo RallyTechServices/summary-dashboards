@@ -38,6 +38,13 @@ Ext.define("TSCountdown", {
                 
                 this.down('#iteration_counter').setEndDate( iteration.get('EndDate') );
                 this.down('#iteration_counter').text = iteration.get('Name') + ": " + iteration.get('EndDate');
+                
+                // subscribe and request status
+                this.subscribe(this, 'timeboxReleaseChanged', this._changeRelease, this);
+                this.subscribe(this, 'timeboxIterationChanged', this._changeIteration, this);
+
+                this.publish('requestTimebox', this);
+
             },
             failure: function(error_message){
                 alert(error_message);
@@ -46,6 +53,20 @@ Ext.define("TSCountdown", {
             me.setLoading(false);
         });
 
+    },
+    _changeRelease: function(timebox) {
+        this.logger.log("_changeRelease", timebox);
+        
+        this.down('#release_counter').setEndDate(timebox.get('ReleaseDate') );
+        this.down('#release_counter').text = timebox.get('Name') + ": " + timebox.get('ReleaseDate');
+        
+    },
+    _changeIteration: function(timebox) {
+        this.logger.log("_changeIteration", timebox);
+        
+        this.down('#iteration_counter').setEndDate( timebox.get('EndDate') );
+        this.down('#iteration_counter').text = timebox.get('Name') + ": " + timebox.get('EndDate');
+        
     },
     _loadAStoreWithAPromise: function(model_name, model_fields, filters){
         var deferred = Ext.create('Deft.Deferred');

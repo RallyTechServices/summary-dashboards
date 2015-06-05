@@ -5,7 +5,8 @@
  * they should have a link via some field in the outer_ring record (e.g., Parent or WorkProduct
  * 
  * 
- */Ext.define('Rally.technicalservices.DoughnutPie',{
+ */
+ Ext.define('Rally.technicalservices.DoughnutPie',{
     extend: 'Ext.Container',
     alias: 'widget.tsdoughnut',
     padding: 5,

@@ -10,15 +10,16 @@ Ext.define("TSUtilization", {
     ],
     launch: function() {
         var me = this;
+        this.logger.log("Launch");
         
-        var zoom = 'iteration';
+        var zoom = 'release';
         
         if ( zoom == 'iteration' ) {
             this.down('#selector_box').add({
                 xtype:'rallyiterationcombobox',
                 listeners: {
                     change: function(combo) {
-                        me.down('#display_box').removeAll();
+                        //me.down('#display_box').removeAll();
                         var name = combo.getRecord().get('Name');
             
                         var filter = [{property:'Name',value: name}];
@@ -99,46 +100,89 @@ Ext.define("TSUtilization", {
         
         Deft.Chain.sequence([
             function() { return me._getIterationCumulativeFlowData(project_filter,iteration_filter); },
-            function() { return me._getReleaseCumulativeFlowData(project_filter,release_filter); }
+            function() { return me._getReleaseCumulativeFlowData(project_filter,release_filter); },
+            function() { return me._getIterationsWithPoints(project_filter, iteration_filter); }
         ]).then({
             scope: this,
             success: function(cfd) {
                 me.logger.log('cfd:', cfd);
                 var icfd = cfd[0];
                 var rcfd = cfd[1];
-                // if (timebox_type == 'iteration' ) {
-                    var array_of_days = this._getArrayOfDaysFromRange(timebox.get(start_field_name),timebox.get(end_field_name));
-                    this.logger.log("For days in Timebox:", array_of_days);
-    
-                    var total_each_day = this._getTotalsFromCFD(array_of_days,icfd);
-                    this.logger.log("Total each day:", total_each_day);
-                    
-                    var ideal_each_day = this._getIdealFromDailyHash(total_each_day);
-                    this.logger.log("Ideal each day:", ideal_each_day);
-                    
-                    var remaining_each_day = this._getTotalsFromCFD(array_of_days,icfd,["Accepted"]);
-                    this.logger.log("Remaining each day:", remaining_each_day);
-                    
-                    var chart_series = [
-                        this._getSeriesFromDailyHash('Total / Stability', total_each_day ),
-                        this._getSeriesFromDailyHash('Ideal Burn', ideal_each_day),
-                        this._getSeriesFromDailyHash('Actual Burn', remaining_each_day )
-                    ];
-                    
-                    var chart_categories = Ext.Array.map(array_of_days, function(day,idx) {
-                        return idx+1;
-                    });
-                // }
+                var iterations = cfd[2];
+
+                var array_of_days = this._getArrayOfDaysFromRange(timebox.get(start_field_name),timebox.get(end_field_name));
+                this.logger.log("For days in Timebox:", array_of_days);
+
+                var planned_each_day = [];
+                if ( timebox_type != 'iteration' ) {
+                    array_of_days = Ext.Object.getKeys(iterations);
+                    planned_each_day = this._getPlannedFromIterationHash(iterations);
+                }
+                
+                var iteration_total_each_day = this._getTotalsFromCFD(array_of_days,icfd);
+                this.logger.log("Total each day:", iteration_total_each_day);
+                
+                var release_total_each_day = this._getTotalsFromCFD(array_of_days,rcfd);
+                this.logger.log("Total each day:", release_total_each_day);
+                
+                var total_each_day = release_total_each_day;
+                if ( timebox_type == 'iteration' ) { total_each_day = iteration_total_each_day; }
+                
+                var ideal_each_day = this._getIdealFromDailyHash(total_each_day);
+                this.logger.log("Ideal each day:", ideal_each_day);
+                
+                var iteration_remaining_each_day = this._getTotalsFromCFD(array_of_days,icfd,["Accepted"]);
+                this.logger.log("Remaining each day:", iteration_remaining_each_day);
+
+                var release_remaining_each_day = this._getTotalsFromCFD(array_of_days,rcfd,["Accepted"]);
+                this.logger.log("Remaining each day:", release_remaining_each_day);
+                
+                var chart_series = [];
+                
+                if ( timebox_type == 'iteration' ) {
+                    chart_series.push(this._getSeriesFromDailyHash('Total / Stability', iteration_total_each_day ));
+                    chart_series.push(this._getSeriesFromDailyHash('Ideal Burn', ideal_each_day));
+                    chart_series.push(this._getSeriesFromDailyHash('Actual Burn', iteration_remaining_each_day ));
+                } else {
+                    chart_series.push(this._getSeriesFromDailyHash('Total / Stability', release_total_each_day ));
+                    chart_series.push(this._getSeriesFromDailyHash('Ideal Burn', ideal_each_day));
+                    chart_series.push(this._getSeriesFromDailyHash('Actual Burn', release_remaining_each_day ));
+                    chart_series.push(this._getSeriesFromDailyHash('Planned', planned_each_day ));
+                }
+
+                
+                var chart_categories = Ext.Array.map(array_of_days, function(day,idx) {
+                    return idx+1;
+                });
                 
                 this._makeChart(chart_categories, chart_series);
             },
             failure: function(error_message){
-                alert(error_message);
+                console.log("oops:",error_message);
+                
+               // alert(error_message);
             }
         }).always(function() {
             me.setLoading(false);
         });
      
+    },
+    _getPlannedFromIterationHash: function(iterations) {
+        var planned = {};
+        var total = 0;
+        
+        Ext.Object.each(iterations, function(day,iteration){
+            var value = iteration.get('PlannedVelocity') || 0;
+            total += value;
+        });
+        
+        
+        Ext.Object.each(iterations, function(day,iteration){
+            var value = iteration.get('PlannedVelocity') || 0;
+            total = total - value;
+            planned[day] = total;
+        });
+        return planned;       
     },
     
     _getIdealFromDailyHash: function(total_each_day) {
@@ -175,6 +219,7 @@ Ext.define("TSUtilization", {
     },
     
     _getTotalsFromCFD: function(array_of_days,cfd, values_to_remove) {
+        var me = this;
         var day_hash = {};
         if ( ! values_to_remove ) { values_to_remove = []; }
         
@@ -182,14 +227,18 @@ Ext.define("TSUtilization", {
             day_hash[day] = null;
         });
         
-        Ext.Array.each(cfd,function(card){ 
+        Ext.Array.each(cfd,function(card){
             var card_date  = card.get('CreationDate');
             var card_state = card.get('CardState');
             
             var current_day_value = day_hash[card_date] || 0;
             
             if (!Ext.Array.contains(values_to_remove, card_state) ) {
-                day_hash[card_date] += card.get('CardEstimateTotal');
+                if ( Ext.isDefined(day_hash[card_date]) ) {
+                    day_hash[card_date] += card.get('CardEstimateTotal');
+                } else {
+                    me.logger.log("A date that doesn't fit:", card_date);
+                }
             }
         });
         
@@ -210,6 +259,39 @@ Ext.define("TSUtilization", {
         return array_of_days;
     },
     
+    _getIterationsWithPoints: function(project_filter,iteration_filter) {
+        var deferred = Ext.create('Deft.Deferred');
+        var me = this;
+        Deft.Chain.pipeline([
+            function() { return me._loadAStoreWithAPromise('Project', ['ObjectID','Name'], project_filter) ; },
+            function(projects) { return me._getTimeboxes(projects, iteration_filter, 'iteration'); }
+        ]).then({
+            success: function(iterations) {
+                var iterations_by_start = {};
+                Ext.Array.each(iterations, function(iteration){
+                    var name = iteration.get('Name');
+                    var planned = iteration.get('PlannedVelocity') || 0;
+                    var end_date = iteration.get('EndDate');
+                    var start_date = iteration.get('StartDate');
+                    
+                    if ( !iterations_by_start[start_date] ) {
+                        iteration.set('PlannedVelocity', 0);
+                        iterations_by_start[start_date] = iteration;
+                    }
+                    
+                    var saved_plan =  iterations_by_start[start_date].get('PlannedVelocity') || 0 ;
+                    iterations_by_start[start_date].set('PlannedVelocity',saved_plan+planned);
+                });
+                
+                deferred.resolve(iterations_by_start);
+            },
+            failure: function(msg) {
+                deferred.reject(msg);
+            }
+        });
+        return deferred.promise;
+    },
+    
     _getIterationCumulativeFlowData: function(project_filter,iteration_filter) {
         var deferred = Ext.create('Deft.Deferred');
         var me = this;
@@ -219,12 +301,12 @@ Ext.define("TSUtilization", {
         ]).then({
             success: function(iterations) {
                 if ( iterations.length > 0 ) {
-                    var iteration_filter_array = Ext.Array.map(iterations, function(iteration) {
+                    var filtered_iteration_array = Ext.Array.map(iterations, function(iteration) {
                         return { property:'IterationObjectID', value: iteration.get('ObjectID') };
                     });
                     
                     var cfd_fields = ['IterationObjectID','CardCount','CardEstimateTotal','CardState','CreationDate'];
-                    var cfd_filter = Rally.data.wsapi.Filter.or(iteration_filter_array);
+                    var cfd_filter = Rally.data.wsapi.Filter.or(filtered_iteration_array);
                     
                     me._loadAStoreWithAPromise('IterationCumulativeFlowData',cfd_fields ,cfd_filter).then({
                         success: function(cfd) {
@@ -235,6 +317,8 @@ Ext.define("TSUtilization", {
                         }
                     });
                 } else {
+                    me.down('#display_box').add({xtype:'container',html:'No iterations'});
+                    
                     deferred.reject("No iterations available for timebox");
                 }
             },
@@ -254,12 +338,12 @@ Ext.define("TSUtilization", {
         ]).then({
             success: function(releases) {
                 if ( releases.length > 0 ) {
-                    var release_filter_array = Ext.Array.map(releases, function(release) {
+                    var filtered_release_array = Ext.Array.map(releases, function(release) {
                         return { property:'ReleaseObjectID', value: release.get('ObjectID') };
                     });
                     
                     var cfd_fields = ['ReleaseObjectID','CardCount','CardEstimateTotal','CardState','CreationDate'];
-                    var cfd_filter = Rally.data.wsapi.Filter.or(release_filter_array);
+                    var cfd_filter = Rally.data.wsapi.Filter.or(filtered_release_array);
                     
                     me._loadAStoreWithAPromise('ReleaseCumulativeFlowData',cfd_fields ,cfd_filter).then({
                         success: function(cfd) {
@@ -284,7 +368,7 @@ Ext.define("TSUtilization", {
         var deferred = Ext.create('Deft.Deferred');
         var me = this;
         
-        this._loadAStoreWithAPromise(timebox_type,['Project','ObjectID','PlannedVelocity'], filter).then({
+        this._loadAStoreWithAPromise(timebox_type,['Project','ObjectID','PlannedVelocity','EndDate','StartDate','Name'], filter).then({
             success: function(timeboxes) {
                 // got all iterations back, reduce them to just ones in the parent and child projects
                 var project_oids = Ext.Array.map(projects, function(project) {
@@ -339,7 +423,8 @@ Ext.define("TSUtilization", {
         return {
             type:'line',
             name: series_name,
-            data: Ext.Object.getValues(value_each_day)
+            data: Ext.Object.getValues(value_each_day),
+            connectNulls: true
         }
     },
     
@@ -353,7 +438,9 @@ Ext.define("TSUtilization", {
                 series: chart_series
             },
             chartConfig: {
-                chart: {},
+                chart: {
+                    height: 300
+                },
                 title: {
                     text: '',
                     align: 'center'

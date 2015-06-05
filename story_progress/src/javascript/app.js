@@ -12,6 +12,8 @@ Ext.define("TSStoryProgressPie", {
     ],
     launch: function() {
         var me = this;
+        this.logger.log("launch");
+        
         this._setInfo(); 
                 
         var base_filter = [{property:'ObjectID',operator:'>',value:0}];
@@ -69,6 +71,8 @@ Ext.define("TSStoryProgressPie", {
     _makePies: function(inside_records,outside_records){
         var container =  this.down('#display_box');
 
+        this.logger.log("_makePies", inside_records, outside_records);
+        
         container.down('#self_chart').removeAll();
         container.down('#team_chart').removeAll();
         
@@ -76,7 +80,9 @@ Ext.define("TSStoryProgressPie", {
             xtype: 'tsdoughnut',
             title: 'Self',
             itemId: 'selfie',
-            width: 300,
+            width: 350,
+            height: 300,
+            margin: 10,
             highlight_owner: this.getContext().getUser().ObjectID,
             remove_non_highlighted: true,
             inside_records: inside_records,
@@ -87,7 +93,9 @@ Ext.define("TSStoryProgressPie", {
         container.down('#team_chart').add( {
             xtype: 'tsdoughnut',
             title: 'Team',
-            width: 300,
+            width: 350,
+            heigh: 300,
+            margin: 10,
             itemId: 'team',
             inside_records: inside_records,
             inside_size_field: 'PlanEstimate',

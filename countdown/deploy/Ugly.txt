@@ -3,10 +3,10 @@
 <head>
     <title>Countdown</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Thu Jun 04 2015 21:05:12 GMT-0700 (PDT) -->
+    <!--  Build Date: Fri Jun 05 2015 08:03:43 GMT-0700 (PDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Thu Jun 04 2015 21:05:12 GMT-0700 (PDT)";
+        var APP_BUILD_DATE = "Fri Jun 05 2015 08:03:43 GMT-0700 (PDT)";
         var CHECKSUM = [%= checksum %];
     </script>
     

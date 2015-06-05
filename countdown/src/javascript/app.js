@@ -5,6 +5,8 @@ Ext.define("TSCountdown", {
     defaults: { margin: 10 },
     items: [
         {xtype:'container',itemId:'settings_box'},
+        {xtype:'container', itemId:'selector_box' },
+        
         {xtype:'tscountdown',itemId:'release_counter',cls:'border-bottom'},
         {xtype:'tscountdown',itemId:'iteration_counter'},
         {xtype:'tsinfolink'}
@@ -26,6 +28,13 @@ Ext.define("TSCountdown", {
     _launch: function(settings) {
         var me = this;
 
+        if ( settings.showScopeSelector || settings.showScopeSelector == "true" ) {
+            this.down('#selector_box').add({
+                    xtype : 'timebox-selector',
+                    context : this.getContext()
+            });
+        }
+        
         var today = Rally.util.DateTime.toIsoString(new Date());
         
         var iteration_filters = [

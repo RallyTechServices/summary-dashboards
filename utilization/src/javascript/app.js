@@ -16,7 +16,6 @@ Ext.define("TSUtilization", {
     },
     
     launch: function() {
-        
         if (this.isExternal()){
             this.showSettings(this.config);
         } else {

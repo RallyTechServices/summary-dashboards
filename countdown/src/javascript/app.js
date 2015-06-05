@@ -4,12 +4,28 @@ Ext.define("TSCountdown", {
     logger: new Rally.technicalservices.Logger(),
     defaults: { margin: 10 },
     items: [
+        {xtype:'container',itemId:'settings_box'},
         {xtype:'tscountdown',itemId:'release_counter',cls:'border-bottom'},
         {xtype:'tscountdown',itemId:'iteration_counter'},
         {xtype:'tsinfolink'}
     ],
+    config: {
+        defaultSettings: {
+            showScopeSelector:  false
+        }
+    },
     launch: function() {
+                
+        if (this.isExternal()){
+            this.showSettings(this.config);
+        } else {
+            this.onSettingsUpdate(this.getSettings());
+        }
+    }, 
+    
+    _launch: function(settings) {
         var me = this;
+
         var today = Rally.util.DateTime.toIsoString(new Date());
         
         var iteration_filters = [
@@ -44,7 +60,6 @@ Ext.define("TSCountdown", {
                 this.subscribe(this, 'timeboxIterationChanged', this._changeIteration, this);
 
                 this.publish('requestTimebox', this);
-
             },
             failure: function(error_message){
                 alert(error_message);
@@ -88,5 +103,62 @@ Ext.define("TSCountdown", {
             }
         });
         return deferred.promise;
+    },
+    
+     /********************************************
+     /* Overrides for App class
+     /*
+     /********************************************/
+    //getSettingsFields:  Override for App
+    getSettingsFields: function() {
+        var me = this;
+
+        return [
+           {
+                name: 'showScopeSelector',
+                xtype: 'rallycheckboxfield',
+                boxLabelAlign: 'after',
+                fieldLabel: '',
+                margin: '0 0 25 200',
+                boxLabel: 'Show Scope Selector<br/><span style="color:#999999;"><i>Tick to use this to broadcast settings.</i></span>'
+            }
+        ];
+    },
+    isExternal: function(){
+        return typeof(this.getAppId()) == 'undefined';
+    },
+    //showSettings:  Override
+    showSettings: function(options) {
+        this._appSettings = Ext.create('Rally.app.AppSettings', Ext.apply({
+            fields: this.getSettingsFields(),
+            settings: this.getSettings(),
+            defaultSettings: this.getDefaultSettings(),
+            context: this.getContext(),
+            settingsScope: this.settingsScope,
+            autoScroll: true
+        }, options));
+
+        this._appSettings.on('cancel', this._hideSettings, this);
+        this._appSettings.on('save', this._onSettingsSaved, this);
+        if (this.isExternal()){
+            if (this.down('#settings_box').getComponent(this._appSettings.id)==undefined){
+                this.down('#settings_box').add(this._appSettings);
+            }
+        } else {
+            this.hide();
+            this.up().add(this._appSettings);
+        }
+        return this._appSettings;
+    },
+    _onSettingsSaved: function(settings){
+        Ext.apply(this.settings, settings);
+        this._hideSettings();
+        this.onSettingsUpdate(settings);
+    },
+    //onSettingsUpdate:  Override
+    onSettingsUpdate: function (settings){
+        this.logger.log('onSettingsUpdate',settings);
+        Ext.apply(this, settings);
+        this._launch(settings);
     }
 });

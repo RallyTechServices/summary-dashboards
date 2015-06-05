@@ -166,8 +166,6 @@ Ext.define('CustomApp', {
             };
         });
 
-        console.log("seriesData",seriesData);
-
         callback(null,categories,seriesData);
 
     },

@@ -109,7 +109,6 @@ Ext.define("ProjectStories", function() {
             ];
 
             async.waterfall( fns , function(err,result) {
-                console.log("result",result);
                 callback( null, result, self.reportProjects, self.scheduleStates );
             });
         },
@@ -245,7 +244,7 @@ Ext.define("ProjectStories", function() {
 
     _timeboxChanged : function(timebox) {
         var that = this;
-        console.log("_timeboxChanged received");
+        console.log("Progress-By-Project:_timeboxChanged received");
         if (timebox.get("_type")==='release')
             that.run(timebox.get("Name"),null);
         else
@@ -361,7 +360,6 @@ Ext.define("ProjectStories", function() {
         if (_.indexOf(summary[_.last(_.keys(summary))],last)===-1)
             summary[_.last(_.keys(summary))].push(_.last(that.scheduleStates));
 
-        console.log("summary",summary);
         return summary;
     }
 

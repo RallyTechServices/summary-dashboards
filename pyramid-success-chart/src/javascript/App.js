@@ -39,7 +39,7 @@ Ext.define('CustomApp', {
 
     _timeboxChanged : function(timebox) {
         var that = this;
-        console.log("_timeboxChanged received");
+        console.log("Pyramid Chart:_timeboxChanged received");
         if (timebox.get("_type")==='release')
             that.run(timebox.get("Name"),null);
         else
@@ -106,6 +106,13 @@ Ext.define('CustomApp', {
 
     createChart : function(categories,seriesData,callback) {
 
+        var isEmpty = function(series) {
+            var total = _.reduce(_.first(series).data,function(memo,d) { 
+                return memo + d[1];
+            },0);
+            return total === 0;
+        };
+
         var that = this;
 
         var chartConfig = {
@@ -125,7 +132,6 @@ Ext.define('CustomApp', {
                     dataLabels: {
                         enabled: true,
                         formatter : function() {
-                            console.log(this);
                             var scope = this.point.y;
                             var completed = this.point.series.options.completedData[this.point.index];
                             var pct = Math.round( scope > 0 ? (completed/scope)*100 : 0);
@@ -158,7 +164,9 @@ Ext.define('CustomApp', {
                 }
             }
         });
-        that.add(that.x);
+
+        if (!isEmpty(seriesData))
+            that.add(that.x);
     }
 
 });

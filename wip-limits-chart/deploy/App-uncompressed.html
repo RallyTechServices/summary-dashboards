@@ -109,7 +109,6 @@ Ext.define("ProjectStories", function() {
             ];
 
             async.waterfall( fns , function(err,result) {
-                console.log("result",result);
                 callback( null, result, self.reportProjects, self.scheduleStates );
             });
         },
@@ -374,8 +373,6 @@ Ext.define("ProjectStories", function() {
             };
         });
 
-        console.log("seriesData",seriesData);
-
         callback(null,categories,seriesData);
 
     },
@@ -424,7 +421,6 @@ Ext.define("ProjectStories", function() {
             text: 'WIP Limits Chart'
         },
         xAxis: {
-            // categories: categories,
         },        
         yAxis: [
             {
@@ -437,10 +433,6 @@ Ext.define("ProjectStories", function() {
             series: {
                 dataLabels: {
                     enabled: true,
-                    // align: 'right',
-                    // formatter : function() {
-                    //     return " [" + Math.round(this.point.y) + "] ";
-                    // },
                     color: '#FFFFFF'
                 },
                 stacking: 'normal'
@@ -448,7 +440,6 @@ Ext.define("ProjectStories", function() {
         }
     },
     constructor: function (config) {
-        // console.log("stacking",config.stacking,(config.stacking===true ? 'normal' : null))
         this.callParent(arguments);
         if (config.title){
             this.chartConfig.title = config.title;

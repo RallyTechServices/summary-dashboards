@@ -37,7 +37,7 @@ Ext.define('CustomApp', {
 
     _timeboxChanged : function(timebox) {
         var that = this;
-        console.log("_timeboxChanged received");
+        console.log("Progress-By-Project:_timeboxChanged received");
         if (timebox.get("_type")==='release')
             that.run(timebox.get("Name"),null);
         else
@@ -153,7 +153,6 @@ Ext.define('CustomApp', {
         if (_.indexOf(summary[_.last(_.keys(summary))],last)===-1)
             summary[_.last(_.keys(summary))].push(_.last(that.scheduleStates));
 
-        console.log("summary",summary);
         return summary;
     }
 

@@ -27,14 +27,14 @@ Ext.define('CustomApp', {
             iteration = tbs.type === "iteration" ? tbs.name : null;
         }
 
-        that.run(release,iteration, that.getSetting('features')===true);
+        that.run(release,iteration);
     },
 
-    run : function(releaseName,iterationName,chartFeatures) {
-
-        console.log("features",chartFeatures===true);
+    run : function(releaseName,iterationName) {
 
         var that = this;
+
+        var chartFeatures = that.getSetting('features')===true;
 
         var pr = Ext.create( "ProjectStories", {
             ctx : that.getContext(),
@@ -189,14 +189,6 @@ Ext.define('CustomApp', {
             _.each(series.points,function(point,index) {
                 var featureWords = series.options.featureWords[index].slice(0,4);
                 var y = point.plotY - (( featureWords.length * wordHeight)/2);
-                // console.log("point", point.plotY, index, this.series.options.featureWords );
-                // ren.path(['M', 0, point.plotY,'L',100,point.plotY])
-                // .attr({
-                //     'stroke-width': 1,
-                //     stroke: 'silver',
-                //     dashstyle: 'dot'
-                // })
-                // .add();
                 _.each(featureWords,function(fw,x) {
                     var word = fw.split(' ').slice(0,2).join(' ');
                     ren.label(word, 5, y + (x*wordHeight))

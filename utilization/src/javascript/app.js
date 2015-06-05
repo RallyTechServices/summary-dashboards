@@ -11,85 +11,112 @@ Ext.define("TSUtilization", {
     launch: function() {
         var me = this;
         
-        this.down('#selector_box').add({
-            xtype:'rallyiterationcombobox',
-            listeners: {
-                change: function(combo) {
-                    me.down('#display_box').removeAll();
-                    var name = combo.getRecord().get('Name');
+        var zoom = 'iteration';
         
-                    var filter = [{property:'Name',value: name}];
-                    
-                    me._loadAStoreWithAPromise('Iteration', ['StartDate','EndDate','Name'], filter ).then({
-                        scope: me,
-                        success: function(iterations) {
-                            if (iterations.length == 0) {
-                                me.down('#display_box').add({ xtype:'container', html:'No iterations in scope'});
-                            } else {
-                                me._gatherData(iterations[0]);
+        if ( zoom == 'iteration' ) {
+            this.down('#selector_box').add({
+                xtype:'rallyiterationcombobox',
+                listeners: {
+                    change: function(combo) {
+                        me.down('#display_box').removeAll();
+                        var name = combo.getRecord().get('Name');
+            
+                        var filter = [{property:'Name',value: name}];
+                        
+                        me._loadAStoreWithAPromise('Iteration', ['StartDate','EndDate','Name'], filter ).then({
+                            scope: me,
+                            success: function(iterations) {
+                                if (iterations.length == 0) {
+                                    me.down('#display_box').add({ xtype:'container', html:'No iterations in scope'});
+                                } else {
+                                    me._gatherData(iterations[0]);
+                                }
                             }
-                        }
-                    });
+                        });
+                    }
                 }
-            }
-        });
-//        this.down('#selector_box').add({
-//            xtype:'rallyreleasecombobox',
-//            listeners: {
-//                change: function(combo) {
-//                me.down('#display_box').removeAll();
-//                    var name = combo.getRecord().get('Name');
-//        
-//                    var filter = [{property:'Name',value:name}];
-//                    
-//                    me._loadAStoreWithAPromise('Release', ['ReleaseStartDate','ReleaseDate','Name'], filter ).then({
-//                        scope: me,
-//                        success: function(releases) {
-//                            if (releases.length == 0) {
-//                                me.down('#display_box').add({ xtype:'container', html:'No releases in scope'});
-//                            } else {
-//                                me._gatherData(releases[0]);
-//                            }
-//                        }
-//                    });
-//                }
-//            }
-//        });
+            });
+        } else {
+            this.down('#selector_box').add({
+                xtype:'rallyreleasecombobox',
+                listeners: {
+                    change: function(combo) {
+                    me.down('#display_box').removeAll();
+                        var name = combo.getRecord().get('Name');
+            
+                        var filter = [{property:'Name',value:name}];
+                        
+                        me._loadAStoreWithAPromise('Release', ['ReleaseStartDate','ReleaseDate','Name'], filter ).then({
+                            scope: me,
+                            success: function(releases) {
+                                if (releases.length == 0) {
+                                    me.down('#display_box').add({ xtype:'container', html:'No releases in scope'});
+                                } else {
+                                    me._gatherData(releases[0]);
+                                }
+                            }
+                        });
+                    }
+                }
+            });
+        }
     },
     _gatherData: function(timebox) {
         var me = this;
-
-        if (timebox.get('_type') == 'iteration' ) {
-            var end_field_name = 'EndDate',
-                start_field_name = 'StartDate';
-                
-            var project_filter = Ext.create('Rally.data.wsapi.Filter',
-                {property:'ObjectID',value:this.getContext().getProject().ObjectID}).or( 
-                Ext.create('Rally.data.wsapi.Filter',
-                    {property:'Parent.ObjectID',value:this.getContext().getProject().ObjectID})
-            );
-            
-            var iteration_filter = [{property:'Name', value:timebox.get('Name')}];
-            
-            Deft.Chain.pipeline([
-                function() { return me._loadAStoreWithAPromise('Project', ['ObjectID','Name'], project_filter) ; },
-                function(projects) { return me._getIterations(projects, iteration_filter); },
-                function(iterations) { return me._getIterationCumulativeFlowData(iterations); }
-            ]).then({
-                scope: this,
-                success: function(cfd) {
-                    me.logger.log('cfd:', cfd);
-                    
-                    var array_of_days = this._getArrayOfDaysFromRange(timebox.get(end_field_name),timebox.get(start_field_name));
-                    this.logger.log("For days in Sprint:", array_of_days);
+        var timebox_type = timebox.get('_type');
+        var end_field_name = "EndDate";
+        var start_field_name = "StartDate";
+        
+        
+        if ( timebox_type == 'release' ) {
+            end_field_name = 'ReleaseDate';
+            start_field_name = 'ReleaseStartDate';
+        }
+        
+        var project_filter = Ext.create('Rally.data.wsapi.Filter',
+            {property:'ObjectID',value:this.getContext().getProject().ObjectID}).or( 
+            Ext.create('Rally.data.wsapi.Filter',
+                {property:'Parent.ObjectID',value:this.getContext().getProject().ObjectID})
+        );
+        
+        var release_filter = [];
+        var iteration_filter = [{property:'Name', value:timebox.get('Name')}];
+        
+        if (timebox_type == 'iteration' ) {
+            release_filter = [
+                {property: 'ReleaseStartDate', operator: '<=', value: Rally.util.DateTime.toIsoString(timebox.get('StartDate'))},
+                {property: 'ReleaseDate', operator: '>=', value: Rally.util.DateTime.toIsoString(timebox.get('EndDate'))}
+            ];
+        }
+        
+        if ( timebox_type == 'release' ) {
+            release_filter = [{property:'Name', value:timebox.get('Name')}];
+            iteration_filter = [
+                {property: 'StartDate', operator: '>=', value: Rally.util.DateTime.toIsoString(timebox.get('ReleaseStartDate'))},
+                {property: 'EndDate', operator: '<=', value: Rally.util.DateTime.toIsoString(timebox.get('ReleaseDate'))}
+            ];
+        }
+        
+        Deft.Chain.sequence([
+            function() { return me._getIterationCumulativeFlowData(project_filter,iteration_filter); },
+            function() { return me._getReleaseCumulativeFlowData(project_filter,release_filter); }
+        ]).then({
+            scope: this,
+            success: function(cfd) {
+                me.logger.log('cfd:', cfd);
+                var icfd = cfd[0];
+                var rcfd = cfd[1];
+                // if (timebox_type == 'iteration' ) {
+                    var array_of_days = this._getArrayOfDaysFromRange(timebox.get(start_field_name),timebox.get(end_field_name));
+                    this.logger.log("For days in Timebox:", array_of_days);
     
-                    var total_each_day = this._getTotalsFromCFD(array_of_days,cfd);
+                    var total_each_day = this._getTotalsFromCFD(array_of_days,icfd);
                     this.logger.log("Total each day:", total_each_day);
                     
                     var ideal_each_day = this._getIdealFromDailyHash(total_each_day);
                     this.logger.log("Ideal each day:", ideal_each_day);
                     
-                    var remaining_each_day = this._getTotalsFromCFD(array_of_days,cfd,["Accepted"]);
+                    var remaining_each_day = this._getTotalsFromCFD(array_of_days,icfd,["Accepted"]);
                     this.logger.log("Remaining each day:", remaining_each_day);
                     
                     var chart_series = [
@@ -101,15 +128,17 @@ Ext.define("TSUtilization", {
                     var chart_categories = Ext.Array.map(array_of_days, function(day,idx) {
                         return idx+1;
                     });
-                    this._makeChart(chart_categories, chart_series);
-                },
-                failure: function(error_message){
-                    alert(error_message);
-                }
-            }).always(function() {
-                me.setLoading(false);
-            });
-        }
+                // }
+                
+                this._makeChart(chart_categories, chart_series);
+            },
+            failure: function(error_message){
+                alert(error_message);
+            }
+        }).always(function() {
+            me.setLoading(false);
+        });
+     
     },
     
     _getIdealFromDailyHash: function(total_each_day) {
@@ -154,7 +183,7 @@ Ext.define("TSUtilization", {
         });
         
         Ext.Array.each(cfd,function(card){ 
-            var card_date = card.get('CreationDate');
+            var card_date  = card.get('CreationDate');
             var card_state = card.get('CardState');
             
             var current_day_value = day_hash[card_date] || 0;
@@ -168,6 +197,8 @@ Ext.define("TSUtilization", {
     },
     
     _getArrayOfDaysFromRange: function(startJS,endJS) {
+        this.logger.log("From/To", startJS, endJS);
+        
         var array_of_days = [];
         
         var new_day = startJS;
@@ -179,37 +210,93 @@ Ext.define("TSUtilization", {
         return array_of_days;
     },
     
-    _getIterationCumulativeFlowData: function(iterations) {
+    _getIterationCumulativeFlowData: function(project_filter,iteration_filter) {
+        var deferred = Ext.create('Deft.Deferred');
         var me = this;
-        var iteration_filter_array = Ext.Array.map(iterations, function(iteration) {
-            return { property:'IterationObjectID', value: iteration.get('ObjectID') };
+        Deft.Chain.pipeline([
+            function() { return me._loadAStoreWithAPromise('Project', ['ObjectID','Name'], project_filter) ; },
+            function(projects) { return me._getTimeboxes(projects, iteration_filter, 'iteration'); }
+        ]).then({
+            success: function(iterations) {
+                if ( iterations.length > 0 ) {
+                    var iteration_filter_array = Ext.Array.map(iterations, function(iteration) {
+                        return { property:'IterationObjectID', value: iteration.get('ObjectID') };
+                    });
+                    
+                    var cfd_fields = ['IterationObjectID','CardCount','CardEstimateTotal','CardState','CreationDate'];
+                    var cfd_filter = Rally.data.wsapi.Filter.or(iteration_filter_array);
+                    
+                    me._loadAStoreWithAPromise('IterationCumulativeFlowData',cfd_fields ,cfd_filter).then({
+                        success: function(cfd) {
+                            deferred.resolve(cfd);
+                        },
+                        failure: function(msg) {
+                            deferred.reject(msg);
+                        }
+                    });
+                } else {
+                    deferred.reject("No iterations available for timebox");
+                }
+            },
+            failure: function(msg) {
+                deferred.reject(msg);
+            }
         });
-        
-        var cfd_fields = ['IterationObjectID','CardCount','CardEstimateTotal','CardState','CreationDate'];
-        var cfd_filter = Rally.data.wsapi.Filter.or(iteration_filter_array);
-        
-        return this._loadAStoreWithAPromise('IterationCumulativeFlowData',cfd_fields ,cfd_filter);
+        return deferred.promise;
     },
     
-    _getIterations: function(projects,iteration_filter) {
+    _getReleaseCumulativeFlowData: function(project_filter,release_filter) {
+        var deferred = Ext.create('Deft.Deferred');
+        var me = this;
+        Deft.Chain.pipeline([
+            function() { return me._loadAStoreWithAPromise('Project', ['ObjectID','Name'], project_filter) ; },
+            function(projects) { return me._getTimeboxes(projects, release_filter,'release'); }
+        ]).then({
+            success: function(releases) {
+                if ( releases.length > 0 ) {
+                    var release_filter_array = Ext.Array.map(releases, function(release) {
+                        return { property:'ReleaseObjectID', value: release.get('ObjectID') };
+                    });
+                    
+                    var cfd_fields = ['ReleaseObjectID','CardCount','CardEstimateTotal','CardState','CreationDate'];
+                    var cfd_filter = Rally.data.wsapi.Filter.or(release_filter_array);
+                    
+                    me._loadAStoreWithAPromise('ReleaseCumulativeFlowData',cfd_fields ,cfd_filter).then({
+                        success: function(cfd) {
+                            deferred.resolve(cfd);
+                        },
+                        failure: function(msg) {
+                            deferred.reject(msg);
+                        }
+                    });
+                } else {
+                    console.log('no releases');
+                    deferred.resolve([]);
+                }
+            },
+            failure: function(msg) {
+                deferred.reject(msg);
+            }
+        });
+        return deferred.promise;
+    },    
+    _getTimeboxes: function(projects,filter,timebox_type) {
         var deferred = Ext.create('Deft.Deferred');
         var me = this;
         
-        this._loadAStoreWithAPromise('Iteration',['Project','ObjectID','PlannedVelocity'], iteration_filter).then({
-            success: function(iterations) {
+        this._loadAStoreWithAPromise(timebox_type,['Project','ObjectID','PlannedVelocity'], filter).then({
+            success: function(timeboxes) {
                 // got all iterations back, reduce them to just ones in the parent and child projects
                 var project_oids = Ext.Array.map(projects, function(project) {
                     return project.get('ObjectID');
                 });
-                
-                me.logger.log('project oids:', project_oids);
-                
-                var filtered_iterations = Ext.Array.filter(iterations, function(iteration) {
-                    var iteration_project_oid = iteration.get('Project').ObjectID;
-                    return Ext.Array.contains(project_oids, iteration_project_oid);
+                                
+                var filtered_timeboxes = Ext.Array.filter(timeboxes, function(timebox) {
+                    var timebox_project_oid = timebox.get('Project').ObjectID;
+                    return Ext.Array.contains(project_oids, timebox_project_oid);
                 });
                 
-                deferred.resolve(filtered_iterations);
+                deferred.resolve(filtered_timeboxes);
                 
             },
             failure: function(msg) {
@@ -225,12 +312,13 @@ Ext.define("TSUtilization", {
         var me = this;
         this.setLoading("Loading " + model_name + " items");
         
-        this.logger.log("Starting load:",model_name,model_fields);
+        this.logger.log("Starting load:",model_name,model_fields, filters);
           
         Ext.create('Rally.data.wsapi.Store', {
             model: model_name,
             fetch: model_fields,
-            filters: filters
+            filters: filters,
+            limit: 'Infinity'
         }).load({
             callback : function(records, operation, successful) {
                 me.setLoading(false);

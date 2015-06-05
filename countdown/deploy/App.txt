@@ -3,11 +3,11 @@
 <head>
     <title>Countdown</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Thu Jun 04 2015 20:45:26 GMT-0700 (PDT) -->
+    <!--  Build Date: Thu Jun 04 2015 21:05:12 GMT-0700 (PDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Thu Jun 04 2015 20:45:26 GMT-0700 (PDT)";
-        var CHECKSUM = 3604796900;
+        var APP_BUILD_DATE = "Thu Jun 04 2015 21:05:12 GMT-0700 (PDT)";
+        var CHECKSUM = 3602875374;
     </script>
     
     <script type="text/javascript" src="/apps/2.0rc2/sdk.js"></script>
@@ -346,9 +346,9 @@ Ext.define("TSCountdown", {
 
     },
     _changeRelease: function(timebox) {
-        this.logger.log("_changeIteration", timebox);
+        this.logger.log("_changeRelease", timebox);
         
-        this.down('#release_counter').setEndDate( timebox.get('ReleaseDate') );
+        this.down('#release_counter').setEndDate(timebox.get('ReleaseDate') );
         this.down('#release_counter').text = timebox.get('Name') + ": " + timebox.get('ReleaseDate');
         
     },

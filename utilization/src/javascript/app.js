@@ -4,15 +4,32 @@ Ext.define("TSUtilization", {
     logger: new Rally.technicalservices.Logger(),
     defaults: { margin: 10 },
     items: [
-    {xtype:'container',itemId:'selector_box'},
+        {xtype:'container',itemId:'settings_box'},
+        {xtype:'container',itemId:'selector_box'},
         {xtype:'container',itemId:'display_box'},
         {xtype:'tsinfolink'}
     ],
+    config: {
+        defaultSettings: {
+            zoomToIteration:  true
+        }
+    },
+    
     launch: function() {
+        
+        if (this.isExternal()){
+            this.showSettings(this.config);
+        } else {
+            this.onSettingsUpdate(this.getSettings());
+        }
+    },
+    _launch: function(settings) {
         var me = this;
-        this.logger.log("Launch");
+        
+        console.log("Settings:", settings);
         
         var zoom = 'release';
+        if ( settings.zoomToIteration == true || settings.zoomToIteration == "true" ) { zoom = 'iteration'; }
         
         if ( zoom == 'iteration' ) {
             this.down('#selector_box').add({
@@ -147,7 +164,7 @@ Ext.define("TSUtilization", {
                     chart_series.push(this._getSeriesFromDailyHash('Total / Stability', release_total_each_day ));
                     chart_series.push(this._getSeriesFromDailyHash('Ideal Burn', ideal_each_day));
                     chart_series.push(this._getSeriesFromDailyHash('Actual Burn', release_remaining_each_day ));
-                    chart_series.push(this._getSeriesFromDailyHash('Planned', planned_each_day ));
+                    chart_series.push(this._getSeriesFromDailyHash('Potential', planned_each_day ));
                 }
 
                 
@@ -463,5 +480,62 @@ Ext.define("TSUtilization", {
                 }
             }
         });
+    },
+    
+     /********************************************
+     /* Overrides for App class
+     /*
+     /********************************************/
+    //getSettingsFields:  Override for App
+    getSettingsFields: function() {
+        var me = this;
+
+        return [
+           {
+                name: 'zoomToIteration',
+                xtype: 'rallycheckboxfield',
+                boxLabelAlign: 'after',
+                fieldLabel: '',
+                margin: '0 0 25 200',
+                boxLabel: 'Show by Iteration<br/><span style="color:#999999;"><i>If <strong>not</strong> ticked, show by iterations in the release.</i></span>'
+            }
+        ];
+    },
+    isExternal: function(){
+        return typeof(this.getAppId()) == 'undefined';
+    },
+    //showSettings:  Override
+    showSettings: function(options) {
+        this._appSettings = Ext.create('Rally.app.AppSettings', Ext.apply({
+            fields: this.getSettingsFields(),
+            settings: this.getSettings(),
+            defaultSettings: this.getDefaultSettings(),
+            context: this.getContext(),
+            settingsScope: this.settingsScope,
+            autoScroll: true
+        }, options));
+
+        this._appSettings.on('cancel', this._hideSettings, this);
+        this._appSettings.on('save', this._onSettingsSaved, this);
+        if (this.isExternal()){
+            if (this.down('#settings_box').getComponent(this._appSettings.id)==undefined){
+                this.down('#settings_box').add(this._appSettings);
+            }
+        } else {
+            this.hide();
+            this.up().add(this._appSettings);
+        }
+        return this._appSettings;
+    },
+    _onSettingsSaved: function(settings){
+        Ext.apply(this.settings, settings);
+        this._hideSettings();
+        this.onSettingsUpdate(settings);
+    },
+    //onSettingsUpdate:  Override
+    onSettingsUpdate: function (settings){
+        this.logger.log('onSettingsUpdate',settings);
+        Ext.apply(this, settings);
+        this._launch(settings);
     }
 });

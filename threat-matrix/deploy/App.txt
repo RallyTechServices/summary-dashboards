@@ -3,11 +3,11 @@
 <head>
     <title>Threat Matrix</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Thu Jun 04 2015 21:55:28 GMT-0600 (MDT) -->
+    <!--  Build Date: Fri Jun 05 2015 06:26:13 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Thu Jun 04 2015 21:55:28 GMT-0600 (MDT)";
-        var CHECKSUM = 31628385998;
+        var APP_BUILD_DATE = "Fri Jun 05 2015 06:26:13 GMT-0600 (MDT)";
+        var CHECKSUM = 31661632592;
     </script>
 
    <script type="text/javascript" src="/apps/2.0rc3/sdk.js"></script>
@@ -395,7 +395,8 @@ Ext.define('Rally.technicalservices.ThreatCalculator', {
             name: artifact.get('FormattedID'),
             tooltip: { pointFormat: pointName},
             dataLabels: {
-                enabled: this.showDataLabels
+                enabled: this.showDataLabels,
+                color: 'black'
             },
             data: [{
                 x: artifact.get('age'),

@@ -9,7 +9,8 @@ Ext.define("ProjectStories", function() {
     return {
         config : {
             ctx : {},
-            filter : null
+            filter : null,
+            featureFilter : null
         },
 
         constructor:function(config) {
@@ -26,8 +27,19 @@ Ext.define("ProjectStories", function() {
                 self.readStories.bind(self)
             ];
 
+            if (self.featureFilter!==null) {
+                fns = [
+                    self.readStates.bind(self),
+                    self.readFeatureTypes.bind(self),
+                    self.readProjects.bind(self),
+                    self.getReportProjects.bind(self),
+                    self.readStories.bind(self),
+                    self.readFeatures.bind(self)
+                ];
+            }
+
             async.waterfall( fns , function(err,result) {
-                callback( null, result, self.reportProjects, self.scheduleStates );
+                callback( null, self.stories, self.reportProjects, self.scheduleStates,self.features );
             });
         },
 
@@ -46,10 +58,26 @@ Ext.define("ProjectStories", function() {
             });
         },
 
+        readFeatureTypes : function(callback) {
+
+            var that = this;
+
+            var configs = [{ model : "TypeDefinition",
+                fetch : true,
+                filters : [ { property:"Ordinal", operator:"=", value:0} ]
+            }];
+
+            async.map(configs,self._wsapiQuery,function(err,results) {
+                self.featureType = _.first(_.first(results)).get("TypePath");
+                callback(null);
+            });
+
+        },
+
         readProjects : function(callback) {
             var that = this;
             var config = { model : "Project", fetch : true, filters : [] };
-            self._wsapiQuery(config,callback);
+            self._wsapiQuery( config, callback );
         },    
 
         // child projects are what we graph
@@ -89,10 +117,35 @@ Ext.define("ProjectStories", function() {
 
             // read stories for each reporting project
             async.map(configs,self._wsapiQuery,function(error,results) {
-                callback(null,results);
+                self.stories = results;
+                callback(null);
             });
         },
-         
+
+        readFeatures : function(callback) {
+
+            var configs = _.map(self.reportProjects,function(project) {
+                return {
+                    model : self.featureType,
+                    filters : [self.featureFilter],
+                    fetch : ["FormattedID","Name","ObjectID","LeafStoryCount","LeafStoryPlanEstimateTotal",
+                        "PreliminaryEstimate", "AcceptedLeafStoryCount", "AcceptedLeafStoryPlanEstimateTotal",
+                        "PercentDoneByStoryCount","c_ValueMetricKPI","Rank"],
+                    order : [ { property : 'DragAndDropRank', direction : 'ASC' } ],
+                    context : {
+                        project: project.get("_ref"),
+                        projectScopeUp: false,
+                        projectScopeDown: true
+                    }
+                };
+            });
+
+            // read stories for each reporting project
+            async.map(configs,self._wsapiQuery,function(error,results) {
+                self.features = results;
+                callback(null);
+            });
+        },
 
         _wsapiQuery : function( config , callback ) {
 
@@ -109,9 +162,14 @@ Ext.define("ProjectStories", function() {
                     }
                 }
             };
+
             if (!_.isUndefined(config.context)) {
                 storeConfig.context = config.context;
-            }         
+            }
+            if (!_.isUndefined(config.order)) {
+                storeConfig.order = config.order;
+            }
+
             Ext.create('Rally.data.WsapiDataStore', storeConfig);
         },
 

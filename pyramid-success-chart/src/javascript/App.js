@@ -2,11 +2,21 @@ Ext.define('CustomApp', {
     extend: 'Rally.app.App',
     componentCls: 'app',
 
+    config: {
+        defaultSettings : { features : true }
+    },
+
+    getSettingsFields: function() {
+        return [
+            { name: 'features', xtype: 'rallycheckboxfield', label : '% based on features (otherwise stories)' }
+        ];
+    }, 
+
     launch: function() {
         var that = this;
-        var release = null;
-        var iteration = "Iteration 1"; // this.getTimeboxScope();
-
+        var release = 'Release 1';
+        var iteration = null; // "Iteration 1"; // this.getTimeboxScope();
+        console.log(that.getSetting('features'));
         that.rallyFunctions = Ext.create("RallyFunctions");
         that.rallyFunctions.subscribe(that);
         
@@ -24,25 +34,34 @@ Ext.define('CustomApp', {
 
         var that = this;
 
+        var chartFeatures = that.getSetting('features')===true;
+
         var pr = Ext.create( "ProjectStories", {
             ctx : that.getContext(),
-            filter : that.rallyFunctions.createFilter(releaseName, iterationName)
+            filter : that.rallyFunctions.createFilter(releaseName, iterationName),
+            featureFilter : that.rallyFunctions.createFeatureFilter(releaseName)
         });
 
-        pr.readProjectStories(function(error, stories, projects, states){
-            that.prepareChartData( stories, projects, states, function(error,series,categories) {
-                that.createChart(series,categories);    
-            });
-            
+        pr.readProjectStories(function(error, stories, projects, states,features){
+            if (chartFeatures===true) {
+                that.prepareFeatureChartData( features, projects, function(error,series,categories) {
+                    that.createChart(series,categories);    
+                });              
+            } else {
+                that.prepareChartData( stories, projects, states, function(error,series,categories) {
+                    that.createChart(series,categories);    
+                });
+            }           
         });
     },
 
     _timeboxChanged : function(timebox) {
         var that = this;
         console.log("Pyramid Chart:_timeboxChanged received");
-        if (timebox.get("_type")==='release')
-            that.run(timebox.get("Name"),null);
-        else
+        if (timebox.get("_type")==='release') {
+            that.releaseName = timebox.get("Name");
+            that.run(that.releaseName,null);
+        } else
             that.run(null,timebox.get("Name"));
     },
 
@@ -104,6 +123,50 @@ Ext.define('CustomApp', {
 
     },
 
+    prepareFeatureChartData : function(features, projects, callback) {
+
+        var that = this;
+        var categories = _.map( projects, function(p) { return p.get("Name"); });
+    
+        var pointsValue = function(value) {
+            return !_.isUndefined(value) && !_.isNull(value) ? value : 0;
+        };
+
+        // totals points for a set of work items based on if they are in a set of states
+        var summarize = function( workItems, completed ) {
+
+            if (completed===false)
+                return workItems.length;
+            else { 
+                return _.reduce(  workItems, function(memo,workItem) {
+                    return memo + ( workItem.get("PercentDoneByStoryCount") >= 1 ? 1 : 0);
+                },0);
+            }
+        };
+
+        var data = _.map(categories,function(project,index){
+            console.log(project,features[index]);
+            return [ project, 
+                summarize(features[index],false),
+                summarize(features[index],true),
+                _.map(features[index],function(feature){ return feature.get("Name") /* ("c_ValueMetricKPI") */; })
+            ];
+        });
+        var sortedData = data.sort(function(a,b) { return b[1] - a[1]; });
+
+        var seriesData = [{
+            name : 'Project Scope',
+            data : sortedData,
+            completedData : _.map(sortedData,function(d) { return d[2];}),
+            featureWords : _.map(sortedData,function(d) { return d[3];})
+        }];
+
+        console.log(categories,seriesData);
+
+        callback(null,categories,seriesData);
+    },
+
+
     createChart : function(categories,seriesData,callback) {
 
         var isEmpty = function(series) {
@@ -115,14 +178,62 @@ Ext.define('CustomApp', {
 
         var that = this;
 
+        // draws the 'words' on the pyramid chart
+        var load = function() {
+
+            var ren = this.renderer;
+            var wordHeight = 11;
+            var series = _.first(this.series);
+            console.log("series",series);
+
+            _.each(series.points,function(point,index) {
+                var featureWords = series.options.featureWords[index].slice(0,4);
+                var y = point.plotY - (( featureWords.length * wordHeight)/2);
+                _.each(featureWords,function(fw,x) {
+                    var word = fw.split(' ').slice(0,2).join(' ');
+                    ren.label(word, 5, y + (x*wordHeight))
+                    .css({
+                        fontWeight: 'normal',
+                        fontSize: '75%'
+                    })
+                    .add();
+                });
+            });
+
+            ren.label("Only first 3 features are shown", 5, 285)
+            .css({
+                fontWeight: 'normal',
+                fontSize: '60%'
+            })
+            .add();
+
+            // Separator, client from service
+            // ren.path(['M', 120, 40, 'L', 120, 330])
+            //     .attr({
+            //         'stroke-width': 2,
+            //         stroke: 'silver',
+            //         dashstyle: 'dash'
+            //     })
+            //     .add();
+            // // Headers
+            // ren.label('Web client', 20, 40)
+            //     .css({
+            //         fontWeight: 'bold'
+            //     })
+            //     .add();
+        };
+
         var chartConfig = {
             colors : ["#3498db","#f1c40f","#c0392b","#9b59b6","#2ecc71"],
              chart: {
                 type: 'pyramid',
-                marginRight : 100
+                marginRight : 100,
+                events : {
+                    load : load
+                }
             },
             title: {
-                text: 'Success Chart'
+                text: ''
             },
             plotOptions: {
                 pyramid : {

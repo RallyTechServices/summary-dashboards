@@ -315,7 +315,7 @@
                 plotOptions: {
                     pie: {
                         shadow: false,
-                        center: ['50%', '30%']
+                        center: ['50%', '20%']
                     }
                 }
             }

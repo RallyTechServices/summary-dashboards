@@ -11,12 +11,11 @@ Ext.define("TSUtilization", {
     ],
     config: {
         defaultSettings: {
-            zoomToIteration:  true
+            zoomToIteration:  false
         }
     },
     
     launch: function() {
-        
         if (this.isExternal()){
             this.showSettings(this.config);
         } else {
@@ -26,58 +25,80 @@ Ext.define("TSUtilization", {
     _launch: function(settings) {
         var me = this;
         
-        console.log("Settings:", settings);
-        
-        var zoom = 'release';
-        if ( settings.zoomToIteration == true || settings.zoomToIteration == "true" ) { zoom = 'iteration'; }
-        
-        if ( zoom == 'iteration' ) {
+        this.logger.log("Settings:", settings);
+        if ( settings.showScopeSelector == true || settings.showScopeSelector == "true" ) {
             this.down('#selector_box').add({
-                xtype:'rallyiterationcombobox',
+                xtype : 'timebox-selector',
+                context : this.getContext(),
                 listeners: {
-                    change: function(combo) {
-                        //me.down('#display_box').removeAll();
-                        var name = combo.getRecord().get('Name');
-            
-                        var filter = [{property:'Name',value: name}];
-                        
-                        me._loadAStoreWithAPromise('Iteration', ['StartDate','EndDate','Name'], filter ).then({
-                            scope: me,
-                            success: function(iterations) {
-                                if (iterations.length == 0) {
-                                    me.down('#display_box').add({ xtype:'container', html:'No iterations in scope'});
-                                } else {
-                                    me._gatherData(iterations[0]);
-                                }
-                            }
-                        });
-                    }
+                    releasechange: function(release){
+                        this._changeRelease(release);
+                    },
+                    iterationchange: function(iteration){
+                        this._changeIteration(iteration);
+                    },
+                    scope: this
+
                 }
             });
         } else {
-            this.down('#selector_box').add({
-                xtype:'rallyreleasecombobox',
-                listeners: {
-                    change: function(combo) {
-                    me.down('#display_box').removeAll();
-                        var name = combo.getRecord().get('Name');
+            this.subscribe(this, 'timeboxReleaseChanged', this._changeRelease, this);
+            this.subscribe(this, 'timeboxIterationChanged', this._changeIteration, this);
+
+            this.publish('requestTimebox', this);
+        }
+        
+    },
+    _changeRelease: function(release) {
+        var me = this;
+        var settings = this.getSettings();
+        this.logger.log("Release Changed:", release);
+        
+        if ( settings.zoomToIteration == false || settings.zoomToIteration == "false" ) {
+            zoom = 'release'; 
             
-                        var filter = [{property:'Name',value:name}];
+            var name = release.get('Name');
+
+            var filter = [{property:'Name',value:name}];
                         
-                        me._loadAStoreWithAPromise('Release', ['ReleaseStartDate','ReleaseDate','Name'], filter ).then({
-                            scope: me,
-                            success: function(releases) {
-                                if (releases.length == 0) {
-                                    me.down('#display_box').add({ xtype:'container', html:'No releases in scope'});
-                                } else {
-                                    me._gatherData(releases[0]);
-                                }
-                            }
-                        });
+            me._loadAStoreWithAPromise('Release', ['ReleaseStartDate','ReleaseDate','Name'], filter ).then({
+                scope: me,
+                success: function(releases) {
+                    if (releases.length == 0) {
+                        me.down('#display_box').add({ xtype:'container', html:'No releases in scope'});
+                    } else {
+                        me._gatherData(releases[0]);
+                    }
+                }
+            });
+                    
+        }
+    },
+    
+    _changeIteration: function(iteration) {
+        var me = this;
+        var settings = this.getSettings();
+        this.logger.log("Iteration changed:", iteration);
+        
+        if ( settings.zoomToIteration == true || settings.zoomToIteration == "true" ) {
+            zoom = 'iteration';
+        
+            var name = iteration.get('Name');
+
+            var filter = [{property:'Name',value: name}];
+            
+            me._loadAStoreWithAPromise('Iteration', ['StartDate','EndDate','Name'], filter ).then({
+                scope: me,
+                success: function(iterations) {
+                    if (iterations.length == 0) {
+                        me.down('#display_box').add({ xtype:'container', html:'No iterations in scope'});
+                    } else {
+                        me._gatherData(iterations[0]);
                     }
                 }
             });
         }
+
     },
     _gatherData: function(timebox) {
         var me = this;
@@ -490,14 +511,22 @@ Ext.define("TSUtilization", {
     getSettingsFields: function() {
         var me = this;
 
-        return [
-           {
+        return [ 
+            {
+                name: 'showScopeSelector',
+                xtype: 'rallycheckboxfield',
+                boxLabelAlign: 'after',
+                fieldLabel: '',
+                margin: '0 0 25 200',
+                boxLabel: 'Show Scope Selector<br/><span style="color:#999999;"><i>Tick to use this to broadcast settings.</i></span>'
+            },
+            {
                 name: 'zoomToIteration',
                 xtype: 'rallycheckboxfield',
                 boxLabelAlign: 'after',
                 fieldLabel: '',
                 margin: '0 0 25 200',
-                boxLabel: 'Show by Iteration<br/><span style="color:#999999;"><i>If <strong>not</strong> ticked, show by iterations in the release.</i></span>'
+                boxLabel: 'Show by Iteration<br/><span style="color:#999999;"><i>If <strong>not</strong> ticked, show by iterations in the selected release.</i></span>'
             }
         ];
     },

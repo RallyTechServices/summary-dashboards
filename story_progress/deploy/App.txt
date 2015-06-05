@@ -1,13 +1,13 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Story Progress Pie</title>
+    <title>Work Queue</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Thu Jun 04 2015 20:06:24 GMT-0700 (PDT) -->
+    <!--  Build Date: Fri Jun 05 2015 13:21:59 GMT-0700 (PDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Thu Jun 04 2015 20:06:24 GMT-0700 (PDT)";
-        var CHECKSUM = 8171381837;
+        var APP_BUILD_DATE = "Fri Jun 05 2015 13:21:59 GMT-0700 (PDT)";
+        var CHECKSUM = 16153594038;
     </script>
     
 <!--[if IE]>
@@ -20,6 +20,142 @@
     <script type="text/javascript">
         Rally.onReady(function() {
              
+Ext.define('timebox-selector', {
+    extend : 'Ext.Container',
+    componentCls : 'app',
+    alias : 'widget.timebox-selector',
+    cls : 'timebox-selector',
+    layout : 'hbox',
+    width : '100%',
+    mixins : [
+        'Rally.Messageable'
+    ],
+    constructor : function()
+    {
+        this.stateId = Rally.environment.getContext().getScopedStateId('timebox-filter');
+        this.callParent(arguments);
+    },
+    initComponent : function()
+    {
+        this.callParent(arguments);
+        this._createReleaseCombo();
+        this.addEvents('releasechange','iterationchange');
+        
+        // configured to allow others to ask what the current selection is,
+        // in case they missed the initial message
+        this.subscribe(this, 'requestTimebox', this._requestTimebox, this);
+        
+    },
+    _createReleaseCombo : function()
+    {
+        this._releaseCombo = this.add({
+            xtype : 'rallyreleasecombobox',
+            fieldLabel : 'Program Increment',
+            hideLabel : false,
+            labelPad : 5,
+            labelSeparator : ':',
+            labelWidth : 130,
+            width : 280,
+            labelAlign : 'right',
+            stateful : false,
+            stateId : 'releasecombo',
+            padding : 5,
+            context : Rally.environment.getContext(),
+            showArrows : false,
+            growToLongestValue : true,
+            defaultToCurrentTimebox : true,
+            listeners : {
+                change : function(t, newVal, oldVal, eOpts)
+                {
+                    var release = t.getRecord();
+                    this.fireEvent('releasechange',release);
+                    this.publish('timeboxReleaseChanged', release);
+                    this._updateIterationCombo(release);
+                },
+                scope : this
+            }
+        });
+    },
+    _updateIterationCombo : function(release)
+    {
+        this.remove('globaliterationpicker');
+        var endFilter = Ext.create('Rally.data.wsapi.Filter', {
+            property : "EndDate",
+            operator : "<=",
+            value : Rally.util.DateTime.toIsoString(release.get('ReleaseDate'))
+        });
+        var startFilter = Ext.create('Rally.data.wsapi.Filter', {
+            property : "StartDate",
+            operator : ">=",
+            value : Rally.util.DateTime.toIsoString(release.get('ReleaseStartDate'))
+        });
+        var filters = endFilter.and(startFilter);
+
+        this._iterationCombo = this.add({
+            xtype : 'rallyiterationcombobox',
+            itemId : 'globaliterationpicker',
+            fieldLabel : 'Sprint/Iteration',
+            hideLabel : false,
+            labelPad : 5,
+            labelSeparator : ':',
+            labelWidth : 100,
+            labelAlign : 'right',
+            stateful : false,
+            padding : 5,
+            context : Rally.environment.getContext(),
+            showArrows : false,
+            growToLongestValue : true,
+            stateId : 'iterationcombo',
+            allowBlank : true,
+            allowClear : true,
+            allowNoEntry : true,
+            noEntryText : 'PI Scope',
+            emptyText : 'PI Scope',
+            noEntryValue : null,
+            defaultToCurrentTimebox : false,
+            defaultSelectPosition : 'first',
+            storeConfig : {
+                remoteFilter : true,
+                filters : filters
+            },
+            listeners : {
+                change : function(t, newVal, oldVal, eOpts)
+                {
+                    var iteration = t.getRecord();
+                    this.fireEvent('iterationchange',iteration);
+                    this.publish('timeboxIterationChanged', iteration);
+                },
+                scope : this
+            }
+        });
+    },
+    _requestTimebox : function(source) {
+        console.log('Got request timebox message', source);
+        var release = this.getReleaseRecord();
+        console.log('release',release);
+        if (release) {
+            this.publish('timeboxReleaseChanged', release);
+        } 
+        
+        var iteration = this.getIterationRecord();
+        console.log('iteration', iteration);
+        if (iteration) {
+            this.publish("timeboxIterationChanged",  iteration);
+        }
+    },
+    getReleaseRecord: function(){
+        if (this._releaseCombo){
+            return this._releaseCombo.getRecord() || null;
+        }
+        return null;
+    },
+    getIterationRecord: function(){
+        if (this._iterationCombo){
+            return this._iterationCombo.getRecord() || null;
+        }
+        return null;
+    }
+});
 /**
  * A link that pops up a version dialog box
  */
@@ -466,7 +602,7 @@ Ext.define('Rally.technicalservices.Logger',{
                 plotOptions: {
                     pie: {
                         shadow: false,
-                        center: ['50%', '30%']
+                        center: ['50%', '20%']
                     }
                 }
             }
@@ -476,25 +612,71 @@ Ext.define('Rally.technicalservices.Logger',{
         return items;
     }
 });
-Ext.define("TSStoryProgressPie", {
+Ext.define("TSWorkQueue", {
     extend: 'Rally.app.App',
     componentCls: 'app',
     logger: new Rally.technicalservices.Logger(),
     defaults: { margin: 10 },
     items: [ 
+        {xtype:'container',itemId:'settings_box'},
+        {xtype:'container',itemId:'selector_box'},
         {xtype:'tsinfolink', minHeight: 18},
         {xtype:'container',itemId:'display_box', layout: { type: 'hbox' }, items: [
             { xtype: 'container', itemId: 'self_chart' },
             { xtype: 'container', itemId: 'team_chart' }
         ] }
     ],
+    config: {
+        defaultSettings: {
+            zoomToIteration:  false
+        }
+    },
+    
     launch: function() {
+        if (this.isExternal()){
+            this.showSettings(this.config);
+        } else {
+            this.onSettingsUpdate(this.getSettings());
+        }
+    },
+    
+    _launch: function(settings) {
         var me = this;
-        this.logger.log("launch");
+        this.logger.log("launch",settings);
+        if ( settings.showScopeSelector == true || settings.showScopeSelector == "true" ) {
+            this.down('#selector_box').add({
+                xtype : 'timebox-selector',
+                context : this.getContext(),
+                listeners: {
+                    releasechange: function(release){
+                        this._changeRelease(release);
+                    },
+                    iterationchange: function(iteration){
+                        this._changeIteration(iteration);
+                    },
+                    scope: this
+
+                }
+            });
+        } else {
+            this.subscribe(this, 'timeboxReleaseChanged', this._changeRelease, this);
+            this.subscribe(this, 'timeboxIterationChanged', this._changeIteration, this);
+
+            this.publish('requestTimebox', this);
+        }
+    },
+    
+    _changeRelease: function(release) {
+        // do nothing yet
+    },
+    
+    _changeIteration: function(iteration) {
+        var me = this;
+        this.logger.log("Iteration changed:", iteration);
         
         this._setInfo(); 
                 
-        var base_filter = [{property:'ObjectID',operator:'>',value:0}];
+        var base_filter = [{property:'Iteration.Name',value:iteration.get('Name')}];
         
         var team_story_filters = Ext.Array.push([],base_filter);
         team_story_filters.push({property:'ScheduleState',value:'In-Progress'});
@@ -512,6 +694,7 @@ Ext.define("TSStoryProgressPie", {
             success: function(results) {
                 var stories = results[0];
                 var tasks = results[1];
+                this.setLoading(false);
                 
                 this._makePies(stories,tasks);
             },
@@ -554,33 +737,37 @@ Ext.define("TSStoryProgressPie", {
         container.down('#self_chart').removeAll();
         container.down('#team_chart').removeAll();
         
-        container.down('#self_chart').add({
-            xtype: 'tsdoughnut',
-            title: 'Self',
-            itemId: 'selfie',
-            width: 350,
-            height: 300,
-            margin: 10,
-            highlight_owner: this.getContext().getUser().ObjectID,
-            remove_non_highlighted: true,
-            inside_records: inside_records,
-            inside_size_field: 'PlanEstimate',
-            outside_records: outside_records,
-            outside_size_field: 'Estimate'
-        });
-        container.down('#team_chart').add( {
-            xtype: 'tsdoughnut',
-            title: 'Team',
-            width: 350,
-            heigh: 300,
-            margin: 10,
-            itemId: 'team',
-            inside_records: inside_records,
-            inside_size_field: 'PlanEstimate',
-            outside_records: outside_records,
-            outside_size_field: 'Estimate'
-        });
-
+        if ( inside_records.length == 0 && outside_records.length == 0 ) {
+            container.down('#self_chart').add({xtype:'container',html:'No items in selection'});
+        } else {
+    
+            container.down('#self_chart').add({
+                xtype: 'tsdoughnut',
+                title: 'Self',
+                itemId: 'selfie',
+                width: 200,
+                height: 200,
+                margin: 10,
+                highlight_owner: this.getContext().getUser().ObjectID,
+                remove_non_highlighted: true,
+                inside_records: inside_records,
+                inside_size_field: 'PlanEstimate',
+                outside_records: outside_records,
+                outside_size_field: 'Estimate'
+            });
+            container.down('#team_chart').add( {
+                xtype: 'tsdoughnut',
+                title: 'Team',
+                width: 200,
+                heigh: 200,
+                margin: 10,
+                itemId: 'team',
+                inside_records: inside_records,
+                inside_size_field: 'PlanEstimate',
+                outside_records: outside_records,
+                outside_size_field: 'Estimate'
+            });
+        }
     },
     
     _setInfo: function() {
@@ -594,14 +781,71 @@ Ext.define("TSStoryProgressPie", {
         chart_info.push("Size of task slices is based on Estimate. (If none of the tasks on a story have Estimates, they are distributed evenly across the story.)")
         
         this.down('tsinfolink').informationHtml = chart_info.join('<br/>');
+    },
+    
+     /********************************************
+     /* Overrides for App class
+     /*
+     /********************************************/
+    //getSettingsFields:  Override for App
+    getSettingsFields: function() {
+        var me = this;
+
+        return [ 
+            {
+                name: 'showScopeSelector',
+                xtype: 'rallycheckboxfield',
+                boxLabelAlign: 'after',
+                fieldLabel: '',
+                margin: '0 0 25 200',
+                boxLabel: 'Show Scope Selector<br/><span style="color:#999999;"><i>Tick to use this to broadcast settings.</i></span>'
+            }
+        ];
+    },
+    isExternal: function(){
+        return typeof(this.getAppId()) == 'undefined';
+    },
+    //showSettings:  Override
+    showSettings: function(options) {
+        this._appSettings = Ext.create('Rally.app.AppSettings', Ext.apply({
+            fields: this.getSettingsFields(),
+            settings: this.getSettings(),
+            defaultSettings: this.getDefaultSettings(),
+            context: this.getContext(),
+            settingsScope: this.settingsScope,
+            autoScroll: true
+        }, options));
+
+        this._appSettings.on('cancel', this._hideSettings, this);
+        this._appSettings.on('save', this._onSettingsSaved, this);
+        if (this.isExternal()){
+            if (this.down('#settings_box').getComponent(this._appSettings.id)==undefined){
+                this.down('#settings_box').add(this._appSettings);
+            }
+        } else {
+            this.hide();
+            this.up().add(this._appSettings);
+        }
+        return this._appSettings;
+    },
+    _onSettingsSaved: function(settings){
+        Ext.apply(this.settings, settings);
+        this._hideSettings();
+        this.onSettingsUpdate(settings);
+    },
+    //onSettingsUpdate:  Override
+    onSettingsUpdate: function (settings){
+        this.logger.log('onSettingsUpdate',settings);
+        Ext.apply(this, settings);
+        this._launch(settings);
     }
 
             
 });
 
             
-               Rally.launchApp('TSStoryProgressPie', {
-                   name: 'Story Progress Pie'
+               Rally.launchApp('TSWorkQueue', {
+                   name: 'Work Queue'
                });
         });
     </script>

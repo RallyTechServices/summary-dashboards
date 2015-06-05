@@ -1,22 +1,68 @@
-Ext.define("TSStoryProgressPie", {
+Ext.define("TSWorkQueue", {
     extend: 'Rally.app.App',
     componentCls: 'app',
     logger: new Rally.technicalservices.Logger(),
     defaults: { margin: 10 },
     items: [ 
+        {xtype:'container',itemId:'settings_box'},
+        {xtype:'container',itemId:'selector_box'},
         {xtype:'tsinfolink', minHeight: 18},
         {xtype:'container',itemId:'display_box', layout: { type: 'hbox' }, items: [
             { xtype: 'container', itemId: 'self_chart' },
             { xtype: 'container', itemId: 'team_chart' }
         ] }
     ],
+    config: {
+        defaultSettings: {
+            zoomToIteration:  false
+        }
+    },
+    
     launch: function() {
+        if (this.isExternal()){
+            this.showSettings(this.config);
+        } else {
+            this.onSettingsUpdate(this.getSettings());
+        }
+    },
+    
+    _launch: function(settings) {
         var me = this;
-        this.logger.log("launch");
+        this.logger.log("launch",settings);
+        if ( settings.showScopeSelector == true || settings.showScopeSelector == "true" ) {
+            this.down('#selector_box').add({
+                xtype : 'timebox-selector',
+                context : this.getContext(),
+                listeners: {
+                    releasechange: function(release){
+                        this._changeRelease(release);
+                    },
+                    iterationchange: function(iteration){
+                        this._changeIteration(iteration);
+                    },
+                    scope: this
+
+                }
+            });
+        } else {
+            this.subscribe(this, 'timeboxReleaseChanged', this._changeRelease, this);
+            this.subscribe(this, 'timeboxIterationChanged', this._changeIteration, this);
+
+            this.publish('requestTimebox', this);
+        }
+    },
+    
+    _changeRelease: function(release) {
+        // do nothing yet
+    },
+    
+    _changeIteration: function(iteration) {
+        var me = this;
+        this.logger.log("Iteration changed:", iteration);
         
         this._setInfo(); 
                 
-        var base_filter = [{property:'ObjectID',operator:'>',value:0}];
+        var base_filter = [{property:'Iteration.Name',value:iteration.get('Name')}];
         
         var team_story_filters = Ext.Array.push([],base_filter);
         team_story_filters.push({property:'ScheduleState',value:'In-Progress'});
@@ -34,6 +80,7 @@ Ext.define("TSStoryProgressPie", {
             success: function(results) {
                 var stories = results[0];
                 var tasks = results[1];
+                this.setLoading(false);
                 
                 this._makePies(stories,tasks);
             },
@@ -76,33 +123,37 @@ Ext.define("TSStoryProgressPie", {
         container.down('#self_chart').removeAll();
         container.down('#team_chart').removeAll();
         
-        container.down('#self_chart').add({
-            xtype: 'tsdoughnut',
-            title: 'Self',
-            itemId: 'selfie',
-            width: 350,
-            height: 300,
-            margin: 10,
-            highlight_owner: this.getContext().getUser().ObjectID,
-            remove_non_highlighted: true,
-            inside_records: inside_records,
-            inside_size_field: 'PlanEstimate',
-            outside_records: outside_records,
-            outside_size_field: 'Estimate'
-        });
-        container.down('#team_chart').add( {
-            xtype: 'tsdoughnut',
-            title: 'Team',
-            width: 350,
-            heigh: 300,
-            margin: 10,
-            itemId: 'team',
-            inside_records: inside_records,
-            inside_size_field: 'PlanEstimate',
-            outside_records: outside_records,
-            outside_size_field: 'Estimate'
-        });
-
+        if ( inside_records.length == 0 && outside_records.length == 0 ) {
+            container.down('#self_chart').add({xtype:'container',html:'No items in selection'});
+        } else {
+    
+            container.down('#self_chart').add({
+                xtype: 'tsdoughnut',
+                title: 'Self',
+                itemId: 'selfie',
+                width: 200,
+                height: 200,
+                margin: 10,
+                highlight_owner: this.getContext().getUser().ObjectID,
+                remove_non_highlighted: true,
+                inside_records: inside_records,
+                inside_size_field: 'PlanEstimate',
+                outside_records: outside_records,
+                outside_size_field: 'Estimate'
+            });
+            container.down('#team_chart').add( {
+                xtype: 'tsdoughnut',
+                title: 'Team',
+                width: 200,
+                heigh: 200,
+                margin: 10,
+                itemId: 'team',
+                inside_records: inside_records,
+                inside_size_field: 'PlanEstimate',
+                outside_records: outside_records,
+                outside_size_field: 'Estimate'
+            });
+        }
     },
     
     _setInfo: function() {
@@ -116,6 +167,63 @@ Ext.define("TSStoryProgressPie", {
         chart_info.push("Size of task slices is based on Estimate. (If none of the tasks on a story have Estimates, they are distributed evenly across the story.)")
         
         this.down('tsinfolink').informationHtml = chart_info.join('<br/>');
+    },
+    
+     /********************************************
+     /* Overrides for App class
+     /*
+     /********************************************/
+    //getSettingsFields:  Override for App
+    getSettingsFields: function() {
+        var me = this;
+
+        return [ 
+            {
+                name: 'showScopeSelector',
+                xtype: 'rallycheckboxfield',
+                boxLabelAlign: 'after',
+                fieldLabel: '',
+                margin: '0 0 25 200',
+                boxLabel: 'Show Scope Selector<br/><span style="color:#999999;"><i>Tick to use this to broadcast settings.</i></span>'
+            }
+        ];
+    },
+    isExternal: function(){
+        return typeof(this.getAppId()) == 'undefined';
+    },
+    //showSettings:  Override
+    showSettings: function(options) {
+        this._appSettings = Ext.create('Rally.app.AppSettings', Ext.apply({
+            fields: this.getSettingsFields(),
+            settings: this.getSettings(),
+            defaultSettings: this.getDefaultSettings(),
+            context: this.getContext(),
+            settingsScope: this.settingsScope,
+            autoScroll: true
+        }, options));
+
+        this._appSettings.on('cancel', this._hideSettings, this);
+        this._appSettings.on('save', this._onSettingsSaved, this);
+        if (this.isExternal()){
+            if (this.down('#settings_box').getComponent(this._appSettings.id)==undefined){
+                this.down('#settings_box').add(this._appSettings);
+            }
+        } else {
+            this.hide();
+            this.up().add(this._appSettings);
+        }
+        return this._appSettings;
+    },
+    _onSettingsSaved: function(settings){
+        Ext.apply(this.settings, settings);
+        this._hideSettings();
+        this.onSettingsUpdate(settings);
+    },
+    //onSettingsUpdate:  Override
+    onSettingsUpdate: function (settings){
+        this.logger.log('onSettingsUpdate',settings);
+        Ext.apply(this, settings);
+        this._launch(settings);
     }
 
             

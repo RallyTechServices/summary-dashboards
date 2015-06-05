@@ -60,6 +60,13 @@ Ext.define('Rally.technicalservices.ThreatChart',{
                     borderColor: 'black'
                 }
             }
+        },
+        events: {
+            load: function(){
+                console.log('chart load');
+                this.container.setSize('100%','100%');
+                //this.setSize()
+            }
         }
 
       },

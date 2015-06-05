@@ -3,11 +3,11 @@
 <head>
     <title>Threat Matrix</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Fri Jun 05 2015 06:26:13 GMT-0600 (MDT) -->
+    <!--  Build Date: Fri Jun 05 2015 15:01:12 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Fri Jun 05 2015 06:26:13 GMT-0600 (MDT)";
-        var CHECKSUM = 31661632592;
+        var APP_BUILD_DATE = "Fri Jun 05 2015 15:01:12 GMT-0600 (MDT)";
+        var CHECKSUM = 42959563049;
     </script>
 
    <script type="text/javascript" src="/apps/2.0rc3/sdk.js"></script>
@@ -393,7 +393,10 @@ Ext.define('Rally.technicalservices.ThreatCalculator', {
             },
             color: color,
             name: artifact.get('FormattedID'),
-            tooltip: { pointFormat: pointName},
+            tooltip: {
+                pointFormat: pointName,
+                borderColor: '#000000'
+            },
             dataLabels: {
                 enabled: this.showDataLabels,
                 color: 'black'
@@ -610,7 +613,17 @@ Ext.define('Rally.technicalservices.ThreatChart',{
                 dataLabels: {
                     formatter: function(){return this.series.name;},
                     inside: true
+                },
+                tooltip: {
+                    borderColor: 'black'
                 }
+            }
+        },
+        events: {
+            load: function(){
+                console.log('chart load');
+                this.container.setSize('100%','100%');
+                //this.setSize()
             }
         }
 
@@ -634,6 +647,7 @@ Ext.define("threat-matrix", {
     defaults: { margin: 10 },
     items: [
         {xtype:'container',itemId:'settings_box'},
+        {xtype:'container', itemId:'selector_box' }
     ],
 
     config: {
@@ -647,7 +661,8 @@ Ext.define("threat-matrix", {
             storySizeMultiplier: 1,
             riskMultiplier: 2,
             showDataLabels: true,
-            showDependencyColors: false
+            showDependencyColors: false,
+            showScopeSelector: true
         }
     },
     storyFetchFields: ['FormattedID','c_Risk','PlanEstimate','Project','ScheduleState','InProgressDate','Blocked','Blocker','CreationDate','Feature','Name','Predecessors'],
@@ -657,8 +672,11 @@ Ext.define("threat-matrix", {
     riskField: 'c_Risk',
     ageGranularity: 'day',
 
+    selectedIteration: undefined,
+    selectedRelease: undefined,
+
     launch: function() {
-        if (this.isExternal()){
+         if (this.isExternal()){
             this.showSettings(this.config);
         } else {
             this.onSettingsUpdate(this.getSettings());
@@ -709,13 +727,42 @@ Ext.define("threat-matrix", {
         this.logger.log('filters', filters.toString());
         return filters;
     },
+    onTimeboxScopeChange: function(newTimeboxScope) {
+        this.logger.log('newTimeboxScope',newTimeboxScope);
+        this.getBody().removeAll();
+        if ((newTimeboxScope) && (newTimeboxScope.get('_type') === 'iteration')) {
+            this.selectedIteration = newTimeboxScope;
+        }
+        if ((newTimeboxScope) && (newTimeboxScope.get('_type') === 'release')) {
+            this.selectedRelease = newTimeboxScope;
+        }
+        if (this.selectedIteration && this.selectedRelease){
+            this.run(this.selectedRelease, this.selectedIteration);
+        } else {
 
-    onTimeboxUpdated: function(release, iteration){
-        //comment out once we get the message bus working
-        iteration = this.getIterationRecord(),
-        release = this.getReleaseRecord();
+            var msg = '';
+            if (!this.selectedRelease){
+                msg += 'a Release'
+            }
+            if (!this.selectedIteration){
+                if (msg.length > 0){
+                    msg += ' and Iteration';
+                } else {
+                    msg += 'an Iteration';
+                }
+            }
 
-        this.logger.log('onTimeboxUpdated',release, iteration);
+            this.getBody().add({
+                xtype: 'container',
+                html: Ext.String.format('Please select {0} to view the Threat Matrix', msg)
+            });
+        }
+
+    },
+
+    run: function(release, iteration){
+
+        this.logger.log('run',release, iteration);
         if (release && iteration){
             this.getBody().removeAll();
             this.setLoading(true);
@@ -758,13 +805,16 @@ Ext.define("threat-matrix", {
                             this.setLoading(false);
                             this.logger.log('runCalculation success series', chartData)
 
-                            this.getBody().add({
+                            var chart = this.getBody().add({
                                 xtype: 'tsthreatchart',
                                 itemId: 'rally-chart',
                                 loadMask: false,
                                 chartData: chartData,
+                                flex: 1,
                                 title: 'Threat Matrix'
+
                             });
+                            chart.setSize('100%','100%');
                             this._addLegend(calc.projectLabelColorMap);
 
                         },
@@ -809,7 +859,7 @@ Ext.define("threat-matrix", {
             xtype: 'container',
             padding: 10,
             html: '<div class="tslegendtext">Types:  </div><div class="tslegend-square">&nbsp;&nbsp;</div><div class="tslegendtext">&nbsp;&nbsp;Feature</div><span class="tslegendspacer">&nbsp;</span>' +
-                '<div class="tslegend-circle">&nbsp;&nbsp;</div><div class="tslegendtext">&nbsp;&nbsp;User Story (50% Opacity)</div><span class="tslegendspacer">&nbsp;</span>'
+                '<div class="tslegend-circle">&nbsp;&nbsp;</div><div class="tslegendtext">&nbsp;&nbsp;Story (more transparent)</div><span class="tslegendspacer">&nbsp;</span>'
         });
 
 
@@ -844,33 +894,44 @@ Ext.define("threat-matrix", {
     },
     addComponents: function(){
         this.logger.log('addComponents');
-        var cb = this.getHeader().add({
-            xtype: 'rallyreleasecombobox',
-            itemId: 'cb-release',
-            fieldLabel: 'Release',
-            labelAlign: 'right',
-            allowNoEntry: false,
-            width: '300'
-        });
-        cb.on('change', this.onTimeboxUpdated,this);
+        var release = null, iteration = null;
 
-        var cb = this.getHeader().add({
-            xtype: 'rallyiterationcombobox',
-            itemId: 'cb-iteration',
-            fieldLabel: 'Iteration',
-            labelAlign: 'right',
-            allowNoEntry: false,
-            width: '300'
-        });
-        cb.on('change', this.onTimeboxUpdated,this);
+        if ( this.getSetting('showScopeSelector') || this.getSetting('showScopeSelector') == "true" ) {
+            var tb = this.getHeader().add({
+                xtype : 'timebox-selector',
+                context : this.getContext(),
+                listeners: {
+                    releasechange: function(release){
+                        this.onTimeboxScopeChange(release);
+                    },
+                    iterationchange: function(iteration){
+                        this.onTimeboxScopeChange(iteration);
+                    },
+                    scope: this
+                }
+            });
+            this._addButton();
+            release = tb.getReleaseRecord();
+            iteration = tb.getIterationRecord();
+            this.onTimeboxScopeChange(release,iteration);
+        } else {
+            this._addButton();
+            this.onTimeboxScopeChange(release,iteration);
+            this.subscribe(this, 'timeboxReleaseChanged', this.onTimeboxScopeChange, this);
+            this.subscribe(this, 'timeboxIterationChanged', this.onTimeboxScopeChange, this);
 
+            this.publish('requestTimebox', this);
+        }
+
+
+    },
+    _addButton: function(){
         this.getHeader().add({
             xtype: 'rallybutton',
             itemId: 'bt-dependency',
             cls: 'small-icon secondary rly-small',
             width: 35,
             iconCls: 'icon-predecessor',
-           // icon: 'icon-predecessor',
             scope: this,
             handler: this._toggleDependencies,
             tooltip: 'Show first level dependency relationships'
@@ -898,16 +959,10 @@ Ext.define("threat-matrix", {
         });
     },
     getIterationRecord: function(){
-        if (this.down('#cb-iteration')){
-            return this.down('#cb-iteration').getRecord();
-        }
-        return null;
+        return this.selectedIteration;
     },
     getReleaseRecord: function(){
-        if (this.down('#cb-release')){
-            return this.down('#cb-release').getRecord();
-        }
-        return null;
+        return this.selectedRelease;
     },
     getHeader: function(){
         this.logger.log('getHeader');
@@ -931,9 +986,11 @@ Ext.define("threat-matrix", {
         }
         return this.add({
             xtype: 'container',
-            itemId: 'ct-body'
+            itemId: 'ct-body',
+            flex: 1
         });
     },
+
     /********************************************
      /* Overrides for App class
      /*
@@ -943,6 +1000,14 @@ Ext.define("threat-matrix", {
         var me = this;
 
         return [
+            {
+                name: 'showScopeSelector',
+                xtype: 'rallycheckboxfield',
+                boxLabelAlign: 'after',
+                fieldLabel: '',
+                margin: '0 0 25 200',
+                boxLabel: 'Show scope selector'
+            },
             {
                 name: 'maxFeatureAgeThreshhold',
                 xtype: 'rallynumberfield',
@@ -1054,10 +1119,147 @@ Ext.define("threat-matrix", {
     onSettingsUpdate: function (settings){
         this.logger.log('onSettingsUpdate',settings);
         Ext.apply(this, settings);
+        console.log('--');
         this.addComponents();
     }
 });
 
+Ext.define('timebox-selector', {
+    extend : 'Ext.Container',
+    componentCls : 'app',
+    alias : 'widget.timebox-selector',
+    cls : 'timebox-selector',
+    layout : 'hbox',
+    width : '100%',
+    mixins : [
+        'Rally.Messageable'
+    ],
+    constructor : function()
+    {
+        this.stateId = Rally.environment.getContext().getScopedStateId('timebox-filter');
+        this.callParent(arguments);
+    },
+    initComponent : function()
+    {
+        this.callParent(arguments);
+        this._createReleaseCombo();
+        this.addEvents('releasechange','iterationchange');
+        
+        // configured to allow others to ask what the current selection is,
+        // in case they missed the initial message
+        this.subscribe(this, 'requestTimebox', this._requestTimebox, this);
+        
+    },
+    _createReleaseCombo : function()
+    {
+        this._releaseCombo = this.add({
+            xtype : 'rallyreleasecombobox',
+            fieldLabel : 'Program Increment',
+            hideLabel : false,
+            labelPad : 5,
+            labelSeparator : ':',
+            labelWidth : 130,
+            width : 280,
+            labelAlign : 'right',
+            stateful : false,
+            stateId : 'releasecombo',
+            padding : 5,
+            context : Rally.environment.getContext(),
+            showArrows : false,
+            growToLongestValue : true,
+            defaultToCurrentTimebox : true,
+            listeners : {
+                change : function(t, newVal, oldVal, eOpts)
+                {
+                    var release = t.getRecord();
+                    this.fireEvent('releasechange',release);
+                    this.publish('timeboxReleaseChanged', release);
+                    this._updateIterationCombo(release);
+                },
+                scope : this
+            }
+        });
+    },
+    _updateIterationCombo : function(release)
+    {
+        this.remove('globaliterationpicker');
+        var endFilter = Ext.create('Rally.data.wsapi.Filter', {
+            property : "EndDate",
+            operator : "<=",
+            value : Rally.util.DateTime.toIsoString(release.get('ReleaseDate'))
+        });
+        var startFilter = Ext.create('Rally.data.wsapi.Filter', {
+            property : "StartDate",
+            operator : ">=",
+            value : Rally.util.DateTime.toIsoString(release.get('ReleaseStartDate'))
+        });
+        var filters = endFilter.and(startFilter);
+
+        this._iterationCombo = this.add({
+            xtype : 'rallyiterationcombobox',
+            itemId : 'globaliterationpicker',
+            fieldLabel : 'Sprint/Iteration',
+            hideLabel : false,
+            labelPad : 5,
+            labelSeparator : ':',
+            labelWidth : 100,
+            labelAlign : 'right',
+            stateful : false,
+            padding : 5,
+            context : Rally.environment.getContext(),
+            showArrows : false,
+            growToLongestValue : true,
+            stateId : 'iterationcombo',
+            allowBlank : true,
+            allowClear : true,
+            allowNoEntry : true,
+            noEntryText : 'PI Scope',
+            emptyText : 'PI Scope',
+            noEntryValue : null,
+            defaultToCurrentTimebox : false,
+            defaultSelectPosition : 'first',
+            storeConfig : {
+                remoteFilter : true,
+                filters : filters
+            },
+            listeners : {
+                change : function(t, newVal, oldVal, eOpts)
+                {
+                    var iteration = t.getRecord();
+                    this.fireEvent('iterationchange',iteration);
+                    this.publish('timeboxIterationChanged', iteration);
+                },
+                scope : this
+            }
+        });
+    },
+    _requestTimebox : function(source) {
+        console.log('Got request timebox message', source);
+        var release = this.getReleaseRecord();
+        console.log('release',release);
+        if (release) {
+            this.publish('timeboxReleaseChanged', release);
+        } 
+        
+        var iteration = this.getIterationRecord();
+        console.log('iteration', iteration);
+        if (iteration) {
+            this.publish("timeboxIterationChanged",  iteration);
+        }
+    },
+    getReleaseRecord: function(){
+        if (this._releaseCombo){
+            return this._releaseCombo.getRecord() || null;
+        }
+        return null;
+    },
+    getIterationRecord: function(){
+        if (this._iterationCombo){
+            return this._iterationCombo.getRecord() || null;
+        }
+        return null;
+    }
+});
             
                Rally.launchApp('threat-matrix', {
                    name: 'Threat Matrix'

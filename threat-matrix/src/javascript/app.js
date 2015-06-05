@@ -34,8 +34,7 @@ Ext.define("threat-matrix", {
     selectedRelease: undefined,
 
     launch: function() {
-        console.log('launch');
-        if (this.isExternal()){
+         if (this.isExternal()){
             this.showSettings(this.config);
         } else {
             this.onSettingsUpdate(this.getSettings());
@@ -87,18 +86,34 @@ Ext.define("threat-matrix", {
         return filters;
     },
     onTimeboxScopeChange: function(newTimeboxScope) {
-
-        this.callParent(arguments);
-        if ((newTimeboxScope) && (newTimeboxScope.getType() === 'iteration')) {
-            this.selectedIteration = iteration;
-            this.run(null,newTimeboxScope.getRecord().get("Name"));
-        } else {
-            if ((newTimeboxScope) && (newTimeboxScope.getType() === 'release')) {
-                this.selectedRelease = release;
-            }
+        this.logger.log('newTimeboxScope',newTimeboxScope);
+        this.getBody().removeAll();
+        if ((newTimeboxScope) && (newTimeboxScope.get('_type') === 'iteration')) {
+            this.selectedIteration = newTimeboxScope;
+        }
+        if ((newTimeboxScope) && (newTimeboxScope.get('_type') === 'release')) {
+            this.selectedRelease = newTimeboxScope;
         }
         if (this.selectedIteration && this.selectedRelease){
             this.run(this.selectedRelease, this.selectedIteration);
+        } else {
+
+            var msg = '';
+            if (!this.selectedRelease){
+                msg += 'a Release'
+            }
+            if (!this.selectedIteration){
+                if (msg.length > 0){
+                    msg += ' and Iteration';
+                } else {
+                    msg += 'an Iteration';
+                }
+            }
+
+            this.getBody().add({
+                xtype: 'container',
+                html: Ext.String.format('Please select {0} to view the Threat Matrix', msg)
+            });
         }
 
     },
@@ -148,13 +163,16 @@ Ext.define("threat-matrix", {
                             this.setLoading(false);
                             this.logger.log('runCalculation success series', chartData)
 
-                            this.getBody().add({
+                            var chart = this.getBody().add({
                                 xtype: 'tsthreatchart',
                                 itemId: 'rally-chart',
                                 loadMask: false,
                                 chartData: chartData,
+                                flex: 1,
                                 title: 'Threat Matrix'
+
                             });
+                            chart.setSize('100%','100%');
                             this._addLegend(calc.projectLabelColorMap);
 
                         },
@@ -199,7 +217,7 @@ Ext.define("threat-matrix", {
             xtype: 'container',
             padding: 10,
             html: '<div class="tslegendtext">Types:  </div><div class="tslegend-square">&nbsp;&nbsp;</div><div class="tslegendtext">&nbsp;&nbsp;Feature</div><span class="tslegendspacer">&nbsp;</span>' +
-                '<div class="tslegend-circle">&nbsp;&nbsp;</div><div class="tslegendtext">&nbsp;&nbsp;User Story (50% Opacity)</div><span class="tslegendspacer">&nbsp;</span>'
+                '<div class="tslegend-circle">&nbsp;&nbsp;</div><div class="tslegendtext">&nbsp;&nbsp;Story (more transparent)</div><span class="tslegendspacer">&nbsp;</span>'
         });
 
 
@@ -234,9 +252,10 @@ Ext.define("threat-matrix", {
     },
     addComponents: function(){
         this.logger.log('addComponents');
+        var release = null, iteration = null;
 
         if ( this.getSetting('showScopeSelector') || this.getSetting('showScopeSelector') == "true" ) {
-            this.down('#selector_box').add({
+            var tb = this.getHeader().add({
                 xtype : 'timebox-selector',
                 context : this.getContext(),
                 listeners: {
@@ -247,16 +266,24 @@ Ext.define("threat-matrix", {
                         this.onTimeboxScopeChange(iteration);
                     },
                     scope: this
-
                 }
             });
+            this._addButton();
+            release = tb.getReleaseRecord();
+            iteration = tb.getIterationRecord();
+            this.onTimeboxScopeChange(release,iteration);
         } else {
+            this._addButton();
+            this.onTimeboxScopeChange(release,iteration);
             this.subscribe(this, 'timeboxReleaseChanged', this.onTimeboxScopeChange, this);
             this.subscribe(this, 'timeboxIterationChanged', this.onTimeboxScopeChange, this);
 
             this.publish('requestTimebox', this);
         }
 
+
+    },
+    _addButton: function(){
         this.getHeader().add({
             xtype: 'rallybutton',
             itemId: 'bt-dependency',
@@ -317,7 +344,8 @@ Ext.define("threat-matrix", {
         }
         return this.add({
             xtype: 'container',
-            itemId: 'ct-body'
+            itemId: 'ct-body',
+            flex: 1
         });
     },
 

@@ -253,9 +253,13 @@ Ext.define('Rally.technicalservices.ThreatCalculator', {
             },
             color: color,
             name: artifact.get('FormattedID'),
-            tooltip: { pointFormat: pointName},
+            tooltip: {
+                pointFormat: pointName,
+                borderColor: '#000000'
+            },
             dataLabels: {
-                enabled: this.showDataLabels
+                enabled: this.showDataLabels,
+                color: 'black'
             },
             data: [{
                 x: artifact.get('age'),

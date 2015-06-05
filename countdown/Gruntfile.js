@@ -1,48 +1,48 @@
 module.exports = function(grunt) {
     require('grunt');
-    
+
     var config_file_name = 'config.json';
     var auth_file_name = 'auth.json';
-    
+
     var config = { auth: {} };
-    
+
     if ( grunt.file.exists(config_file_name) ) {
-    
+
         config = grunt.file.readJSON('config.json');
 
-        config.js_files = grunt.file.expand(['src/javascript/*.js']);
+        config.js_files = grunt.file.expand(['src/javascript/*.js', '../common/src/javascript/scope_selector*.js']);
 
         config.ugly_files = grunt.file.expand(['deploy/app.min.*.js']);
-        
+
         config.css_files = grunt.file.expand( 'src/style/*.css' );
         config.checksum = "<!= checksum !>";
-        
+
         config.js_contents = " ";
         for (var i=0;i<config.js_files.length;i++) {
             grunt.log.writeln( config.js_files[i]);
             config.js_contents = config.js_contents + "\n" + grunt.file.read(config.js_files[i]);
         }
-    
+
         config.style_contents = "";
         for (var i=0;i<config.css_files.length;i++) {
             grunt.log.writeln( config.css_files[i]);
             config.style_contents = config.style_contents + "\n" + grunt.file.read(config.css_files[i]);
         }
-        
+
         config.ugly_contents = "";
         for ( var i=0;i<config.ugly_files;i++ ) {
             grunt.file.read(config.ugly_files[i]);
         }
     }
     if ( grunt.file.exists(auth_file_name) ) {
-    // grunt.log.writeln( config.js_contents );
+        // grunt.log.writeln( config.js_contents );
         var auth = grunt.file.readJSON(auth_file_name);
         config.auth = auth
     } else {
         grunt.log.writeln("");
         grunt.log.writeln("WARNING: Slow tests won't run without an auth.json file");
     }
-    
+
     grunt.initConfig({
         pkg: grunt.file.readJSON('package.json'),
         uglify: {
@@ -54,36 +54,36 @@ module.exports = function(grunt) {
             }
         },
         template: {
-                dev: {
-                    src: 'templates/App-debug-tpl.html',
-                    dest: 'App-debug.html',
-                    engine: 'underscore',
-                    variables: config
-                },
-                prod: {
-                    src: 'templates/App-tpl.html',
-                    dest: 'deploy/App.txt',
-                    engine: 'underscore',
-                    variables: config
-                },
-                apikey: {
-                    src: 'templates/App-apikey-tpl.html',
-                    dest: 'deploy/ExternalApp.txt',
-                    engine: 'underscore',
-                    variables: config
-                },
-                confluence: {
-                    src: 'templates/App-confluence-tpl.html',
-                    dest: 'deploy/ConfluenceApp.txt',
-                    engine: 'underscore',
-                    variables: config
-                },
-                ugly: {
-                    src: 'templates/App-ugly-tpl.html',
-                    dest: 'deploy/Ugly.txt',
-                    engine: 'underscore',
-                    variables: config
-                }
+            dev: {
+                src: 'templates/App-debug-tpl.html',
+                dest: 'App-debug.html',
+                engine: 'underscore',
+                variables: config
+            },
+            prod: {
+                src: 'templates/App-tpl.html',
+                dest: 'deploy/App.txt',
+                engine: 'underscore',
+                variables: config
+            },
+            apikey: {
+                src: 'templates/App-apikey-tpl.html',
+                dest: 'deploy/ExternalApp.txt',
+                engine: 'underscore',
+                variables: config
+            },
+            confluence: {
+                src: 'templates/App-confluence-tpl.html',
+                dest: 'deploy/ConfluenceApp.txt',
+                engine: 'underscore',
+                variables: config
+            },
+            ugly: {
+                src: 'templates/App-ugly-tpl.html',
+                dest: 'deploy/Ugly.txt',
+                engine: 'underscore',
+                variables: config
+            }
         },
         jasmine: {
             fast: {
@@ -94,7 +94,7 @@ module.exports = function(grunt) {
                     template: 'test/fast/custom.tmpl',
                     templateOptions: config,
                     keepRunner: true,
-                    junit: { 
+                    junit: {
                         path: 'test/logs/fast'
                     }
                 }
@@ -108,14 +108,14 @@ module.exports = function(grunt) {
                     templateOptions: config,
                     keepRunner: true,
                     timeout: 50000,
-                    junit: { 
+                    junit: {
                         path: 'test/logs/slow'
                     }
                 }
             }
         }
     });
-    
+
     grunt.registerTask('setChecksum', 'Make a sloppy checksum', function() {
         var fs = require('fs');
         var chk = 0x12345678,
@@ -125,7 +125,7 @@ module.exports = function(grunt) {
         var file = grunt.file.read(deploy_file);
         string = file.replace(/var CHECKSUM = .*;/,"");
         string = string.replace(/\s/g,"");  //Remove all whitespace from the string.
-        
+
         for (i = 0; i < string.length; i++) {
             chk += (string.charCodeAt(i) * i);
         }
@@ -133,10 +133,10 @@ module.exports = function(grunt) {
         grunt.log.writeln('length: ' + string.length);
 // 
         grunt.template.addDelimiters('square-brackets','[%','%]');
-        
+
         var output = grunt.template.process(file, { data: { checksum: chk },  delimiters: 'square-brackets' });
         grunt.file.write(deploy_file,output);
-        
+
     });
 
     //load
@@ -145,7 +145,7 @@ module.exports = function(grunt) {
     grunt.loadNpmTasks('grunt-contrib-uglify');
     //tasks
     grunt.registerTask('default', ['debug','build','ugly','apikey']);
-    
+
     // (uses all the files in src/javascript)
     grunt.registerTask('build', "Create the html for deployment",['template:prod','setChecksum']);
     // 

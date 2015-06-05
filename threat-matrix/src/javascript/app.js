@@ -5,6 +5,7 @@ Ext.define("threat-matrix", {
     defaults: { margin: 10 },
     items: [
         {xtype:'container',itemId:'settings_box'},
+        {xtype:'container', itemId:'selector_box' }
     ],
 
     config: {
@@ -18,7 +19,8 @@ Ext.define("threat-matrix", {
             storySizeMultiplier: 1,
             riskMultiplier: 2,
             showDataLabels: true,
-            showDependencyColors: false
+            showDependencyColors: false,
+            showScopeSelector: true
         }
     },
     storyFetchFields: ['FormattedID','c_Risk','PlanEstimate','Project','ScheduleState','InProgressDate','Blocked','Blocker','CreationDate','Feature','Name','Predecessors'],
@@ -28,7 +30,11 @@ Ext.define("threat-matrix", {
     riskField: 'c_Risk',
     ageGranularity: 'day',
 
+    selectedIteration: undefined,
+    selectedRelease: undefined,
+
     launch: function() {
+        console.log('launch');
         if (this.isExternal()){
             this.showSettings(this.config);
         } else {
@@ -80,13 +86,26 @@ Ext.define("threat-matrix", {
         this.logger.log('filters', filters.toString());
         return filters;
     },
+    onTimeboxScopeChange: function(newTimeboxScope) {
 
-    onTimeboxUpdated: function(release, iteration){
-        //comment out once we get the message bus working
-        iteration = this.getIterationRecord(),
-        release = this.getReleaseRecord();
+        this.callParent(arguments);
+        if ((newTimeboxScope) && (newTimeboxScope.getType() === 'iteration')) {
+            this.selectedIteration = iteration;
+            this.run(null,newTimeboxScope.getRecord().get("Name"));
+        } else {
+            if ((newTimeboxScope) && (newTimeboxScope.getType() === 'release')) {
+                this.selectedRelease = release;
+            }
+        }
+        if (this.selectedIteration && this.selectedRelease){
+            this.run(this.selectedRelease, this.selectedIteration);
+        }
 
-        this.logger.log('onTimeboxUpdated',release, iteration);
+    },
+
+    run: function(release, iteration){
+
+        this.logger.log('run',release, iteration);
         if (release && iteration){
             this.getBody().removeAll();
             this.setLoading(true);
@@ -215,25 +234,28 @@ Ext.define("threat-matrix", {
     },
     addComponents: function(){
         this.logger.log('addComponents');
-        var cb = this.getHeader().add({
-            xtype: 'rallyreleasecombobox',
-            itemId: 'cb-release',
-            fieldLabel: 'Release',
-            labelAlign: 'right',
-            allowNoEntry: false,
-            width: '300'
-        });
-        cb.on('change', this.onTimeboxUpdated,this);
 
-        var cb = this.getHeader().add({
-            xtype: 'rallyiterationcombobox',
-            itemId: 'cb-iteration',
-            fieldLabel: 'Iteration',
-            labelAlign: 'right',
-            allowNoEntry: false,
-            width: '300'
-        });
-        cb.on('change', this.onTimeboxUpdated,this);
+        if ( this.getSetting('showScopeSelector') || this.getSetting('showScopeSelector') == "true" ) {
+            this.down('#selector_box').add({
+                xtype : 'timebox-selector',
+                context : this.getContext(),
+                listeners: {
+                    releasechange: function(release){
+                        this.onTimeboxScopeChange(release);
+                    },
+                    iterationchange: function(iteration){
+                        this.onTimeboxScopeChange(iteration);
+                    },
+                    scope: this
+
+                }
+            });
+        } else {
+            this.subscribe(this, 'timeboxReleaseChanged', this.onTimeboxScopeChange, this);
+            this.subscribe(this, 'timeboxIterationChanged', this.onTimeboxScopeChange, this);
+
+            this.publish('requestTimebox', this);
+        }
 
         this.getHeader().add({
             xtype: 'rallybutton',
@@ -241,7 +263,6 @@ Ext.define("threat-matrix", {
             cls: 'small-icon secondary rly-small',
             width: 35,
             iconCls: 'icon-predecessor',
-           // icon: 'icon-predecessor',
             scope: this,
             handler: this._toggleDependencies,
             tooltip: 'Show first level dependency relationships'
@@ -269,16 +290,10 @@ Ext.define("threat-matrix", {
         });
     },
     getIterationRecord: function(){
-        if (this.down('#cb-iteration')){
-            return this.down('#cb-iteration').getRecord();
-        }
-        return null;
+        return this.selectedIteration;
     },
     getReleaseRecord: function(){
-        if (this.down('#cb-release')){
-            return this.down('#cb-release').getRecord();
-        }
-        return null;
+        return this.selectedRelease;
     },
     getHeader: function(){
         this.logger.log('getHeader');
@@ -305,6 +320,7 @@ Ext.define("threat-matrix", {
             itemId: 'ct-body'
         });
     },
+
     /********************************************
      /* Overrides for App class
      /*
@@ -314,6 +330,14 @@ Ext.define("threat-matrix", {
         var me = this;
 
         return [
+            {
+                name: 'showScopeSelector',
+                xtype: 'rallycheckboxfield',
+                boxLabelAlign: 'after',
+                fieldLabel: '',
+                margin: '0 0 25 200',
+                boxLabel: 'Show scope selector'
+            },
             {
                 name: 'maxFeatureAgeThreshhold',
                 xtype: 'rallynumberfield',
@@ -425,6 +449,7 @@ Ext.define("threat-matrix", {
     onSettingsUpdate: function (settings){
         this.logger.log('onSettingsUpdate',settings);
         Ext.apply(this, settings);
+        console.log('--');
         this.addComponents();
     }
 });

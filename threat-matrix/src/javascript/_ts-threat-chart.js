@@ -55,6 +55,9 @@ Ext.define('Rally.technicalservices.ThreatChart',{
                 dataLabels: {
                     formatter: function(){return this.series.name;},
                     inside: true
+                },
+                tooltip: {
+                    borderColor: 'black'
                 }
             }
         }

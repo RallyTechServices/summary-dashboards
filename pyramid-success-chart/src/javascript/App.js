@@ -195,7 +195,7 @@ Ext.define('CustomApp', {
                     ren.label(word, 5, y + (x*wordHeight))
                     .css({
                         fontWeight: 'normal',
-                        fontSize: '75%',
+                        fontSize: '75%'
                     })
                     .attr({
                         zIndex : 9

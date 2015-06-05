@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Utilization</title>
+    <script type="text/javascript">
+        var APP_BUILD_DATE = "Thu Jun 04 2015 08:25:59 GMT-0700 (PDT)";
+    </script>
+    
+    <script type="text/javascript" src="https://10.32.16.145/apps/2.0rc3/sdk-debug.js"></script>
+
+    <script type="text/javascript">
+        Rally.onReady(function() {
+            Rally.loadScripts(["src/javascript/__ts-info-link.js","src/javascript/__ts-logger.js","src/javascript/app.js"],
+	            function() {
+	                Rally.launchApp('TSUtilization', {
+	                    name: 'Utilization'
+	                })
+	            }, true);
+        });
+    </script>
+<link rel="stylesheet" type="text/css" href="src/style/app.css">
+
+</head>
+<body></body>
+</html>

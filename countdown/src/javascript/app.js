@@ -6,7 +6,6 @@ Ext.define("TSCountdown", {
     items: [
         {xtype:'container',itemId:'settings_box'},
         {xtype:'container', itemId:'selector_box' },
-
         {xtype:'tscountdown',itemId:'release_counter',cls:'border-bottom'},
         {xtype:'tscountdown',itemId:'iteration_counter'},
         {xtype:'tsinfolink'}
@@ -63,6 +62,20 @@ Ext.define("TSCountdown", {
         this.down('#iteration_counter').setEndDate( timebox.get('EndDate') );
         this.down('#iteration_counter').text = timebox.get('Name') + ": " + timebox.get('EndDate');
 
+    },
+    _changeRelease: function(timebox) {
+        this.logger.log("_changeRelease", timebox);
+        
+        this.down('#release_counter').setEndDate(timebox.get('ReleaseDate') );
+        this.down('#release_counter').text = timebox.get('Name') + ": " + timebox.get('ReleaseDate');
+        
+    },
+    _changeIteration: function(timebox) {
+        this.logger.log("_changeIteration", timebox);
+        
+        this.down('#iteration_counter').setEndDate( timebox.get('EndDate') );
+        this.down('#iteration_counter').text = timebox.get('Name') + ": " + timebox.get('EndDate');
+        
     },
     _loadAStoreWithAPromise: function(model_name, model_fields, filters){
         var deferred = Ext.create('Deft.Deferred');

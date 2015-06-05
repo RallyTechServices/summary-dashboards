@@ -3,15 +3,17 @@ Ext.define("TSStoryProgressPie", {
     componentCls: 'app',
     logger: new Rally.technicalservices.Logger(),
     defaults: { margin: 10 },
-    items: [        
+    items: [ 
+        {xtype:'tsinfolink', minHeight: 18},
         {xtype:'container',itemId:'display_box', layout: { type: 'hbox' }, items: [
             { xtype: 'container', itemId: 'self_chart' },
             { xtype: 'container', itemId: 'team_chart' }
-        ] },
-        {xtype:'tsinfolink'}
+        ] }
     ],
     launch: function() {
         var me = this;
+        this.logger.log("launch");
+        
         this._setInfo(); 
                 
         var base_filter = [{property:'ObjectID',operator:'>',value:0}];
@@ -69,6 +71,8 @@ Ext.define("TSStoryProgressPie", {
     _makePies: function(inside_records,outside_records){
         var container =  this.down('#display_box');
 
+        this.logger.log("_makePies", inside_records, outside_records);
+        
         container.down('#self_chart').removeAll();
         container.down('#team_chart').removeAll();
         
@@ -76,7 +80,9 @@ Ext.define("TSStoryProgressPie", {
             xtype: 'tsdoughnut',
             title: 'Self',
             itemId: 'selfie',
-            width: 300,
+            width: 350,
+            height: 300,
+            margin: 10,
             highlight_owner: this.getContext().getUser().ObjectID,
             remove_non_highlighted: true,
             inside_records: inside_records,
@@ -87,7 +93,9 @@ Ext.define("TSStoryProgressPie", {
         container.down('#team_chart').add( {
             xtype: 'tsdoughnut',
             title: 'Team',
-            width: 300,
+            width: 350,
+            heigh: 300,
+            margin: 10,
             itemId: 'team',
             inside_records: inside_records,
             inside_size_field: 'PlanEstimate',
@@ -98,7 +106,16 @@ Ext.define("TSStoryProgressPie", {
     },
     
     _setInfo: function() {
-        this.down('tsinfolink').informationHtml = "Hi";
+        var chart_info = [];
+        
+        chart_info.push("These charts show stories in the In Progress state with their tasks.");
+        chart_info.push("Gray tasks on the Self chart represent tasks that belong to someone other than the current user");
+        chart_info.push("The 'lightness' of tasks represents progress from Defined (darkest) to Completed (brightest)");
+        chart_info.push("White tasks on either chart represent a story not having any tasks");
+        chart_info.push("Size of story slices is based upon Plan Estimate");
+        chart_info.push("Size of task slices is based on Estimate. (If none of the tasks on a story have Estimates, they are distributed evenly across the story.)")
+        
+        this.down('tsinfolink').informationHtml = chart_info.join('<br/>');
     }
 
             

@@ -1,12 +1,12 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Countdown</title>
+    <title>Utilization</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Fri Jun 05 2015 11:49:06 GMT-0700 (PDT) -->
+    <!--  Build Date: Fri Jun 05 2015 07:58:32 GMT-0700 (PDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Fri Jun 05 2015 11:49:06 GMT-0700 (PDT)";
+        var APP_BUILD_DATE = "Fri Jun 05 2015 07:58:32 GMT-0700 (PDT)";
         var CHECKSUM = [%= checksum %];
     </script>
     
@@ -16,15 +16,16 @@
         Rally.onReady(function() {
             
             
-               Rally.launchApp('TSCountdown', {
-                   name: 'Countdown'
+               Rally.launchApp('TSUtilization', {
+                   name: 'Utilization'
                });
         });
     </script>
     
     <style type="text/css">
 
-
+.app {
+}
 .tsinfolink {
     position:absolute;
     right:0px;
@@ -39,20 +40,6 @@
     margin-top: 25px;
     margin-right: 5px;
     cursor: pointer;
-}
-
-.clock-counter {
-    text-align: center;
-    font: bold 48px "Lucida Console", Monaco, monospace;
-}
-
-.clock-label {
-    text-align: center;
-    font: 8px Arial, Helvetica, sans-serif;
-}
-
-.border-bottom {
-    border-bottom: solid blue;
 }
     </style>
 

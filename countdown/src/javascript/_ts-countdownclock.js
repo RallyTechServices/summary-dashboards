@@ -50,6 +50,8 @@ Ext.define('Rally.technicalservices.CountDownClock',{
     },
     
     setEndDate: function(end_date) {
+        console.log("setEndDate",end_date);
+        
         this.endDate = end_date;
         this.updateCounters();
     },

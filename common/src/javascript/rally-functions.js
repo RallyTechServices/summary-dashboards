@@ -62,6 +62,20 @@ Ext.define("RallyFunctions", function() {
             return filter;
         },
 
+        createFeatureFilter : function( releaseName ) { 
+            var filter = null;
+
+            if (!_.isNull(releaseName)) {
+                filter = Ext.create('Rally.data.wsapi.Filter', {
+                    property: 'Release.Name',
+                    operator: '=',
+                    value: releaseName
+                });
+            }
+
+            return filter;
+        },
+
         subscribe : function(app) {
             app.subscribe(app, 'timeboxReleaseChanged', app._timeboxChanged, app);
             app.subscribe(app, 'timeboxIterationChanged', app._timeboxChanged, app);

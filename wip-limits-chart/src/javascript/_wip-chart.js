@@ -15,7 +15,6 @@ Ext.define('Rally.technicalservices.wipChart',{
             text: 'WIP Limits Chart'
         },
         xAxis: {
-            // categories: categories,
         },        
         yAxis: [
             {
@@ -28,10 +27,6 @@ Ext.define('Rally.technicalservices.wipChart',{
             series: {
                 dataLabels: {
                     enabled: true,
-                    // align: 'right',
-                    // formatter : function() {
-                    //     return " [" + Math.round(this.point.y) + "] ";
-                    // },
                     color: '#FFFFFF'
                 },
                 stacking: 'normal'
@@ -39,7 +34,6 @@ Ext.define('Rally.technicalservices.wipChart',{
         }
     },
     constructor: function (config) {
-        // console.log("stacking",config.stacking,(config.stacking===true ? 'normal' : null))
         this.callParent(arguments);
         if (config.title){
             this.chartConfig.title = config.title;

@@ -70,6 +70,11 @@ Ext.define("RallyFunctions", function() {
                 filter = _.isNull(filter) ? ifilter : filter.and(ifilter);              
             }
             return filter;
+        },
+
+        subscribe : function(app) {
+            app.subscribe(app, 'timeboxReleaseChanged', app._timeboxChanged, app);
+            app.subscribe(app, 'timeboxIterationChanged', app._timeboxChanged, app);
         }
        
     };
@@ -104,7 +109,6 @@ Ext.define("ProjectStories", function() {
             ];
 
             async.waterfall( fns , function(err,result) {
-                console.log("result",result);
                 callback( null, result, self.reportProjects, self.scheduleStates );
             });
         },
@@ -210,6 +214,8 @@ Ext.define("ProjectStories", function() {
         var that = this;
 
         that.rallyFunctions = Ext.create("RallyFunctions");
+        that.rallyFunctions.subscribe(that);
+        
         var release = null;
         var iteration = "Iteration 1"; // this.getTimeboxScope();
 
@@ -254,8 +260,17 @@ Ext.define("ProjectStories", function() {
                 });
             });
         });
-
     },  
+
+    _timeboxChanged : function(timebox) {
+        var that = this;
+        console.log("WIP Limits Chart:_timeboxChanged received");
+        if (timebox.get("_type")==='release')
+            that.run(timebox.get("Name"),null);
+        else
+            that.run(null,timebox.get("Name"));
+    },
+
 
     getTimeboxScope : function() {
         var timeboxScope = this.getContext().getTimeboxScope();
@@ -311,7 +326,7 @@ Ext.define("ProjectStories", function() {
 
         var that = this;
 
-        var categories = _.map(projects, function(p) { return p.get("Name"); });
+        var categories = _.map(projects, function(p) { return _.last(p.get("Name").split('>')); });
 
         var states = ["In-Progress","Completed"];
 
@@ -357,8 +372,6 @@ Ext.define("ProjectStories", function() {
                 })
             };
         });
-
-        console.log("seriesData",seriesData);
 
         callback(null,categories,seriesData);
 
@@ -408,7 +421,6 @@ Ext.define("ProjectStories", function() {
             text: 'WIP Limits Chart'
         },
         xAxis: {
-            // categories: categories,
         },        
         yAxis: [
             {
@@ -421,10 +433,6 @@ Ext.define("ProjectStories", function() {
             series: {
                 dataLabels: {
                     enabled: true,
-                    // align: 'right',
-                    // formatter : function() {
-                    //     return " [" + Math.round(this.point.y) + "] ";
-                    // },
                     color: '#FFFFFF'
                 },
                 stacking: 'normal'
@@ -432,7 +440,6 @@ Ext.define("ProjectStories", function() {
         }
     },
     constructor: function (config) {
-        // console.log("stacking",config.stacking,(config.stacking===true ? 'normal' : null))
         this.callParent(arguments);
         if (config.title){
             this.chartConfig.title = config.title;

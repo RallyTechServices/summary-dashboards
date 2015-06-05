@@ -60,6 +60,11 @@ Ext.define("RallyFunctions", function() {
                 filter = _.isNull(filter) ? ifilter : filter.and(ifilter);              
             }
             return filter;
+        },
+
+        subscribe : function(app) {
+            app.subscribe(app, 'timeboxReleaseChanged', app._timeboxChanged, app);
+            app.subscribe(app, 'timeboxIterationChanged', app._timeboxChanged, app);
         }
        
     };

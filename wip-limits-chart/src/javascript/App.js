@@ -7,6 +7,8 @@ Ext.define('CustomApp', {
         var that = this;
 
         that.rallyFunctions = Ext.create("RallyFunctions");
+        that.rallyFunctions.subscribe(that);
+        
         var release = null;
         var iteration = "Iteration 1"; // this.getTimeboxScope();
 
@@ -51,8 +53,17 @@ Ext.define('CustomApp', {
                 });
             });
         });
-
     },  
+
+    _timeboxChanged : function(timebox) {
+        var that = this;
+        console.log("WIP Limits Chart:_timeboxChanged received");
+        if (timebox.get("_type")==='release')
+            that.run(timebox.get("Name"),null);
+        else
+            that.run(null,timebox.get("Name"));
+    },
+
 
     getTimeboxScope : function() {
         var timeboxScope = this.getContext().getTimeboxScope();
@@ -108,7 +119,7 @@ Ext.define('CustomApp', {
 
         var that = this;
 
-        var categories = _.map(projects, function(p) { return p.get("Name"); });
+        var categories = _.map(projects, function(p) { return _.last(p.get("Name").split('>')); });
 
         var states = ["In-Progress","Completed"];
 
@@ -154,8 +165,6 @@ Ext.define('CustomApp', {
                 })
             };
         });
-
-        console.log("seriesData",seriesData);
 
         callback(null,categories,seriesData);
 

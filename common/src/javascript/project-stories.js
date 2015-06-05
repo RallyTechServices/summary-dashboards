@@ -27,7 +27,6 @@ Ext.define("ProjectStories", function() {
             ];
 
             async.waterfall( fns , function(err,result) {
-                console.log("result",result);
                 callback( null, result, self.reportProjects, self.scheduleStates );
             });
         },

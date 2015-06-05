@@ -70,6 +70,11 @@ Ext.define("RallyFunctions", function() {
                 filter = _.isNull(filter) ? ifilter : filter.and(ifilter);              
             }
             return filter;
+        },
+
+        subscribe : function(app) {
+            app.subscribe(app, 'timeboxReleaseChanged', app._timeboxChanged, app);
+            app.subscribe(app, 'timeboxIterationChanged', app._timeboxChanged, app);
         }
        
     };
@@ -104,7 +109,6 @@ Ext.define("ProjectStories", function() {
             ];
 
             async.waterfall( fns , function(err,result) {
-                console.log("result",result);
                 callback( null, result, self.reportProjects, self.scheduleStates );
             });
         },
@@ -211,6 +215,7 @@ Ext.define("ProjectStories", function() {
         var iteration = "Iteration 1"; // this.getTimeboxScope();
 
         that.rallyFunctions = Ext.create("RallyFunctions");
+        that.rallyFunctions.subscribe(that);
 
         var tbs = that.getTimeboxScope();
         if (!_.isNull(tbs)) {
@@ -230,12 +235,22 @@ Ext.define("ProjectStories", function() {
         });
 
         pr.readProjectStories(function(error, stories, projects, states) {
-            that.prepareChartData( stories, projects, state, function(error, categories, series) {
+            that.prepareChartData( stories, projects, states, function(error, categories, series) {
               that.createChart( categories, series );
             });
         });
 
     },
+
+    _timeboxChanged : function(timebox) {
+        var that = this;
+        console.log("Progress-By-Project:_timeboxChanged received");
+        if (timebox.get("_type")==='release')
+            that.run(timebox.get("Name"),null);
+        else
+            that.run(null,timebox.get("Name"));
+    },
+
 
     getTimeboxScope : function() {
 
@@ -262,7 +277,7 @@ Ext.define("ProjectStories", function() {
 
         var that = this;
 
-        var projectKeys = _.map(projects,function(project) { return project.get("Name"); });
+        var projectKeys = _.map(projects,function(project) { return _.last(project.get("Name").split('>')); });
 
         var pointsValue = function(value) {
             return !_.isUndefined(value) && !_.isNull(value) ? value : 0;
@@ -291,8 +306,8 @@ Ext.define("ProjectStories", function() {
         var seriesData = _.map( _.keys(summary), function( summaryKey ) {
             return {
                 name : summaryKey,
-                data : _.map( projectKeys, function( projectKey ) {
-                    return summarize( groupedWorkItems[projectKey], summary[summaryKey]);
+                data : _.map( projectKeys, function( projectKey, index ) {
+                    return summarize( stories[index] , summary[summaryKey]);
                 })
             };
         });
@@ -345,7 +360,6 @@ Ext.define("ProjectStories", function() {
         if (_.indexOf(summary[_.last(_.keys(summary))],last)===-1)
             summary[_.last(_.keys(summary))].push(_.last(that.scheduleStates));
 
-        console.log("summary",summary);
         return summary;
     }
 

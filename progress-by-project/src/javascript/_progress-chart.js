@@ -35,7 +35,7 @@ Ext.define('Rally.technicalservices.progressChart',{
                     enabled: true,
                     align: 'center',
                     formatter : function() {
-                        return Math.round(this.percentage) + " %";
+                        return (this.percentage !== 0) ? (Math.round(this.percentage) + " %") : "";
                     },
                     color: '#FFFFFF'
                 },

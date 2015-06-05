@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Countdown</title>
+    <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
+    <!--  Build Date: Fri Jun 05 2015 11:49:05 GMT-0700 (PDT) -->
+    
+    <script type="text/javascript">
+        var APP_BUILD_DATE = "Fri Jun 05 2015 11:49:05 GMT-0700 (PDT)";
+        var CHECKSUM = 8049632214;
+    </script>
+    
+    <script type="text/javascript" src="/apps/2.0rc3/sdk.js"></script>
+
+    <script type="text/javascript">
+        if (!window.location.origin) {
+            window.location.origin = window.location.protocol + "//" + window.location.hostname + (window.location.port ? ':' + window.location.port: '');
+        }
+
+        Rally.onReady(function() {
+             
+Ext.define('timebox-selector', {
+    extend : 'Ext.Container',
+    componentCls : 'app',
+    alias : 'widget.timebox-selector',
+    cls : 'timebox-selector',
+    layout : 'hbox',
+    width : '100%',
+    mixins : [
+        'Rally.Messageable'
+    ],
+    constructor : function()
+    {
+        this.stateId = Rally.environment.getContext().getScopedStateId('timebox-filter');
+        this.callParent(arguments);
+    },
+    initComponent : function()
+    {
+        this.callParent(arguments);
+        this._createReleaseCombo();
+        this.addEvents('releasechange','iterationchange');
+        
+        // configured to allow others to ask what the current selection is,
+        // in case they missed the initial message
+        this.subscribe(this, 'requestTimebox', this._requestTimebox, this);
+        
+    },
+    _createReleaseCombo : function()
+    {
+        this._releaseCombo = this.add({
+            xtype : 'rallyreleasecombobox',
+            fieldLabel : 'Program Increment',
+            hideLabel : false,
+            labelPad : 5,
+            labelSeparator : ':',
+            labelWidth : 130,
+            width : 280,
+            labelAlign : 'right',
+            stateful : false,
+            stateId : 'releasecombo',
+            padding : 5,
+            context : Rally.environment.getContext(),
+            showArrows : false,
+            growToLongestValue : true,
+            defaultToCurrentTimebox : true,
+            listeners : {
+                change : function(t, newVal, oldVal, eOpts)
+                {
+                    var release = t.getRecord();
+                    this.fireEvent('releasechange',release);
+                    this.publish('timeboxReleaseChanged', release);
+                    this._updateIterationCombo(release);
+                },
+                scope : this
+            }
+        });
+    },
+    _updateIterationCombo : function(release)
+    {
+        this.remove('globaliterationpicker');
+        var endFilter = Ext.create('Rally.data.wsapi.Filter', {
+            property : "EndDate",
+            operator : "<=",
+            value : Rally.util.DateTime.toIsoString(release.get('ReleaseDate'))
+        });
+        var startFilter = Ext.create('Rally.data.wsapi.Filter', {
+            property : "StartDate",
+            operator : ">=",
+            value : Rally.util.DateTime.toIsoString(release.get('ReleaseStartDate'))
+        });
+        var filters = endFilter.and(startFilter);
+
+        this._iterationCombo = this.add({
+            xtype : 'rallyiterationcombobox',
+            itemId : 'globaliterationpicker',
+            fieldLabel : 'Sprint/Iteration',
+            hideLabel : false,
+            labelPad : 5,
+            labelSeparator : ':',
+            labelWidth : 100,
+            labelAlign : 'right',
+            stateful : false,
+            padding : 5,
+            context : Rally.environment.getContext(),
+            showArrows : false,
+            growToLongestValue : true,
+            stateId : 'iterationcombo',
+            allowBlank : true,
+            allowClear : true,
+            allowNoEntry : true,
+            noEntryText : 'PI Scope',
+            emptyText : 'PI Scope',
+            noEntryValue : null,
+            defaultToCurrentTimebox : false,
+            defaultSelectPosition : 'first',
+            storeConfig : {
+                remoteFilter : true,
+                filters : filters
+            },
+            listeners : {
+                change : function(t, newVal, oldVal, eOpts)
+                {
+                    var iteration = t.getRecord();
+                    this.fireEvent('iterationchange',iteration);
+                    this.publish('timeboxIterationChanged', iteration);
+                },
+                scope : this
+            }
+        });
+    },
+    _requestTimebox : function(source) {
+        console.log('Got request timebox message', source);
+        var release = this.getReleaseRecord();
+        console.log('release',release);
+        if (release) {
+            this.publish('timeboxReleaseChanged', release);
+        } 
+        
+        var iteration = this.getIterationRecord();
+        console.log('iteration', iteration);
+        if (iteration) {
+            this.publish("timeboxIterationChanged",  iteration);
+        }
+    },
+    getReleaseRecord: function(){
+        if (this._releaseCombo){
+            return this._releaseCombo.getRecord() || null;
+        }
+        return null;
+    },
+    getIterationRecord: function(){
+        if (this._iterationCombo){
+            return this._iterationCombo.getRecord() || null;
+        }
+        return null;
+    }
+});
+/**
+ * A link that pops up a version dialog box
+ */
+
+Ext.define('Rally.technicalservices.InfoLink',{
+    extend: 'Ext.Component',
+    alias: 'widget.tsinfolink',
+    
+    /**
+     * @cfg {String} informationHtml
+     * Additional text to be displayed on the popup dialog (for exmaple,
+     * to add a description of the app's use or functionality)
+     */
+    informationHtml: null,
+    
+    /**
+     * 
+     * cfg {String} title
+     * The title for the dialog box
+     */
+     title: "Build Information",
+    
+    renderTpl: "<div id='{id}-infolinkWrap' class='tsinfolink'>i</div>",
+
+    initComponent: function() {
+        this.callParent(arguments);
+       
+    },
+    
+    onRender: function() {
+        this.callParent(arguments);
+        this.mon(this.el,'click',this.onClick,this);
+    },
+    _generateChecksum: function(string){
+        var chk = 0x12345678,
+            i;
+        string = string.replace(/var CHECKSUM = .*;/,"");
+        string = string.replace(/\s/g,"");  //Remove all whitespace from the string.
+        
+        for (i = 0; i < string.length; i++) {
+            chk += (string.charCodeAt(i) * i);
+        }
+    
+        return chk;
+    },
+    _checkChecksum: function(container) {
+        var me = this;
+        Ext.Ajax.request({
+            url: document.URL,
+            params: {
+                id: 1
+            },
+            success: function (response) {
+                text = response.responseText;
+                if ( CHECKSUM ) {
+                    if ( CHECKSUM !== me._generateChecksum(text) ) {
+                        console.log("Checksums don't match!");
+                        if ( me.dialog ) {
+                            me.dialog.add({xtype:'container',html:'Checksums do not match'});
+                        }
+                    }
+                }
+            }
+        });
+    },
+    onClick: function(e) {
+        var me = this;
+        this._checkChecksum(this);
+        
+        var dialog_items = [];
+        
+        if ( this.informationHtml ) {
+            dialog_items.push({
+                xtype:'container',
+                html: this.informationHtml
+            });
+        }
+                
+        dialog_items.push({
+            xtype:'container',
+            html:"This app was created by the Rally Technical Services Team."
+        });
+        
+        if ( APP_BUILD_DATE ) {
+            dialog_items.push({
+                xtype:'container',
+                html:'Build date/time: ' + APP_BUILD_DATE
+            });
+        }
+        
+        if (this.dialog){this.dialog.destroy();}
+        this.dialog = Ext.create('Rally.ui.dialog.Dialog',{
+            defaults: { padding: 5, margin: 5 },
+            closable: true,
+            draggable: true,
+            title: me.title,
+            items: dialog_items
+        });
+        this.dialog.show();
+    }
+});
+
+/*
+ */
+Ext.define('Rally.technicalservices.Logger',{
+    constructor: function(config){
+        Ext.apply(this,config);
+    },
+    log: function(args){
+        var timestamp = "[ " + Ext.util.Format.date(new Date(), "Y-m-d H:i:s.u") + " ]";
+        //var output_args = arguments;
+        //output_args.unshift( [ "[ " + timestamp + " ]" ] );
+        //output_args = Ext.Array.push(output_args,arguments);
+        
+        var output_args = [];
+        output_args = Ext.Array.push(output_args,[timestamp]);
+        output_args = Ext.Array.push(output_args, Ext.Array.slice(arguments,0));
+
+        window.console && console.log.apply(console,output_args);
+    }
+
+});
+
+Ext.define('Rally.technicalservices.CountDownClock',{
+    extend: 'Ext.Container',
+    alias: 'widget.tscountdown',
+    layout: { type: 'table', columns: 4 },
+    padding: 5,
+    defaults: { margin: '0 7 0 7' },
+    
+    config: {
+        /**
+         * @cfg {Date} 
+         * The end date (and time) for the counter to count down to
+         */
+        endDate: new Date(),
+        /**
+         * @cfg {String}
+         * A message to show on click of the whole thing
+         */
+        text: ''
+    },
+    
+    constructor: function(config) {
+        this.mergeConfig(config);
+        this.callParent([this.config]);
+    },
+
+    initComponent: function() {
+        this.items = this._buildItems();
+        this.callParent(arguments);
+
+        this.currentDate = new Date();
+        this.on('render', this._addClickEvent, this);
+        
+        Ext.TaskManager.start({ run: this.updateCounters, interval: 750, scope: this } );
+    },
+    
+    _addClickEvent: function() {
+        this.mon(this.getEl(), 'click', this._showDescriptionDialog, this);
+    },
+    
+    _showDescriptionDialog: function() {
+        Ext.create('Rally.ui.dialog.Dialog',{
+            title: 'Source',
+            autoShow: true,
+            draggable: true,
+            width: this.width,
+            height: this.height,
+            closable: true,
+            items: [{xtype:'container', html: this.text, padding: 15}]
+        });
+    },
+    
+    setEndDate: function(end_date) {
+        console.log("setEndDate",end_date);
+        
+        this.endDate = end_date;
+        this.updateCounters();
+    },
+    
+    updateCounters: function() {
+        var end_date = this.endDate;
+        current_date = new Date();
+        var diff = this.calculateDifferences(end_date, current_date);
+        this.down('#days').update(diff);
+        this.down('#hours').update(diff);
+        this.down('#minutes').update(diff);
+        this.down('#seconds').update(diff);
+    },
+    
+    // return a hash { days: 12, 
+    calculateDifferences: function(end_date, current_date){
+        var diff = {
+            days: this._getDifferenceAboveZero(end_date, current_date, 'day'),
+            hours: this._getDifferenceAboveZero(end_date,current_date, 'hour'),
+            minutes: this._getDifferenceAboveZero(end_date,current_date, 'minute'),
+            seconds: this._getDifferenceAboveZero(end_date,current_date, 'second')
+        }
+
+        return diff;
+    },
+    
+    _getDifferenceAboveZero: function(end_date,current_date,metric) {
+        var diff = Rally.util.DateTime.getDifference(end_date,current_date, metric);
+        diff > 0 ? diff = diff : diff = 0;
+        
+        metric_tops = { 'hour': 24, 'minute': 60, 'second': 60 };
+        
+        if ( metric_tops[metric] ) {
+            diff = diff % metric_tops[metric];
+        }
+
+        return diff;
+    },
+    
+    _buildItems: function() {
+        var items = [];
+        
+        items.push({ 
+            xtype: 'container', 
+            itemId:'days',
+            cellCls: 'clock-counter',
+            tpl: '{days:leftPad(3,"0")}'
+        });
+        
+        items.push({ 
+            xtype: 'container', 
+            itemId:'hours',
+            cellCls: 'clock-counter',
+            tpl: '{hours:leftPad(2,"0")}'
+        });
+        
+        items.push({ 
+            xtype: 'container', 
+            itemId:'minutes',
+            cellCls: 'clock-counter',
+            tpl: '{minutes:leftPad(2,"0")}'
+        });
+        
+        items.push( { 
+            xtype: 'container', 
+            itemId:'seconds',
+            cellCls: 'clock-counter',
+            tpl: '{seconds:leftPad(2,"0")}'
+        });
+        
+        items.push({
+            xtype: 'container',
+            cellCls: 'clock-label',
+            html: 'DAYS'
+        });
+        
+        items.push({
+            xtype: 'container',
+            cellCls: 'clock-label',
+            html: 'HOURS'
+        });
+        
+        items.push({
+            xtype: 'container',
+            cellCls: 'clock-label',
+            html: 'MINUTES'
+        });
+       
+        
+        items.push({
+            xtype: 'container',
+            cellCls: 'clock-label',
+            html: 'SECONDS'
+        });
+
+        
+        return items;
+    }
+});
+Ext.define("TSCountdown", {
+    extend: 'Rally.app.App',
+    componentCls: 'app',
+    logger: new Rally.technicalservices.Logger(),
+    defaults: { margin: 10 },
+    items: [
+        {xtype:'container',itemId:'settings_box'},
+        {xtype:'container', itemId:'selector_box' },
+        {xtype:'tscountdown',itemId:'release_counter',cls:'border-bottom'},
+        {xtype:'tscountdown',itemId:'iteration_counter'},
+        {xtype:'tsinfolink'}
+    ],
+    config: {
+        defaultSettings: {
+            showScopeSelector:  false
+        }
+    },
+    launch: function() {
+
+        if (this.isExternal()){
+            this.showSettings(this.config);
+        } else {
+            this.onSettingsUpdate(this.getSettings());
+        }
+    },
+
+    _launch: function(settings) {
+        var me = this;
+
+        if ( settings.showScopeSelector == true || settings.showScopeSelector == "true" ) {
+            this.down('#selector_box').add({
+                xtype : 'timebox-selector',
+                context : this.getContext(),
+                listeners: {
+                    releasechange: function(release){
+                        this._changeRelease(release);
+                    },
+                    iterationchange: function(iteration){
+                        this._changeIteration(iteration);
+                    },
+                    scope: this
+
+                }
+            });
+        } else {
+            this.subscribe(this, 'timeboxReleaseChanged', this._changeRelease, this);
+            this.subscribe(this, 'timeboxIterationChanged', this._changeIteration, this);
+
+            this.publish('requestTimebox', this);
+        }
+   },
+    _changeRelease: function(timebox) {
+        this.logger.log("_changeRelease", timebox);
+
+        this.down('#release_counter').setEndDate(timebox.get('ReleaseDate') );
+        this.down('#release_counter').text = timebox.get('Name') + ": " + timebox.get('ReleaseDate');
+
+    },
+    _changeIteration: function(timebox) {
+        this.logger.log("_changeIteration", timebox);
+
+        this.down('#iteration_counter').setEndDate( timebox.get('EndDate') );
+        this.down('#iteration_counter').text = timebox.get('Name') + ": " + timebox.get('EndDate');
+
+    },
+    _changeRelease: function(timebox) {
+        this.logger.log("_changeRelease", timebox);
+        
+        this.down('#release_counter').setEndDate(timebox.get('ReleaseDate') );
+        this.down('#release_counter').text = timebox.get('Name') + ": " + timebox.get('ReleaseDate');
+        
+    },
+    _changeIteration: function(timebox) {
+        this.logger.log("_changeIteration", timebox);
+        
+        this.down('#iteration_counter').setEndDate( timebox.get('EndDate') );
+        this.down('#iteration_counter').text = timebox.get('Name') + ": " + timebox.get('EndDate');
+        
+    },
+    _loadAStoreWithAPromise: function(model_name, model_fields, filters){
+        var deferred = Ext.create('Deft.Deferred');
+        var me = this;
+        this.logger.log("Starting load:",model_name,model_fields);
+
+        Ext.create('Rally.data.wsapi.Store', {
+            model: model_name,
+            fetch: model_fields,
+            filters: filters
+        }).load({
+            callback : function(records, operation, successful) {
+                if (successful){
+                    deferred.resolve(records);
+                } else {
+                    me.logger.log("Failed: ", operation);
+                    deferred.reject('Problem loading: ' + operation.error.errors.join('. '));
+                }
+            }
+        });
+        return deferred.promise;
+    },
+
+    /********************************************
+     /* Overrides for App class
+     /*
+     /********************************************/
+    //getSettingsFields:  Override for App
+    getSettingsFields: function() {
+        var me = this;
+
+        return [
+            {
+                name: 'showScopeSelector',
+                xtype: 'rallycheckboxfield',
+                boxLabelAlign: 'after',
+                fieldLabel: '',
+                margin: '0 0 25 200',
+                boxLabel: 'Show Scope Selector<br/><span style="color:#999999;"><i>Tick to use this to broadcast settings.</i></span>'
+            }
+        ];
+    },
+    isExternal: function(){
+        return typeof(this.getAppId()) == 'undefined';
+    },
+    //showSettings:  Override
+    showSettings: function(options) {
+        this._appSettings = Ext.create('Rally.app.AppSettings', Ext.apply({
+            fields: this.getSettingsFields(),
+            settings: this.getSettings(),
+            defaultSettings: this.getDefaultSettings(),
+            context: this.getContext(),
+            settingsScope: this.settingsScope,
+            autoScroll: true
+        }, options));
+
+        this._appSettings.on('cancel', this._hideSettings, this);
+        this._appSettings.on('save', this._onSettingsSaved, this);
+        if (this.isExternal()){
+            if (this.down('#settings_box').getComponent(this._appSettings.id)==undefined){
+                this.down('#settings_box').add(this._appSettings);
+            }
+        } else {
+            this.hide();
+            this.up().add(this._appSettings);
+        }
+        return this._appSettings;
+    },
+    _onSettingsSaved: function(settings){
+        Ext.apply(this.settings, settings);
+        this._hideSettings();
+        this.onSettingsUpdate(settings);
+    },
+    //onSettingsUpdate:  Override
+    onSettingsUpdate: function (settings){
+        this.logger.log('onSettingsUpdate',settings);
+        Ext.apply(this, settings);
+        this._launch(settings);
+    }
+});
+
+            
+               Rally.launchApp('TSCountdown', {
+                   name: 'Countdown'
+               });
+        });
+    </script>
+    
+    <style type="text/css">
+
+
+.tsinfolink {
+    position:absolute;
+    right:0px;
+    width: 14px;
+    height: 14px;
+    border-radius: 7px;
+    text-align: center;
+    color: white;
+    background: #C0C0C0;
+    border-style: solid;
+    border-width: 1px;
+    margin-top: 25px;
+    margin-right: 5px;
+    cursor: pointer;
+}
+
+.clock-counter {
+    text-align: center;
+    font: bold 48px "Lucida Console", Monaco, monospace;
+}
+
+.clock-label {
+    text-align: center;
+    font: 8px Arial, Helvetica, sans-serif;
+}
+
+.border-bottom {
+    border-bottom: solid blue;
+}
+    </style>
+
+</head>
+<body></body>
+</html>

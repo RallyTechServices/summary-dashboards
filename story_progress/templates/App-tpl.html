@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title><%= name %></title>
+    <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
+    <!--  Build Date: <%= new Date() %> -->
+    
+    <script type="text/javascript">
+        var APP_BUILD_DATE = "<%= new Date() %>";
+        var CHECKSUM = [%= checksum %];
+    </script>
+    
+<!--[if IE]>
+<script type="text/javascript" src="//rally1.rallydev.com/apps/2.0rc3/sdk.js"></script>
+<![endif]-->
+<![if !IE]>
+<script type="text/javascript" src="/apps/2.0rc3/sdk.js"></script>
+<![endif]>
+
+    <script type="text/javascript">
+        Rally.onReady(function() {
+            <%= js_contents %>
+            
+               Rally.launchApp('<%= className %>', {
+                   name: '<%= name %>'
+               });
+        });
+    </script>
+    
+    <style type="text/css">
+<%= style_contents %>
+    </style>
+
+</head>
+<body></body>
+</html>

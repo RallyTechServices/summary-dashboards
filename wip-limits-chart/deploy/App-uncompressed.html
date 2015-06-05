@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>progress-by-project</title>
+    <title>wip-limits-chart</title>
 
     <script type="text/javascript" src="/apps/2.0rc2/sdk.js"></script>
     <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/async/1.22/async.min.js"></script>
@@ -210,12 +210,14 @@ Ext.define("ProjectStories", function() {
     componentCls: 'app',
 
     launch: function() {
+
         var that = this;
-        var release = null;
-        var iteration = "Iteration 1"; // this.getTimeboxScope();
 
         that.rallyFunctions = Ext.create("RallyFunctions");
         that.rallyFunctions.subscribe(that);
+        
+        var release = null;
+        var iteration = "Iteration 1"; // this.getTimeboxScope();
 
         var tbs = that.getTimeboxScope();
         if (!_.isNull(tbs)) {
@@ -223,7 +225,24 @@ Ext.define("ProjectStories", function() {
             iteration = tbs.type === "iteration" ? tbs.name : null;
         }
         that.run(release,iteration);
+
     },
+
+    config: {
+        defaultSettings : {
+            stacking : true
+        }
+    },
+
+    getSettingsFields: function() {
+        return [
+            { 
+                name: 'stacking',
+                xtype: 'rallycheckboxfield',
+                label : 'Stack bars on chart'
+            }
+        ];
+    }, 
 
     run : function(releaseName,iterationName) {
 
@@ -234,17 +253,18 @@ Ext.define("ProjectStories", function() {
             filter : that.rallyFunctions.createFilter(releaseName,iterationName)
         });
 
-        pr.readProjectStories(function(error, stories, projects, states) {
-            that.prepareChartData( stories, projects, states, function(error, categories, series) {
-              that.createChart( categories, series );
+        pr.readProjectStories(function(error, stories, projects, states){
+            that.readWipValues(projects,function(error,wipLimits) {
+                that.prepareChartData(stories, projects, wipLimits, function(error, categories, series) {
+                    that.createChart(categories,series);
+                });
             });
         });
-
-    },
+    },  
 
     _timeboxChanged : function(timebox) {
         var that = this;
-        console.log("Progress-By-Project:_timeboxChanged received");
+        console.log("WIP Limits Chart:_timeboxChanged received");
         if (timebox.get("_type")==='release')
             that.run(timebox.get("Name"),null);
         else
@@ -253,7 +273,6 @@ Ext.define("ProjectStories", function() {
 
 
     getTimeboxScope : function() {
-
         var timeboxScope = this.getContext().getTimeboxScope();
         if (timeboxScope) {
             return { type : timeboxScope.getType(), name : timeboxScope.getRecord().get("Name") };
@@ -262,7 +281,6 @@ Ext.define("ProjectStories", function() {
     },
 
     onTimeboxScopeChange: function(newTimeboxScope) {
-
         this.callParent(arguments);
         if ((newTimeboxScope) && (newTimeboxScope.getType() === 'iteration')) {
             this.run(null,newTimeboxScope.getRecord().get("Name"));
@@ -273,11 +291,44 @@ Ext.define("ProjectStories", function() {
         }
     },
 
-    prepareChartData : function(stories, projects, states, callback) {
+    // project-wip:IA-Program > IM FT Client outcomes > CAP DELIVERY 2 Scrum Team:DefinedWIP
+    // "project-wip:IA-Program > Big Data Analytics & Shared Services > BDASS:CompletedWIP"
+
+    readWipValues : function(projects,callback) {
 
         var that = this;
 
-        var projectKeys = _.map(projects,function(project) { return _.last(project.get("Name").split('>')); });
+        var projectKeys = _.map( projects, function(p) { return p.get("Name"); });
+
+        var states = ["In-Progress","Completed"];
+
+        var keys = _.flatten(_.map(projectKeys,function(pKey) {
+            return _.map(states,function(state) {
+                return "project-wip:" + pKey + ":" + state + "WIP";
+            });
+        }));
+
+        var configs = _.map(keys,function(key) {
+            return {
+                model : "Preference",
+                filters : [{property:"Name",operator:"=",value:key}],
+                fetch : true
+            };
+        });
+
+        async.map(configs, that.rallyFunctions._wsapiQuery, function(error,results){
+            callback(null, _.flatten(results));
+        });
+
+    },
+
+    prepareChartData : function(stories,projects,wipLimits,callback) {
+
+        var that = this;
+
+        var categories = _.map(projects, function(p) { return _.last(p.get("Name").split('>')); });
+
+        var states = ["In-Progress","Completed"];
 
         var pointsValue = function(value) {
             return !_.isUndefined(value) && !_.isNull(value) ? value : 0;
@@ -285,34 +336,44 @@ Ext.define("ProjectStories", function() {
 
         // totals points for a set of work items based on if they are in a set of states
         var summarize = function( workItems, states ) {
-
-            // calc total points
-            var total = _.reduce(workItems, function(memo,workItem) {
-                    return memo + pointsValue(workItem.get("PlanEstimate"));
-            },0);
-
-            // totals points for a set of work items based on if they are in a set of states
             var stateTotal = _.reduce(  workItems, function(memo,workItem) {
-                return memo + ( _.indexOf(states,workItem.get("ScheduleState")) > -1 ? 
-                            pointsValue(workItem.get("PlanEstimate")) : 0);
-            },0);
-
-            var p = ( total > 0 ? ((stateTotal/total)*100) : 0);
-            return Math.round(p);
+                    return memo + ( _.indexOf(states,workItem.get("ScheduleState")) > -1 ? 
+                            1 : 0);
+                },0);
+            return stateTotal;
         };
 
-        var summary = that.createSummaryRecord();
+        var wipForProjectAndState = function( project, state ) {
+            var wip = _.find( wipLimits, function( limit ) {
+                return limit.get("Name").indexOf(project.get("Name"))!==-1 &&
+                    limit.get("Name").indexOf(state)!==-1;
+            });
+            if (!_.isUndefined(wip) && !_.isNull(wip)) {
+                var val = wip.get("Value").replace(/"/g,"");
+                return parseInt(val,10);
+            } else {
+                return 0;
+            }
+        };
 
-        var seriesData = _.map( _.keys(summary), function( summaryKey ) {
+        var seriesData = _.map( states, function( state ) {
+
+            var counts = _.map( categories, function( project, index ) {
+                return summarize( stories[index], [state]);
+            });
+            var wips = _.map( categories, function( project, index) {
+                return wipForProjectAndState( projects[index], state);
+            });
+
             return {
-                name : summaryKey,
-                data : _.map( projectKeys, function( projectKey, index ) {
-                    return summarize( stories[index] , summary[summaryKey]);
+                name : state,
+                data : _.map( categories, function( project, index) {
+                    return counts[index] - wips[index];
                 })
             };
         });
 
-        callback(null, projectKeys, seriesData );
+        callback(null,categories,seriesData);
 
     },
 
@@ -324,10 +385,11 @@ Ext.define("ProjectStories", function() {
             that.remove(that.chart);
         }
 
-        that.chart = Ext.create('Rally.technicalservices.progressChart', {
+        that.chart = Ext.create('Rally.technicalservices.wipChart', {
             itemId: 'rally-chart',
             chartData: { series : seriesData, categories : categories },
-            title: 'Progress By Project'
+            title: 'WIP Limits by Projecgt',
+            stacking : that.getSetting('stacking')
         });
 
         that.add(that.chart);
@@ -338,61 +400,32 @@ Ext.define("ProjectStories", function() {
         _.each(elems, function(e) { e.remove(); });
         var elems = p.query("div.x-mask-msg");
         _.each(elems, function(e) { e.remove(); });
-
-    },
-
-    // utilities below here ... 
-    createSummaryRecord : function() { 
-
-        var that = this;
-      
-        var summary = {
-            "Backlog" : ["Defined"],
-            "In-Progress" : ["In-Progress"],
-            "Completed/Accepted" : ["Completed","Accepted"]
-        };
-
-        // add initial and last states if necessary
-        var first = _.first(that.scheduleStates);
-        var last = _.last(that.scheduleStates);
-        if (_.indexOf(summary[_.first(_.keys(summary))],first)===-1)
-            summary[_.first(_.keys(summary))].push(_.first(that.scheduleStates));
-        if (_.indexOf(summary[_.last(_.keys(summary))],last)===-1)
-            summary[_.last(_.keys(summary))].push(_.last(that.scheduleStates));
-
-        return summary;
     }
 
 });
 
-                Ext.define('Rally.technicalservices.progressChart',{
+                Ext.define('Rally.technicalservices.wipChart',{
     extend: 'Rally.ui.chart.Chart',
-    alias: 'widget.progresschart',
+    alias: 'widget.wipchart',
 
     itemId: 'rally-chart',
     chartData: {},
     loadMask: false,
     chartColors : [],
     chartConfig: {
-        colors : ["#E0E0E0","#00a9e0","#8dc63f"],
+        colors : [/*"#E0E0E0",*/"#00a9e0","#8dc63f"],
         chart: {
             type: 'bar'
         },
         title: {
-            text: 'Progress by Project'
+            text: 'WIP Limits Chart'
         },
         xAxis: {
-            tickInterval: 1,
-            title: {
-                text: '%'
-            }
-        },
+        },        
         yAxis: [
             {
-                min: 0,
-                max: 100,
                 title: {
-                    text: '% of Scheduled Stories by State'
+                    text: 'Under / Over WIP Limits'
                 }
             }
         ],
@@ -400,10 +433,6 @@ Ext.define("ProjectStories", function() {
             series: {
                 dataLabels: {
                     enabled: true,
-                    align: 'center',
-                    formatter : function() {
-                        return Math.round(this.percentage) + " %";
-                    },
                     color: '#FFFFFF'
                 },
                 stacking: 'normal'
@@ -415,11 +444,14 @@ Ext.define("ProjectStories", function() {
         if (config.title){
             this.chartConfig.title = config.title;
         }
+        if (!_.isUndefined(config.stacking)) {
+            this.chartConfig.plotOptions.series.stacking = (config.stacking===true ? 'normal' : null);
+        }
     }
 });
 
             Rally.launchApp('CustomApp', {
-                name:"progress-by-project",
+                name:"wip-limits-chart",
 	            parentRepos:""
             });
 

@@ -1,38 +1,71 @@
 Ext.define('CustomApp', {
     extend: 'Rally.app.App',
     componentCls: 'app',
-
+    items: [
+        {xtype:'container',itemId:'settings_box'},
+        {xtype:'container', itemId:'selector_box' }
+    ],
     config: {
-        defaultSettings : { features : true }
+        defaultSettings : { 
+            features : true, 
+            showScopeSelector :  false
+        }
     },
 
-    getSettingsFields: function() {
-        return [
-            { name: 'features', xtype: 'rallycheckboxfield', label : '% based on features (otherwise stories)' }
-        ];
-    }, 
-
     launch: function() {
-        var that = this;
-        var release = 'Release 1';
-        var iteration = null; // "Iteration 1"; // this.getTimeboxScope();
-        console.log(that.getSetting('features'));
-        that.rallyFunctions = Ext.create("RallyFunctions");
-        that.rallyFunctions.subscribe(that);
-        
-        var tbs = that.getTimeboxScope();
 
-        if (!_.isNull(tbs)) {
-            release = tbs.type === "release" ? tbs.name : null;
-            iteration = tbs.type === "iteration" ? tbs.name : null;
+        console.log("launch");
+
+        if (this.isExternal()){
+            this.showSettings(this.config);
+        } else {
+            this.onSettingsUpdate(this.getSettings());
+        }
+    },
+
+    _launch: function(settings) {
+        console.log("_launch");
+        var that = this;
+
+        console.log("Settings:", settings);
+        if ( settings.showScopeSelector === true || settings.showScopeSelector === "true" ) {
+            this.down('#selector_box').add({
+                xtype : 'timebox-selector',
+                context : this.getContext(),
+                listeners: {
+                    releasechange: function(release){
+                        this._changeRelease(release);
+                    },
+                    iterationchange: function(iteration){
+                        this._changeIteration(iteration);
+                    },
+                    scope: this
+
+                }
+            });
+        } else {
+            this.subscribe(this, 'timeboxReleaseChanged', this._changeRelease, this);
+            this.subscribe(this, 'timeboxIterationChanged', this._changeIteration, this);
+            this.publish('requestTimebox', this);
         }
 
         that.run(release,iteration);
     },
 
+    _changeRelease: function(release) {
+        this.run(release.get("Name"),null);
+    },
+
+    _changeIteration: function(iteration) {
+        this.run(null,iteration.get("Name"),null);
+    },
+
+
     run : function(releaseName,iterationName) {
 
         var that = this;
+
+        that.rallyFunctions = Ext.create("RallyFunctions");
 
         var chartFeatures = that.getSetting('features')===true;
 
@@ -149,10 +182,10 @@ Ext.define('CustomApp', {
             return [ project, 
                 summarize(features[index],false),
                 summarize(features[index],true),
-                _.map(features[index],function(feature){ return feature.get("Name") /* ("c_ValueMetricKPI") */; })
+                _.map(features[index],function(feature){ return feature.get("FormattedID") + " " + feature.get("c_ValueMetricKPI") /* ("c_ValueMetricKPI") */; })
             ];
         });
-        var sortedData = data.sort(function(a,b) { return b[1] - a[1]; });
+        var sortedData = data.sort(function(a,b) { return b[1] - a[1]; }) ;
 
         var seriesData = [{
             name : 'Project Scope',
@@ -190,37 +223,26 @@ Ext.define('CustomApp', {
                 var featureWords = series.options.featureWords[index].slice(0,4);
                 var y = point.plotY - (( featureWords.length * wordHeight)/2);
                 _.each(featureWords,function(fw,x) {
-                    var word = fw.split(' ').slice(0,2).join(' ');
+                    // var word = fw.split(' ').slice(0,2).join(' ');
+                    var word = fw;
                     ren.label(word, 5, y + (x*wordHeight))
                     .css({
                         fontWeight: 'normal',
                         fontSize: '75%'
                     })
+                    .attr({
+                        zIndex : 9
+                    })
                     .add();
                 });
             });
 
-            ren.label("Only first 3 features are shown", 5, 285)
+            ren.label("Only first 3 top ranked features are shown", 5, 285)
             .css({
                 fontWeight: 'normal',
                 fontSize: '60%'
             })
             .add();
-
-            // Separator, client from service
-            // ren.path(['M', 120, 40, 'L', 120, 330])
-            //     .attr({
-            //         'stroke-width': 2,
-            //         stroke: 'silver',
-            //         dashstyle: 'dash'
-            //     })
-            //     .add();
-            // // Headers
-            // ren.label('Web client', 20, 40)
-            //     .css({
-            //         fontWeight: 'bold'
-            //     })
-            //     .add();
         };
 
         var chartConfig = {
@@ -278,6 +300,69 @@ Ext.define('CustomApp', {
 
         if (!isEmpty(seriesData))
             that.add(that.x);
+    },
+
+
+    isExternal: function(){
+        return typeof(this.getAppId()) == 'undefined';
+    },
+    //showSettings:  Override
+    showSettings: function(options) {
+        this._appSettings = Ext.create('Rally.app.AppSettings', Ext.apply({
+            fields: this.getSettingsFields(),
+            settings: this.getSettings(),
+            defaultSettings: this.getDefaultSettings(),
+            context: this.getContext(),
+            settingsScope: this.settingsScope,
+            autoScroll: true
+        }, options));
+
+        this._appSettings.on('cancel', this._hideSettings, this);
+        this._appSettings.on('save', this._onSettingsSaved, this);
+        if (this.isExternal()){
+            if (this.down('#settings_box').getComponent(this._appSettings.id)===undefined){
+                this.down('#settings_box').add(this._appSettings);
+            }
+        } else {
+            this.hide();
+            this.up().add(this._appSettings);
+        }
+        return this._appSettings;
+    },
+    _onSettingsSaved: function(settings){
+        Ext.apply(this.settings, settings);
+        this._hideSettings();
+        this.onSettingsUpdate(settings);
+    },
+    //onSettingsUpdate:  Override
+    onSettingsUpdate: function (settings){
+        console.log('onSettingsUpdate',settings);
+        Ext.apply(this, settings);
+        this._launch(settings);
+    },
+
+    getSettingsFields: function() {
+        var me = this;
+
+        return [ 
+            {
+                name: 'showScopeSelector',
+                xtype: 'rallycheckboxfield',
+                boxLabelAlign: 'after',
+                fieldLabel: '',
+                margin: '0 0 25 200',
+                boxLabel: 'Show Scope Selector<br/><span style="color:#999999;"><i>Tick to use this to broadcast settings.</i></span>'
+            },
+            { 
+                name: 'features', 
+                xtype: 'rallycheckboxfield',
+                boxLabelAlign: 'after',
+                fieldLabel: '',
+                margin: '0 0 25 200',
+                boxLabel : '% based on features (otherwise stories)'
+            }
+        ];
     }
+
 
 });

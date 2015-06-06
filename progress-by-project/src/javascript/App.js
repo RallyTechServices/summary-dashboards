@@ -1,21 +1,67 @@
 Ext.define('CustomApp', {
     extend: 'Rally.app.App',
     componentCls: 'app',
+    items: [
+        {xtype:'container',itemId:'settings_box'},
+        {xtype:'container', itemId:'selector_box' }
+    ],
+    config: {
+        defaultSettings: {
+            showScopeSelector :  false
+        }
+    },
 
     launch: function() {
+
+        console.log("launch");
+
+        console.log("up",this.up(".x-portlet"));
+
+        if (this.isExternal()){
+            this.showSettings(this.config);
+        } else {
+            this.onSettingsUpdate(this.getSettings());
+        }
+    },
+
+    _launch: function(settings) {
+
         var that = this;
-        var release = null;
-        var iteration = "Iteration 1"; // this.getTimeboxScope();
 
         that.rallyFunctions = Ext.create("RallyFunctions");
-        that.rallyFunctions.subscribe(that);
+        
+        console.log("Settings:", settings);
+        if ( settings.showScopeSelector === true || settings.showScopeSelector === "true" ) {
+            this.down('#selector_box').add({
+                xtype : 'timebox-selector',
+                context : this.getContext(),
+                listeners: {
+                    releasechange: function(release){
+                        this._changeRelease(release);
+                    },
+                    iterationchange: function(iteration){
+                        this._changeIteration(iteration);
+                    },
+                    scope: this
 
-        var tbs = that.getTimeboxScope();
-        if (!_.isNull(tbs)) {
-            release = tbs.type === "release" ? tbs.name : null;
-            iteration = tbs.type === "iteration" ? tbs.name : null;
+                }
+            });
+        } else {
+            this.subscribe(this, 'timeboxReleaseChanged', this._changeRelease, this);
+            this.subscribe(this, 'timeboxIterationChanged', this._changeIteration, this);
+            this.publish('requestTimebox', this);
         }
+        
         that.run(release,iteration);
+       
+    },
+
+    _changeRelease: function(release) {
+        this.run(release.get("Name"),null);
+    },
+
+    _changeIteration: function(iteration) {
+        this.run(null,iteration.get("Name"),null);
     },
 
     run : function(releaseName,iterationName) {
@@ -154,6 +200,60 @@ Ext.define('CustomApp', {
             summary[_.last(_.keys(summary))].push(_.last(that.scheduleStates));
 
         return summary;
-    }
+    },
+
+    isExternal: function(){
+        return typeof(this.getAppId()) == 'undefined';
+    },
+    //showSettings:  Override
+    showSettings: function(options) {
+        this._appSettings = Ext.create('Rally.app.AppSettings', Ext.apply({
+            fields: this.getSettingsFields(),
+            settings: this.getSettings(),
+            defaultSettings: this.getDefaultSettings(),
+            context: this.getContext(),
+            settingsScope: this.settingsScope,
+            autoScroll: true
+        }, options));
+
+        this._appSettings.on('cancel', this._hideSettings, this);
+        this._appSettings.on('save', this._onSettingsSaved, this);
+        if (this.isExternal()){
+            if (this.down('#settings_box').getComponent(this._appSettings.id)==undefined){
+                this.down('#settings_box').add(this._appSettings);
+            }
+        } else {
+            this.hide();
+            this.up().add(this._appSettings);
+        }
+        return this._appSettings;
+    },
+    _onSettingsSaved: function(settings){
+        Ext.apply(this.settings, settings);
+        this._hideSettings();
+        this.onSettingsUpdate(settings);
+    },
+    //onSettingsUpdate:  Override
+    onSettingsUpdate: function (settings){
+        console.log('onSettingsUpdate',settings);
+        Ext.apply(this, settings);
+        this._launch(settings);
+    },
+
+    getSettingsFields: function() {
+        var me = this;
+
+        return [ 
+            {
+                name: 'showScopeSelector',
+                xtype: 'rallycheckboxfield',
+                boxLabelAlign: 'after',
+                fieldLabel: '',
+                margin: '0 0 25 200',
+                boxLabel: 'Show Scope Selector<br/><span style="color:#999999;"><i>Tick to use this to broadcast settings.</i></span>'
+            }
+        ];
+    },
+
 
 });

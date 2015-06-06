@@ -168,12 +168,15 @@ Ext.define("threat-matrix", {
                                 itemId: 'rally-chart',
                                 loadMask: false,
                                 chartData: chartData,
-                                flex: 1,
+                                maxWidth: 600,
                                 title: 'Threat Matrix'
 
                             });
-                            chart.setSize('100%','100%');
+
+                            this.getBody().setSize(this.getWidth() * 0.95);
+
                             this._addLegend(calc.projectLabelColorMap);
+
 
                         },
                         failure: function(operation){
@@ -219,6 +222,7 @@ Ext.define("threat-matrix", {
             html: '<div class="tslegendtext">Types:  </div><div class="tslegend-square">&nbsp;&nbsp;</div><div class="tslegendtext">&nbsp;&nbsp;Feature</div><span class="tslegendspacer">&nbsp;</span>' +
                 '<div class="tslegend-circle">&nbsp;&nbsp;</div><div class="tslegendtext">&nbsp;&nbsp;Story (more transparent)</div><span class="tslegendspacer">&nbsp;</span>'
         });
+        ct.setSize(this.getWidth() *.95);
 
 
     },
@@ -258,6 +262,7 @@ Ext.define("threat-matrix", {
             var tb = this.getHeader().add({
                 xtype : 'timebox-selector',
                 context : this.getContext(),
+                width: '75%',
                 listeners: {
                     releasechange: function(release){
                         this.onTimeboxScopeChange(release);
@@ -269,6 +274,7 @@ Ext.define("threat-matrix", {
                 }
             });
             this._addButton();
+            this.getHeader().setSize(this.getWidth() * 0.95);
             release = tb.getReleaseRecord();
             iteration = tb.getIterationRecord();
             this.onTimeboxScopeChange(release,iteration);
@@ -344,8 +350,7 @@ Ext.define("threat-matrix", {
         }
         return this.add({
             xtype: 'container',
-            itemId: 'ct-body',
-            flex: 1
+            itemId: 'ct-body'
         });
     },
 

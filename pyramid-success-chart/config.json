@@ -7,11 +7,11 @@
       "../common/src/javascript/rally-functions.js",
       "../common/src/javascript/project-stories.js",
       "../common/src/javascript/scope_selector_component.js",
-      "https://code.jquery.com/jquery-2.1.4.min.js",
       "src/javascript/App.js",
-      "https://cdnjs.cloudflare.com/ajax/libs/async/1.22/async.min.js",
-      "https://code.highcharts.com/highcharts.js",
-      "https://code.highcharts.com/modules/funnel.js"
+      "src/lib/jquery-2.1.4.min.js",
+      "src/lib/async.min.js",
+      "src/lib/highcharts.js",
+      "src/lib/funnel.js"
    ],
    "css": [
       "src/css/app.css"

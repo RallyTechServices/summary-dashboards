@@ -9,7 +9,7 @@
       "../common/src/javascript/scope_selector_component.js",
       "src/javascript/App.js",
       "src/javascript/_wip-chart.js",
-      "https://cdnjs.cloudflare.com/ajax/libs/async/1.22/async.min.js"
+      "src/lib/async.min.js"
    ],
    "css": [
       "src/css/app.css"

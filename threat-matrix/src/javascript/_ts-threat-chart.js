@@ -7,8 +7,14 @@ Ext.define('Rally.technicalservices.ThreatChart',{
     chartConfig: {
         loadMask: false,
         chart: {
+
             type: 'scatter',
-            zoom: 'xy'
+            zoom: 'xy',
+            events: {
+                load: function(){
+                    console.log('chart load', this);
+                }
+            }
         },
         title: {
             text: 'Threat Matrix'
@@ -60,14 +66,8 @@ Ext.define('Rally.technicalservices.ThreatChart',{
                     borderColor: 'black'
                 }
             }
-        },
-        events: {
-            load: function(){
-                console.log('chart load');
-                this.container.setSize('100%','100%');
-                //this.setSize()
-            }
         }
+
 
       },
     constructor: function (config) {

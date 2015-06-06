@@ -3,11 +3,11 @@
 <head>
     <title>Threat Matrix</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Fri Jun 05 2015 15:01:12 GMT-0600 (MDT) -->
+    <!--  Build Date: Sat Jun 06 2015 13:35:05 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Fri Jun 05 2015 15:01:12 GMT-0600 (MDT)";
-        var CHECKSUM = 42959563049;
+        var APP_BUILD_DATE = "Sat Jun 06 2015 13:35:05 GMT-0600 (MDT)";
+        var CHECKSUM = 43124248581;
     </script>
 
    <script type="text/javascript" src="/apps/2.0rc3/sdk.js"></script>
@@ -565,8 +565,14 @@ Ext.define('Rally.technicalservices.ThreatChart',{
     chartConfig: {
         loadMask: false,
         chart: {
+
             type: 'scatter',
-            zoom: 'xy'
+            zoom: 'xy',
+            events: {
+                load: function(){
+                    console.log('chart load', this);
+                }
+            }
         },
         title: {
             text: 'Threat Matrix'
@@ -618,14 +624,8 @@ Ext.define('Rally.technicalservices.ThreatChart',{
                     borderColor: 'black'
                 }
             }
-        },
-        events: {
-            load: function(){
-                console.log('chart load');
-                this.container.setSize('100%','100%');
-                //this.setSize()
-            }
         }
+
 
       },
     constructor: function (config) {
@@ -810,12 +810,15 @@ Ext.define("threat-matrix", {
                                 itemId: 'rally-chart',
                                 loadMask: false,
                                 chartData: chartData,
-                                flex: 1,
+                                maxWidth: 600,
                                 title: 'Threat Matrix'
 
                             });
-                            chart.setSize('100%','100%');
+
+                            this.getBody().setSize(this.getWidth() * 0.95);
+
                             this._addLegend(calc.projectLabelColorMap);
+
 
                         },
                         failure: function(operation){
@@ -858,9 +861,10 @@ Ext.define("threat-matrix", {
         var ct2 = ct_legend.add({
             xtype: 'container',
             padding: 10,
-            html: '<div class="tslegendtext">Types:  </div><div class="tslegend-square">&nbsp;&nbsp;</div><div class="tslegendtext">&nbsp;&nbsp;Feature</div><span class="tslegendspacer">&nbsp;</span>' +
-                '<div class="tslegend-circle">&nbsp;&nbsp;</div><div class="tslegendtext">&nbsp;&nbsp;Story (more transparent)</div><span class="tslegendspacer">&nbsp;</span>'
+            html: '<div class="tslegendtext">Types:  </div><div class="tslegend-square">&nbsp;&nbsp;</div><div class="tslegendtext">&nbsp;&nbsp;Feature (Solid)</div><span class="tslegendspacer">&nbsp;</span>' +
+                '<div class="tslegend-circle">&nbsp;&nbsp;</div><div class="tslegendtext">&nbsp;&nbsp;Story (Translucent)</div><span class="tslegendspacer">&nbsp;</span>'
         });
+        ct.setSize(this.getWidth() *.95);
 
 
     },
@@ -900,6 +904,7 @@ Ext.define("threat-matrix", {
             var tb = this.getHeader().add({
                 xtype : 'timebox-selector',
                 context : this.getContext(),
+                width: '75%',
                 listeners: {
                     releasechange: function(release){
                         this.onTimeboxScopeChange(release);
@@ -911,6 +916,7 @@ Ext.define("threat-matrix", {
                 }
             });
             this._addButton();
+            this.getHeader().setSize(this.getWidth() * 0.95);
             release = tb.getReleaseRecord();
             iteration = tb.getIterationRecord();
             this.onTimeboxScopeChange(release,iteration);
@@ -986,8 +992,7 @@ Ext.define("threat-matrix", {
         }
         return this.add({
             xtype: 'container',
-            itemId: 'ct-body',
-            flex: 1
+            itemId: 'ct-body'
         });
     },
 
@@ -1332,6 +1337,8 @@ Ext.define('timebox-selector', {
     border-width: 1px;
     display: inline-block;
 }
+
+
     </style>
 
 </head>

@@ -48,6 +48,8 @@ Ext.define('Rally.technicalservices.ValidationRules',{
                     return 'Feature has no Stories';
                 case 'ruleFn_FeatureHasNotBeenStarted':
                     return 'Feature not started.';
+                case 'ruleFn_featureHasNotBeenCompleted':
+                    return 'Feature not completed.';
                 case 'ruleFn_featureMissingFields':
                     return 'Feature fields Missing';
                 case 'ruleFn_storyMissingFields':
@@ -62,6 +64,14 @@ Ext.define('Rally.technicalservices.ValidationRules',{
                     return 'Story Blocked without Reason';
                 case 'ruleFn_storyRelaseDoesNotMatchFeatureRelease':
                     return 'Story Release is not Feature Release';
+                case 'ruleFn_storyPlanEstimate':
+                    return 'Story has no points.';
+                case 'ruleFn_featureHasNoPoints':
+                    return 'Feature has no points';
+                case 'ruleFn_storyRiskDescription':
+                    return 'Story Risk has no Description';
+                case 'ruleFn_featureRiskDescription':
+                    return 'Feature Risk has no Description';
             }
             return ruleName;
         }

@@ -2,6 +2,7 @@ Ext.define('Rally.technicalservices.UserStoryValidationRules',{
     extend: 'Rally.technicalservices.ValidationRules',
     //ruleFnPrefix: 'ruleFn_',
     requiredFields: undefined, //
+    features: undefined,
 
     constructor: function(config){
         Ext.apply(this, config);
@@ -47,6 +48,12 @@ Ext.define('Rally.technicalservices.UserStoryValidationRules',{
         }
         return null;
     },
+    ruleFn_storyPlanEstimate: function(r){
+        if (r.get('PlanEstimate')==0){
+            return '<li>Story Plan Estimate is 0';
+        }
+        return null;
+    },
     ruleFn_storyHasIterationWithoutRelease: function(r){
         if (!r.get('Release') && r.get('Iteration')){
             return Ext.String.format('<li>Story is scheduled in Iteration [{0}] without a Release.', r.get('Iteration').Name);
@@ -54,12 +61,36 @@ Ext.define('Rally.technicalservices.UserStoryValidationRules',{
         return null;
     },
     ruleFn_storyBlockedWithoutReason: function(r){
+        console.log('blocked',r.get('FormattedID'), r.get('Blocked'), r.get('BlockedReason'), r.get('Blocker'));
         if (r.get('Blocked') && !r.get('BlockedReason')){
-            return '<li>Story is blocked without a reason.';
+            if (r.get('Blocker')){
+                console.log('blocker', r.get('Blocker'));
+                return '<li>Story is blocked without reason.  Verify descendant artifact has a reason.';
+            } else {
+                return '<li>Story is blocked without a reason.';
+            }
         }
         return null;
     },
     ruleFn_storyRelaseDoesNotMatchFeatureRelease: function(r){
+        var msg = null;
+
+        if (r.get('Feature')){
+            var release = r.get('Release');
+
+            if (!r.get('Feature').Release || r.get('Feature').Release.Name != release.Name ||
+                r.get('Feature').Release.ReleaseStartDate != release.ReleaseStartDate ||
+                r.get('Feature').Release.ReleaseDate != release.ReleaseDate){
+                msg = '<li>Story\'s release does not match parent Feature\'s release';
+            }
+
+        }
+        return msg;
+    },
+    ruleFn_storyRiskDescription: function(r){
+        if (r.get('c_Risk') && !r.get('c_RiskDescription')){
+            return '<li>Story flagged as Risk has no Risk description.'
+        }
         return null;
     }
 });

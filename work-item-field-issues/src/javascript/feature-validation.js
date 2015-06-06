@@ -2,41 +2,42 @@ Ext.define('Rally.technicalservices.FeatureValidationRules',{
     extend: 'Rally.technicalservices.ValidationRules',
 
     requiredFields: undefined,
-    iterations: [],
-    stories: [],
 
     constructor: function(config){
         Ext.apply(this, config);
-        this.requiredFields = ['Owner','PlannedEndDate','PlannedStartDate','State'];
+        this.requiredFields = ['Owner','PlannedEndDate','PlannedStartDate','State','c_ValueMetricKPI','ValueScore'];
 
     },
-    //ruleFn_stateSynchronization: function(r) {
-    //    /**
-    //     * State == Done,
-    //     * then all user stories should be accepted
-    //     * AND
-    //     * if All user stories == Accepted,
-    //     * State should be Done
-    //     */
-    //
-    //    var featureDone = r.get('State') ? r.get('State').Name === 'Done' : false ,
-    //        storiesAccepted = r.get('AcceptedLeafStoryCount') === r.get('LeafStoryCount');
-    //
-    //    if (featureDone === storiesAccepted){
-    //        return null;
-    //    }
-    //    if (featureDone){
-    //        return Ext.String.format('Feature is Done but not all stories are accepted ({0} of {1} accepted)', r.get('AcceptedLeafStoryCount'), r.get('LeafStoryCount'));
-    //    }
-    //    return Ext.String.format('Feature state ({0}) should be Done because all stories are accepted.', r.get('State').Name);
-    //},
-    ruleFn_featureRule2: function(r){
-        /**
-         * FTS == R4.xxx,
-         * and R4.xxx == iteration (R4.xxx),
-         * and iteration (R4.xxx) == done, then
-         * FTS.State should be Done
-         */
+    ruleFn_noStoriesForFeature: function(r){
+        if (r.get('LeafStoryCount') == 0){
+            return Ext.String.format('<li>Feature has no stories.')
+        }
+        return null;
+    },
+    ruleFn_FeatureHasNotBeenStarted: function(r){
+        if (!r.get('ActualStartDate')){
+            return Ext.String.format('<li>Feature has not been started.');
+        }
+        return null;
+    },
+    ruleFn_featureMissingFields: function(r) {
+        var missingFields = [];
+
+        _.each(this.requiredFields, function (f) {
+            if (!r.get(f)) {
+                var name = r.getField(f).displayName;
+                missingFields.push(name);
+            }
+        });
+        if (missingFields.length === 0) {
+            return null;
+        }
+        return Ext.String.format('<li>Missing fields: {0}', missingFields.join(','));
+    },
+    ruleFn_FeatureHasNoParent: function(r) {
+        if (!r.get('Parent')) {
+            return Ext.String.format('<li>Feature has no parent.');
+        }
         return null;
     }
 });

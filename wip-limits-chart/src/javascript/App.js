@@ -1,45 +1,71 @@
 Ext.define('CustomApp', {
     extend: 'Rally.app.App',
     componentCls: 'app',
+    items: [
+        {xtype:'container',itemId:'settings_box'},
+        {xtype:'container', itemId:'selector_box' }
+    ],
+
+    config: {
+        defaultSettings : { 
+            stacking : true,
+            showScopeSelector :  false
+        }
+    },
 
     launch: function() {
+        if (this.isExternal()){
+            this.showSettings(this.config);
+        } else {
+            this.onSettingsUpdate(this.getSettings());
+        }
+    },
 
+    _launch: function(settings) {
+
+        console.log("_launch");
         var that = this;
 
-        that.rallyFunctions = Ext.create("RallyFunctions");
-        that.rallyFunctions.subscribe(that);
-        
-        var release = null;
-        var iteration = "Iteration 1"; // this.getTimeboxScope();
+        console.log("Settings:", settings);
+        if ( settings.showScopeSelector === true || settings.showScopeSelector === "true" ) {
+            this.down('#selector_box').add({
+                xtype : 'timebox-selector',
+                context : this.getContext(),
+                listeners: {
+                    releasechange: function(release){
+                        this._changeRelease(release);
+                    },
+                    iterationchange: function(iteration){
+                        this._changeIteration(iteration);
+                    },
+                    scope: this
 
-        var tbs = that.getTimeboxScope();
-        if (!_.isNull(tbs)) {
-            release = tbs.type === "release" ? tbs.name : null;
-            iteration = tbs.type === "iteration" ? tbs.name : null;
+                }
+            });
+        } else {
+            this.subscribe(this, 'timeboxReleaseChanged', this._changeRelease, this);
+            this.subscribe(this, 'timeboxIterationChanged', this._changeIteration, this);
+            this.publish('requestTimebox', this);
         }
+
         that.run(release,iteration);
 
     },
 
-    config: {
-        defaultSettings : {
-            stacking : true
-        }
+    _changeRelease: function(release) {
+        this.run(release.get("Name"),null);
     },
 
-    getSettingsFields: function() {
-        return [
-            { 
-                name: 'stacking',
-                xtype: 'rallycheckboxfield',
-                label : 'Stack bars on chart'
-            }
-        ];
-    }, 
+    _changeIteration: function(iteration) {
+        this.run(null,iteration.get("Name"),null);
+    },
+
 
     run : function(releaseName,iterationName) {
 
         var that = this;
+
+        that.rallyFunctions = Ext.create("RallyFunctions");
 
         var pr = Ext.create( "ProjectStories", {
             ctx : that.getContext(),
@@ -193,6 +219,66 @@ Ext.define('CustomApp', {
         _.each(elems, function(e) { e.remove(); });
         var elems = p.query("div.x-mask-msg");
         _.each(elems, function(e) { e.remove(); });
+    },
+
+
+    isExternal: function(){
+        return typeof(this.getAppId()) == 'undefined';
+    },
+    //showSettings:  Override
+    showSettings: function(options) {
+        this._appSettings = Ext.create('Rally.app.AppSettings', Ext.apply({
+            fields: this.getSettingsFields(),
+            settings: this.getSettings(),
+            defaultSettings: this.getDefaultSettings(),
+            context: this.getContext(),
+            settingsScope: this.settingsScope,
+            autoScroll: true
+        }, options));
+
+        this._appSettings.on('cancel', this._hideSettings, this);
+        this._appSettings.on('save', this._onSettingsSaved, this);
+        if (this.isExternal()){
+            if (this.down('#settings_box').getComponent(this._appSettings.id)===undefined){
+                this.down('#settings_box').add(this._appSettings);
+            }
+        } else {
+            this.hide();
+            this.up().add(this._appSettings);
+        }
+        return this._appSettings;
+    },
+    _onSettingsSaved: function(settings){
+        Ext.apply(this.settings, settings);
+        this._hideSettings();
+        this.onSettingsUpdate(settings);
+    },
+    //onSettingsUpdate:  Override
+    onSettingsUpdate: function (settings){
+        console.log('onSettingsUpdate',settings);
+        Ext.apply(this, settings);
+        this._launch(settings);
+    },
+
+    getSettingsFields: function() {
+        return [ 
+            {
+                name: 'showScopeSelector',
+                xtype: 'rallycheckboxfield',
+                boxLabelAlign: 'after',
+                fieldLabel: '',
+                margin: '0 0 25 200',
+                boxLabel: 'Show Scope Selector<br/><span style="color:#999999;"><i>Tick to use this to broadcast settings.</i></span>'
+            },
+            { 
+                name: 'stacking', 
+                xtype: 'rallycheckboxfield',
+                boxLabelAlign: 'after',
+                fieldLabel: '',
+                margin: '0 0 25 200',
+                boxLabel : 'If true the chart values will be stacked, otherwise shown side by side'
+            }
+        ];
     }
 
 });

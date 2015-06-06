@@ -4,7 +4,6 @@
     <title>wip-limits-chart</title>
 
     <script type="text/javascript" src="/apps/2.0rc2/sdk.js"></script>
-    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/async/1.22/async.min.js"></script>
 
     <script type="text/javascript">
         Rally.onReady(function () {
@@ -72,6 +71,20 @@ Ext.define("RallyFunctions", function() {
             return filter;
         },
 
+        createFeatureFilter : function( releaseName ) { 
+            var filter = null;
+
+            if (!_.isNull(releaseName)) {
+                filter = Ext.create('Rally.data.wsapi.Filter', {
+                    property: 'Release.Name',
+                    operator: '=',
+                    value: releaseName
+                });
+            }
+
+            return filter;
+        },
+
         subscribe : function(app) {
             app.subscribe(app, 'timeboxReleaseChanged', app._timeboxChanged, app);
             app.subscribe(app, 'timeboxIterationChanged', app._timeboxChanged, app);
@@ -91,7 +104,8 @@ Ext.define("ProjectStories", function() {
     return {
         config : {
             ctx : {},
-            filter : null
+            filter : null,
+            featureFilter : null
         },
 
         constructor:function(config) {
@@ -108,8 +122,19 @@ Ext.define("ProjectStories", function() {
                 self.readStories.bind(self)
             ];
 
+            if (self.featureFilter!==null) {
+                fns = [
+                    self.readStates.bind(self),
+                    self.readFeatureTypes.bind(self),
+                    self.readProjects.bind(self),
+                    self.getReportProjects.bind(self),
+                    self.readStories.bind(self),
+                    self.readFeatures.bind(self)
+                ];
+            }
+
             async.waterfall( fns , function(err,result) {
-                callback( null, result, self.reportProjects, self.scheduleStates );
+                callback( null, self.stories, self.reportProjects, self.scheduleStates,self.features );
             });
         },
 
@@ -128,10 +153,26 @@ Ext.define("ProjectStories", function() {
             });
         },
 
+        readFeatureTypes : function(callback) {
+
+            var that = this;
+
+            var configs = [{ model : "TypeDefinition",
+                fetch : true,
+                filters : [ { property:"Ordinal", operator:"=", value:0} ]
+            }];
+
+            async.map(configs,self._wsapiQuery,function(err,results) {
+                self.featureType = _.first(_.first(results)).get("TypePath");
+                callback(null);
+            });
+
+        },
+
         readProjects : function(callback) {
             var that = this;
             var config = { model : "Project", fetch : true, filters : [] };
-            self._wsapiQuery(config,callback);
+            self._wsapiQuery( config, callback );
         },    
 
         // child projects are what we graph
@@ -171,10 +212,35 @@ Ext.define("ProjectStories", function() {
 
             // read stories for each reporting project
             async.map(configs,self._wsapiQuery,function(error,results) {
-                callback(null,results);
+                self.stories = results;
+                callback(null);
             });
         },
-         
+
+        readFeatures : function(callback) {
+
+            var configs = _.map(self.reportProjects,function(project) {
+                return {
+                    model : self.featureType,
+                    filters : [self.featureFilter],
+                    fetch : ["FormattedID","Name","ObjectID","LeafStoryCount","LeafStoryPlanEstimateTotal",
+                        "PreliminaryEstimate", "AcceptedLeafStoryCount", "AcceptedLeafStoryPlanEstimateTotal",
+                        "PercentDoneByStoryCount","c_ValueMetricKPI","Rank"],
+                    order : [ { property : 'DragAndDropRank', direction : 'ASC' } ],
+                    context : {
+                        project: project.get("_ref"),
+                        projectScopeUp: false,
+                        projectScopeDown: true
+                    }
+                };
+            });
+
+            // read stories for each reporting project
+            async.map(configs,self._wsapiQuery,function(error,results) {
+                self.features = results;
+                callback(null);
+            });
+        },
 
         _wsapiQuery : function( config , callback ) {
 
@@ -191,9 +257,14 @@ Ext.define("ProjectStories", function() {
                     }
                 }
             };
+
             if (!_.isUndefined(config.context)) {
                 storeConfig.context = config.context;
-            }         
+            }
+            if (!_.isUndefined(config.order)) {
+                storeConfig.order = config.order;
+            }
+
             Ext.create('Rally.data.WsapiDataStore', storeConfig);
         },
 
@@ -205,48 +276,210 @@ Ext.define("ProjectStories", function() {
     };
    
 });
+                Ext.define('timebox-selector', {
+    extend : 'Ext.Container',
+    componentCls : 'app',
+    alias : 'widget.timebox-selector',
+    cls : 'timebox-selector',
+    layout : 'hbox',
+    width : '100%',
+    mixins : [
+        'Rally.Messageable'
+    ],
+    constructor : function()
+    {
+        this.stateId = Rally.environment.getContext().getScopedStateId('timebox-filter');
+        this.callParent(arguments);
+    },
+    initComponent : function()
+    {
+        this.callParent(arguments);
+        this._createReleaseCombo();
+        this.addEvents('releasechange','iterationchange');
+        
+        // configured to allow others to ask what the current selection is,
+        // in case they missed the initial message
+        this.subscribe(this, 'requestTimebox', this._requestTimebox, this);
+        
+    },
+    _createReleaseCombo : function()
+    {
+        this._releaseCombo = this.add({
+            xtype : 'rallyreleasecombobox',
+            fieldLabel : 'Program Increment',
+            hideLabel : false,
+            labelPad : 5,
+            labelSeparator : ':',
+            labelWidth : 130,
+            width : 280,
+            labelAlign : 'right',
+            stateful : false,
+            stateId : 'releasecombo',
+            padding : 5,
+            context : Rally.environment.getContext(),
+            showArrows : false,
+            growToLongestValue : true,
+            defaultToCurrentTimebox : true,
+            listeners : {
+                change : function(t, newVal, oldVal, eOpts)
+                {
+                    var release = t.getRecord();
+                    this.fireEvent('releasechange',release);
+                    this.publish('timeboxReleaseChanged', release);
+                    this._updateIterationCombo(release);
+                },
+                scope : this
+            }
+        });
+    },
+    _updateIterationCombo : function(release)
+    {
+        this.remove('globaliterationpicker');
+        var endFilter = Ext.create('Rally.data.wsapi.Filter', {
+            property : "EndDate",
+            operator : "<=",
+            value : Rally.util.DateTime.toIsoString(release.get('ReleaseDate'))
+        });
+        var startFilter = Ext.create('Rally.data.wsapi.Filter', {
+            property : "StartDate",
+            operator : ">=",
+            value : Rally.util.DateTime.toIsoString(release.get('ReleaseStartDate'))
+        });
+        var filters = endFilter.and(startFilter);
+
+        this._iterationCombo = this.add({
+            xtype : 'rallyiterationcombobox',
+            itemId : 'globaliterationpicker',
+            fieldLabel : 'Sprint/Iteration',
+            hideLabel : false,
+            labelPad : 5,
+            labelSeparator : ':',
+            labelWidth : 100,
+            labelAlign : 'right',
+            stateful : false,
+            padding : 5,
+            context : Rally.environment.getContext(),
+            showArrows : false,
+            growToLongestValue : true,
+            stateId : 'iterationcombo',
+            allowBlank : true,
+            allowClear : true,
+            allowNoEntry : true,
+            noEntryText : 'PI Scope',
+            emptyText : 'PI Scope',
+            noEntryValue : null,
+            defaultToCurrentTimebox : false,
+            defaultSelectPosition : 'first',
+            storeConfig : {
+                remoteFilter : true,
+                filters : filters
+            },
+            listeners : {
+                change : function(t, newVal, oldVal, eOpts)
+                {
+                    var iteration = t.getRecord();
+                    this.fireEvent('iterationchange',iteration);
+                    this.publish('timeboxIterationChanged', iteration);
+                },
+                scope : this
+            }
+        });
+    },
+    _requestTimebox : function(source) {
+        console.log('Got request timebox message', source);
+        var release = this.getReleaseRecord();
+        console.log('release',release);
+        if (release) {
+            this.publish('timeboxReleaseChanged', release);
+        } 
+        
+        var iteration = this.getIterationRecord();
+        console.log('iteration', iteration);
+        if (iteration) {
+            this.publish("timeboxIterationChanged",  iteration);
+        }
+    },
+    getReleaseRecord: function(){
+        if (this._releaseCombo){
+            return this._releaseCombo.getRecord() || null;
+        }
+        return null;
+    },
+    getIterationRecord: function(){
+        if (this._iterationCombo){
+            return this._iterationCombo.getRecord() || null;
+        }
+        return null;
+    }
+});
                 Ext.define('CustomApp', {
     extend: 'Rally.app.App',
     componentCls: 'app',
+    items: [
+        {xtype:'container',itemId:'settings_box'},
+        {xtype:'container', itemId:'selector_box' }
+    ],
+
+    config: {
+        defaultSettings : { 
+            stacking : true,
+            showScopeSelector :  false
+        }
+    },
 
     launch: function() {
+        if (this.isExternal()){
+            this.showSettings(this.config);
+        } else {
+            this.onSettingsUpdate(this.getSettings());
+        }
+    },
 
+    _launch: function(settings) {
+
+        console.log("_launch");
         var that = this;
 
-        that.rallyFunctions = Ext.create("RallyFunctions");
-        that.rallyFunctions.subscribe(that);
-        
-        var release = null;
-        var iteration = "Iteration 1"; // this.getTimeboxScope();
+        console.log("Settings:", settings);
+        if ( settings.showScopeSelector === true || settings.showScopeSelector === "true" ) {
+            this.down('#selector_box').add({
+                xtype : 'timebox-selector',
+                context : this.getContext(),
+                listeners: {
+                    releasechange: function(release){
+                        this._changeRelease(release);
+                    },
+                    iterationchange: function(iteration){
+                        this._changeIteration(iteration);
+                    },
+                    scope: this
 
-        var tbs = that.getTimeboxScope();
-        if (!_.isNull(tbs)) {
-            release = tbs.type === "release" ? tbs.name : null;
-            iteration = tbs.type === "iteration" ? tbs.name : null;
+                }
+            });
+        } else {
+            this.subscribe(this, 'timeboxReleaseChanged', this._changeRelease, this);
+            this.subscribe(this, 'timeboxIterationChanged', this._changeIteration, this);
+            this.publish('requestTimebox', this);
         }
+
         that.run(release,iteration);
 
     },
 
-    config: {
-        defaultSettings : {
-            stacking : true
-        }
+    _changeRelease: function(release) {
+        this.run(release.get("Name"),null);
     },
 
-    getSettingsFields: function() {
-        return [
-            { 
-                name: 'stacking',
-                xtype: 'rallycheckboxfield',
-                label : 'Stack bars on chart'
-            }
-        ];
-    }, 
+    _changeIteration: function(iteration) {
+        this.run(null,iteration.get("Name"),null);
+    },
+
 
     run : function(releaseName,iterationName) {
 
         var that = this;
+
+        that.rallyFunctions = Ext.create("RallyFunctions");
 
         var pr = Ext.create( "ProjectStories", {
             ctx : that.getContext(),
@@ -400,6 +633,66 @@ Ext.define("ProjectStories", function() {
         _.each(elems, function(e) { e.remove(); });
         var elems = p.query("div.x-mask-msg");
         _.each(elems, function(e) { e.remove(); });
+    },
+
+
+    isExternal: function(){
+        return typeof(this.getAppId()) == 'undefined';
+    },
+    //showSettings:  Override
+    showSettings: function(options) {
+        this._appSettings = Ext.create('Rally.app.AppSettings', Ext.apply({
+            fields: this.getSettingsFields(),
+            settings: this.getSettings(),
+            defaultSettings: this.getDefaultSettings(),
+            context: this.getContext(),
+            settingsScope: this.settingsScope,
+            autoScroll: true
+        }, options));
+
+        this._appSettings.on('cancel', this._hideSettings, this);
+        this._appSettings.on('save', this._onSettingsSaved, this);
+        if (this.isExternal()){
+            if (this.down('#settings_box').getComponent(this._appSettings.id)===undefined){
+                this.down('#settings_box').add(this._appSettings);
+            }
+        } else {
+            this.hide();
+            this.up().add(this._appSettings);
+        }
+        return this._appSettings;
+    },
+    _onSettingsSaved: function(settings){
+        Ext.apply(this.settings, settings);
+        this._hideSettings();
+        this.onSettingsUpdate(settings);
+    },
+    //onSettingsUpdate:  Override
+    onSettingsUpdate: function (settings){
+        console.log('onSettingsUpdate',settings);
+        Ext.apply(this, settings);
+        this._launch(settings);
+    },
+
+    getSettingsFields: function() {
+        return [ 
+            {
+                name: 'showScopeSelector',
+                xtype: 'rallycheckboxfield',
+                boxLabelAlign: 'after',
+                fieldLabel: '',
+                margin: '0 0 25 200',
+                boxLabel: 'Show Scope Selector<br/><span style="color:#999999;"><i>Tick to use this to broadcast settings.</i></span>'
+            },
+            { 
+                name: 'stacking', 
+                xtype: 'rallycheckboxfield',
+                boxLabelAlign: 'after',
+                fieldLabel: '',
+                margin: '0 0 25 200',
+                boxLabel : 'If true the chart values will be stacked, otherwise shown side by side'
+            }
+        ];
     }
 
 });
@@ -449,6 +742,7 @@ Ext.define("ProjectStories", function() {
         }
     }
 });
+                /*global setTimeout: false, console: false */(function(){var a={},b=this,c=b.async;typeof module!="undefined"&&module.exports?module.exports=a:b.async=a,a.noConflict=function(){return b.async=c,a};var d=function(a,b){if(a.forEach)return a.forEach(b);for(var c=0;c<a.length;c+=1)b(a[c],c,a)},e=function(a,b){if(a.map)return a.map(b);var c=[];return d(a,function(a,d,e){c.push(b(a,d,e))}),c},f=function(a,b,c){return a.reduce?a.reduce(b,c):(d(a,function(a,d,e){c=b(c,a,d,e)}),c)},g=function(a){if(Object.keys)return Object.keys(a);var b=[];for(var c in a)a.hasOwnProperty(c)&&b.push(c);return b};typeof process=="undefined"||!process.nextTick?a.nextTick=function(a){setTimeout(a,0)}:a.nextTick=process.nextTick,a.forEach=function(a,b,c){c=c||function(){};if(!a.length)return c();var e=0;d(a,function(d){b(d,function(b){b?(c(b),c=function(){}):(e+=1,e===a.length&&c(null))})})},a.forEachSeries=function(a,b,c){c=c||function(){};if(!a.length)return c();var d=0,e=function(){b(a[d],function(b){b?(c(b),c=function(){}):(d+=1,d===a.length?c(null):e())})};e()},a.forEachLimit=function(a,b,c,d){d=d||function(){};if(!a.length||b<=0)return d();var e=0,f=0,g=0;(function h(){if(e===a.length)return d();while(g<b&&f<a.length)f+=1,g+=1,c(a[f-1],function(b){b?(d(b),d=function(){}):(e+=1,g-=1,e===a.length?d():h())})})()};var h=function(b){return function(){var c=Array.prototype.slice.call(arguments);return b.apply(null,[a.forEach].concat(c))}},i=function(b){return function(){var c=Array.prototype.slice.call(arguments);return b.apply(null,[a.forEachSeries].concat(c))}},j=function(a,b,c,d){var f=[];b=e(b,function(a,b){return{index:b,value:a}}),a(b,function(a,b){c(a.value,function(c,d){f[a.index]=d,b(c)})},function(a){d(a,f)})};a.map=h(j),a.mapSeries=i(j),a.reduce=function(b,c,d,e){a.forEachSeries(b,function(a,b){d(c,a,function(a,d){c=d,b(a)})},function(a){e(a,c)})},a.inject=a.reduce,a.foldl=a.reduce,a.reduceRight=function(b,c,d,f){var g=e(b,function(a){return a}).reverse();a.reduce(g,c,d,f)},a.foldr=a.reduceRight;var k=function(a,b,c,d){var f=[];b=e(b,function(a,b){return{index:b,value:a}}),a(b,function(a,b){c(a.value,function(c){c&&f.push(a),b()})},function(a){d(e(f.sort(function(a,b){return a.index-b.index}),function(a){return a.value}))})};a.filter=h(k),a.filterSeries=i(k),a.select=a.filter,a.selectSeries=a.filterSeries;var l=function(a,b,c,d){var f=[];b=e(b,function(a,b){return{index:b,value:a}}),a(b,function(a,b){c(a.value,function(c){c||f.push(a),b()})},function(a){d(e(f.sort(function(a,b){return a.index-b.index}),function(a){return a.value}))})};a.reject=h(l),a.rejectSeries=i(l);var m=function(a,b,c,d){a(b,function(a,b){c(a,function(c){c?(d(a),d=function(){}):b()})},function(a){d()})};a.detect=h(m),a.detectSeries=i(m),a.some=function(b,c,d){a.forEach(b,function(a,b){c(a,function(a){a&&(d(!0),d=function(){}),b()})},function(a){d(!1)})},a.any=a.some,a.every=function(b,c,d){a.forEach(b,function(a,b){c(a,function(a){a||(d(!1),d=function(){}),b()})},function(a){d(!0)})},a.all=a.every,a.sortBy=function(b,c,d){a.map(b,function(a,b){c(a,function(c,d){c?b(c):b(null,{value:a,criteria:d})})},function(a,b){if(a)return d(a);var c=function(a,b){var c=a.criteria,d=b.criteria;return c<d?-1:c>d?1:0};d(null,e(b.sort(c),function(a){return a.value}))})},a.auto=function(a,b){b=b||function(){};var c=g(a);if(!c.length)return b(null);var e={},h=[],i=function(a){h.unshift(a)},j=function(a){for(var b=0;b<h.length;b+=1)if(h[b]===a){h.splice(b,1);return}},k=function(){d(h.slice(0),function(a){a()})};i(function(){g(e).length===c.length&&(b(null,e),b=function(){})}),d(c,function(c){var d=a[c]instanceof Function?[a[c]]:a[c],g=function(a){if(a)b(a),b=function(){};else{var d=Array.prototype.slice.call(arguments,1);d.length<=1&&(d=d[0]),e[c]=d,k()}},h=d.slice(0,Math.abs(d.length-1))||[],l=function(){return f(h,function(a,b){return a&&e.hasOwnProperty(b)},!0)&&!e.hasOwnProperty(c)};if(l())d[d.length-1](g,e);else{var m=function(){l()&&(j(m),d[d.length-1](g,e))};i(m)}})},a.waterfall=function(b,c){c=c||function(){};if(!b.length)return c();var d=function(b){return function(e){if(e)c(e),c=function(){};else{var f=Array.prototype.slice.call(arguments,1),g=b.next();g?f.push(d(g)):f.push(c),a.nextTick(function(){b.apply(null,f)})}}};d(a.iterator(b))()},a.parallel=function(b,c){c=c||function(){};if(b.constructor===Array)a.map(b,function(a,b){a&&a(function(a){var c=Array.prototype.slice.call(arguments,1);c.length<=1&&(c=c[0]),b.call(null,a,c)})},c);else{var d={};a.forEach(g(b),function(a,c){b[a](function(b){var e=Array.prototype.slice.call(arguments,1);e.length<=1&&(e=e[0]),d[a]=e,c(b)})},function(a){c(a,d)})}},a.series=function(b,c){c=c||function(){};if(b.constructor===Array)a.mapSeries(b,function(a,b){a&&a(function(a){var c=Array.prototype.slice.call(arguments,1);c.length<=1&&(c=c[0]),b.call(null,a,c)})},c);else{var d={};a.forEachSeries(g(b),function(a,c){b[a](function(b){var e=Array.prototype.slice.call(arguments,1);e.length<=1&&(e=e[0]),d[a]=e,c(b)})},function(a){c(a,d)})}},a.iterator=function(a){var b=function(c){var d=function(){return a.length&&a[c].apply(null,arguments),d.next()};return d.next=function(){return c<a.length-1?b(c+1):null},d};return b(0)},a.apply=function(a){var b=Array.prototype.slice.call(arguments,1);return function(){return a.apply(null,b.concat(Array.prototype.slice.call(arguments)))}};var n=function(a,b,c,d){var e=[];a(b,function(a,b){c(a,function(a,c){e=e.concat(c||[]),b(a)})},function(a){d(a,e)})};a.concat=h(n),a.concatSeries=i(n),a.whilst=function(b,c,d){b()?c(function(e){if(e)return d(e);a.whilst(b,c,d)}):d()},a.until=function(b,c,d){b()?d():c(function(e){if(e)return d(e);a.until(b,c,d)})},a.queue=function(b,c){var e=0,f={tasks:[],concurrency:c,saturated:null,empty:null,drain:null,push:function(b,e){b.constructor!==Array&&(b=[b]),d(b,function(b){f.tasks.push({data:b,callback:typeof e=="function"?e:null}),f.saturated&&f.tasks.length==c&&f.saturated(),a.nextTick(f.process)})},process:function(){if(e<f.concurrency&&f.tasks.length){var a=f.tasks.shift();f.empty&&f.tasks.length==0&&f.empty(),e+=1,b(a.data,function(){e-=1,a.callback&&a.callback.apply(a,arguments),f.drain&&f.tasks.length+e==0&&f.drain(),f.process()})}},length:function(){return f.tasks.length},running:function(){return e}};return f};var o=function(a){return function(b){var c=Array.prototype.slice.call(arguments,1);b.apply(null,c.concat([function(b){var c=Array.prototype.slice.call(arguments,1);typeof console!="undefined"&&(b?console.error&&console.error(b):console[a]&&d(c,function(b){console[a](b)}))}]))}};a.log=o("log"),a.dir=o("dir"),a.memoize=function(a,b){var c={},d={};b=b||function(a){return a};var e=function(){var e=Array.prototype.slice.call(arguments),f=e.pop(),g=b.apply(null,e);g in c?f.apply(null,c[g]):g in d?d[g].push(f):(d[g]=[f],a.apply(null,e.concat([function(){c[g]=arguments;var a=d[g];delete d[g];for(var b=0,e=a.length;b<e;b++)a[b].apply(null,arguments)}])))};return e.unmemoized=a,e},a.unmemoize=function(a){return function(){return(a.unmemoized||a).apply(null,arguments)}}})();
 
             Rally.launchApp('CustomApp', {
                 name:"wip-limits-chart",

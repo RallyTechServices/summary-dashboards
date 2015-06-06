@@ -6,9 +6,10 @@
    "javascript": [
       "../common/src/javascript/rally-functions.js",
       "../common/src/javascript/project-stories.js",
+      "../common/src/javascript/scope_selector_component.js",
       "src/javascript/App.js",
       "src/javascript/_progress-chart.js",
-      "https://cdnjs.cloudflare.com/ajax/libs/async/1.22/async.min.js"
+      "src/lib/async.min.js"
    ],
    "css": [
       "src/css/app.css"

@@ -12,6 +12,7 @@
     padding: 5,
     
     config: {
+
         /**
          * @cfg [{Ext.data.Model}] 
          * Records that will each have a slice of the inside pie
@@ -73,11 +74,14 @@
          * 
          */
         non_owned_color: '#F8F8FF',
+        minHeight: 300,
+        flex: 1,
         /**
          * @cfg String
          * The color to use for task elements that hold a spot for stories without tasks
          */
         missing_color: 'white'
+        
         
     },
     
@@ -88,9 +92,11 @@
 
     initComponent: function() {
         this.data = this.calculateSlices();
-        this.items = this._buildItems(this.data);
         this.callParent(arguments);
+        
+        this._addChart();
     },
+    
     
     calculateSlices: function() {
         var inside_series_data = [];
@@ -261,13 +267,13 @@
         return idx % this.colors.length;
      },
      
-    _buildItems: function(series_data) {
-        var items = [];
-                
+     _addChart: function() {
+        console.log("adding chart");
+        
         var series = [{
             name: 'Stories',
-            data: series_data[0],
-            size: '65%',
+            data: this.data[0],
+            size: '60%',
             tooltip: {
                 headerFormat: '',
                 pointFormat: '<b>{point.name}</b>.'
@@ -282,9 +288,9 @@
         },
         {
             name: 'Tasks',
-            data: series_data[1],
-            size: '80%',
-            innerSize: '65%',
+            data: this.data[1],
+            size: '70%',
+            innerSize: '60%',
             tooltip: {
                 headerFormat: '',
                 pointFormat: '<b>{point.name}</b>.'
@@ -297,9 +303,10 @@
             }
         }];
         
-        items.push({
+        var chart = this.add({
             xtype:'rallychart',
             loadMask: false,
+           
             chartData: {
                 series: series
             },
@@ -314,14 +321,22 @@
                 },
                 plotOptions: {
                     pie: {
-                        shadow: false,
-                        center: ['50%', '20%']
+                        shadow: true,
+                        center: ['50%', '35%']
                     }
                 }
             }
         });
-
         
-        return items;
-    }
+//        var me = this;
+//        chart.on('chartRendered', function() {
+//            console.log("Resizing", this, this.getWidth(), this.getHeight());
+//            chart.setSize(this.getWidth() * 0.85, this.getWidth() * 0.85);
+//        }, this, { single: true });
+
+//        console.log("setting height");
+//        this.setSize(300,300);
+
+     }
+
 });

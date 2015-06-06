@@ -335,8 +335,7 @@
 //        }, this, { single: true });
 
 //        console.log("setting height");
-//        this.setSize(300,300);
-
+        //this.getBody().setSize(this.getWidth() * 0.95);
      }
 
 });

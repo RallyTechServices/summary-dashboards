@@ -59,12 +59,20 @@ Ext.define("TSWorkQueue", {
         
         this._setInfo(); 
                 
-        var base_filter = [{property:'Iteration.Name',value:iteration.get('Name')}];
+        var base_filter = [  {property:'Iteration.Name',value:iteration.get('Name')}];
         
         var team_story_filters = Ext.Array.push([],base_filter);
         team_story_filters.push({property:'ScheduleState',value:'In-Progress'});
-
-        var team_task_filters = Ext.Array.push([],base_filter);
+        team_story_filters = Rally.data.wsapi.Filter.and(team_story_filters);
+        
+        var team_task_filters = Rally.data.wsapi.Filter.and( Ext.Array.push([],base_filter) );
+        
+        var project_filter = Ext.create('Rally.data.wsapi.Filter',{property:'Project.ObjectID',value:this.getContext().getProject().ObjectID}).or(
+            Ext.create('Rally.data.wsapi.Filter',{property:'Project.Parent.ObjectID',value:this.getContext().getProject().ObjectID})
+        );
+        team_task_filters = team_task_filters.and(project_filter);
+        team_story_filters = team_story_filters.and(project_filter);
+        
         var task_fields = ['Estimate','FormattedID','WorkProduct','PlanEstimate','Blocked','State','Owner','ObjectID'];
         var story_fields = ['PlanEstimate','FormattedID','Blocked','Owner','ObjectID'];
         

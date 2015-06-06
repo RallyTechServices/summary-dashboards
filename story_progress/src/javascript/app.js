@@ -11,7 +11,7 @@ Ext.define("TSWorkQueue", {
     ],
     config: {
         defaultSettings: {
-            zoomToIteration:  false
+            showScopeSelector :  false
         }
     },
     

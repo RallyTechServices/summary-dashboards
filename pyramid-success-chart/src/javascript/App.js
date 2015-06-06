@@ -62,7 +62,9 @@ Ext.define('CustomApp', {
 
 
     run : function(releaseName,iterationName) {
-
+        this.setLoading('loading data...');
+        console.log("run:",releaseName,iterationName);
+        
         var that = this;
 
         that.rallyFunctions = Ext.create("RallyFunctions");
@@ -201,7 +203,8 @@ Ext.define('CustomApp', {
 
 
     createChart : function(categories,seriesData,callback) {
-
+        this.setLoading(false);
+        
         var isEmpty = function(series) {
             var total = _.reduce(_.first(series).data,function(memo,d) { 
                 return memo + d[1];

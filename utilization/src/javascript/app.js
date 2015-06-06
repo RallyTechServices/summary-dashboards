@@ -163,9 +163,18 @@ Ext.define("TSUtilization", {
                 this.logger.log("by team:", team_iteration_cfds, team_release_cfds);
                 var chart_series = [];
                 
+                var colors = [ '#2f7ed8', '#8bbc21', '#910000',
+                    '#492970', '#f28f43', '#145499','#77a1e5', '#c42525', '#a6c96a',
+                    '#7cb5ec', '#434348', '#90ed7d', '#f7a35c', '#8085e9','#aa1925',
+                    '#f15c80', '#e4d354', '#2b908f', '#f45b5b', '#91e8e1','#1aadce',
+                    '#4572A7', '#AA4643', '#89A54E', '#80699B', '#3D96AE',
+                    '#DB843D', '#92A8CD', '#A47D7C', '#B5CA92'];
+                
+                var counter = -1;
                 Ext.Object.each( team_iteration_cfds, function(team, cfd) {
                     var icfd = team_iteration_cfds[team];
                     var rcfd = team_release_cfds[team];
+                    counter++;
                     
                     var iteration_total_each_day = this._getTotalsFromCFD(array_of_days,icfd);
                     this.logger.log("Total each day:", iteration_total_each_day);
@@ -185,23 +194,25 @@ Ext.define("TSUtilization", {
                     var release_remaining_each_day = this._getTotalsFromCFD(array_of_days,rcfd,["Accepted"]);
                     this.logger.log("Remaining each day:", release_remaining_each_day);
                     
+                    if ( counter >= colors.length ) { counter = 0; }
+                    var color = colors[counter];
                     
                     if ( timebox_type == 'iteration' ) {
-                        chart_series.push(this._getSeriesFromDailyHash(team + ': Total / Stability', iteration_total_each_day ));
-                        chart_series.push(this._getSeriesFromDailyHash(team + ': Ideal Burn', ideal_each_day));
-                        chart_series.push(this._getSeriesFromDailyHash(team + ': Actual Burn', iteration_remaining_each_day ));
+                        chart_series.push(this._getSeriesFromDailyHash(team + ': Total / Stability', iteration_total_each_day, { color: color, marker: { symbol:'circle'} } ));
+                        chart_series.push(this._getSeriesFromDailyHash(team + ': Ideal Burn', ideal_each_day, { color: color,marker: { symbol: 'triangle' } }));
+                        chart_series.push(this._getSeriesFromDailyHash(team + ': Actual Burn', iteration_remaining_each_day, { color: color,marker: { symbol: 'triangle-down' } } ));
                     } else {
-                        chart_series.push(this._getSeriesFromDailyHash(team + ': Total / Stability', release_total_each_day ));
-                        chart_series.push(this._getSeriesFromDailyHash(team + ': Ideal Burn', ideal_each_day));
-                        chart_series.push(this._getSeriesFromDailyHash(team + ': Actual Burn', release_remaining_each_day ));
-                        chart_series.push(this._getSeriesFromDailyHash(team + ': Potential', planned_each_day ));
+                        chart_series.push(this._getSeriesFromDailyHash(team + ': Total / Stability', release_total_each_day , { color: color,marker: { symbol: 'circle' } }));
+                        chart_series.push(this._getSeriesFromDailyHash(team + ': Ideal Burn', ideal_each_day, { color: color,marker: { symbol: 'triangle' } }));
+                        chart_series.push(this._getSeriesFromDailyHash(team + ': Actual Burn', release_remaining_each_day, { color: color,marker: { symbol: 'triangle-down' } } ));
+                        chart_series.push(this._getSeriesFromDailyHash(team + ': Potential', planned_each_day, { color: color,marker: { symbol: 'square' } } ));
                     }
                 },this);
                 
                 var chart_categories = Ext.Array.map(array_of_days, function(day,idx) {
                     return idx+1;
                 });
-                
+                                
                 this._makeChart(chart_categories, chart_series);
             },
             failure: function(error_message){
@@ -322,7 +333,7 @@ Ext.define("TSUtilization", {
                 if ( Ext.isDefined(day_hash[card_date]) ) {
                     day_hash[card_date] += card.get('CardEstimateTotal');
                 } else {
-                    me.logger.log("A date that doesn't fit:", card_date);
+                    //me.logger.log("A date that doesn't fit:", card_date);
                 }
             }
         });
@@ -521,22 +532,29 @@ Ext.define("TSUtilization", {
         return deferred.promise;
     },
     
-    _getSeriesFromDailyHash: function(series_name, value_each_day ){
+    _getSeriesFromDailyHash: function(series_name, value_each_day, additional_settings ){
         // expect that value_each_day is hash 'date/time': value
-        return {
+        if ( ! additional_settings ) { additional_settings = {}; }
+        console.log("color:", additional_settings.color);
+        
+        return Ext.apply({
             type:'line',
             name: series_name,
             data: Ext.Object.getValues(value_each_day),
-            connectNulls: true
-        }
+            connectNulls: true,
+            tooltip: { valueDecimals: 1 },
+        }, additional_settings);
+        
     },
     
     _makeChart: function(categories, chart_series) {
         this.down('#display_box').removeAll();
         
+        var chartColors = Ext.Array.map(chart_series, function(series){ return series.color });
         this.down('#display_box').add({
             xtype:'rallychart',
             loadMask: false,
+            chartColors: chartColors,
             chartData: {
                 series: chart_series
             },

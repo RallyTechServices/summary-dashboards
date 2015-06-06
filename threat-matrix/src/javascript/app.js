@@ -219,8 +219,8 @@ Ext.define("threat-matrix", {
         var ct2 = ct_legend.add({
             xtype: 'container',
             padding: 10,
-            html: '<div class="tslegendtext">Types:  </div><div class="tslegend-square">&nbsp;&nbsp;</div><div class="tslegendtext">&nbsp;&nbsp;Feature</div><span class="tslegendspacer">&nbsp;</span>' +
-                '<div class="tslegend-circle">&nbsp;&nbsp;</div><div class="tslegendtext">&nbsp;&nbsp;Story (more transparent)</div><span class="tslegendspacer">&nbsp;</span>'
+            html: '<div class="tslegendtext">Types:  </div><div class="tslegend-square">&nbsp;&nbsp;</div><div class="tslegendtext">&nbsp;&nbsp;Feature (Solid)</div><span class="tslegendspacer">&nbsp;</span>' +
+                '<div class="tslegend-circle">&nbsp;&nbsp;</div><div class="tslegendtext">&nbsp;&nbsp;Story (Translucent)</div><span class="tslegendspacer">&nbsp;</span>'
         });
         ct.setSize(this.getWidth() *.95);
 

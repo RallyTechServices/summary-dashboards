@@ -2,6 +2,7 @@ Ext.define('Rally.technicalservices.FeatureValidationRules',{
     extend: 'Rally.technicalservices.ValidationRules',
 
     requiredFields: undefined,
+    stories: undefined,
 
     constructor: function(config){
         Ext.apply(this, config);
@@ -14,9 +15,21 @@ Ext.define('Rally.technicalservices.FeatureValidationRules',{
         }
         return null;
     },
+    ruleFn_featureHasNoPoints: function(r){
+        if (r.get('LeafStoryPlanEstimateTotal')==0){
+            return '<li>Feature has no points.'
+        }
+        return null;
+    },
     ruleFn_FeatureHasNotBeenStarted: function(r){
         if (!r.get('ActualStartDate')){
             return Ext.String.format('<li>Feature has not been started.');
+        }
+        return null;
+    },
+    ruleFn_featureHasNotBeenCompleted: function(r){
+        if (!r.get('ActualEndDate')){
+            return Ext.String.format('<li>Feature has not been completed.');
         }
         return null;
     },
@@ -37,6 +50,12 @@ Ext.define('Rally.technicalservices.FeatureValidationRules',{
     ruleFn_FeatureHasNoParent: function(r) {
         if (!r.get('Parent')) {
             return Ext.String.format('<li>Feature has no parent.');
+        }
+        return null;
+    },
+    ruleFn_featureRiskDescription: function(r){
+        if (r.get('c_Risk') && !r.get('c_RiskDescription')){
+            return 'Feature flagged as Risk has no Risk description.'
         }
         return null;
     }

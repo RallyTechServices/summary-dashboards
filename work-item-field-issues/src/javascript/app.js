@@ -8,8 +8,8 @@ Ext.define("work-item-field-issues", {
          */
         allReleasesText: 'All Releases',
         portfolioItemFeature: 'PortfolioItem/Feature',
-        featureFetchFields: ['FormattedID','Name','Project','Release','State','AcceptedLeafStoryCount','LeafStoryCount','PlannedStartDate','PlannedEndDate','Owner','ActualStartDate','Parent','ValueScore','c_ValueMetricKPI'],
-        storyFetchFields: ['FormattedID','Name','Project','Iteration','Release','ScheduleState','Feature','Owner','PlanEstimate','Blocked','BlockedReason',],
+        featureFetchFields: ['FormattedID','Name','Project','Release','State','AcceptedLeafStoryCount','LeafStoryCount','PlannedStartDate','PlannedEndDate','Owner','ActualStartDate','Parent','ValueScore','c_ValueMetricKPI','c_Risk','c_RiskDescription'],
+        storyFetchFields: ['FormattedID','Name','Project','Iteration','Release','ScheduleState','Feature','Owner','PlanEstimate','Blocked','BlockedReason','Blocker','c_Risk','c_RiskDescription'],
 
 
         typeMapping: {
@@ -24,6 +24,9 @@ Ext.define("work-item-field-issues", {
             '#4572A7', '#AA4643', '#89A54E', '#80699B', '#3D96AE',
             '#DB843D', '#92A8CD', '#A47D7C', '#B5CA92'],
 
+        selectedRelease: null,
+        selectedIteration: null,
+
         launch: function() {
             if (this.isExternal()){
                 this.showSettings(this.config);
@@ -31,14 +34,19 @@ Ext.define("work-item-field-issues", {
                 this.onSettingsUpdate(this.getSettings());
             }
         },
-    onTimeboxScopeChange: function(newTimeboxScope) {
-        this.logger.log('newTimeboxScope',newTimeboxScope);
 
-        if (((newTimeboxScope) && (newTimeboxScope.get('_type') === 'release'))
-                            ||!newTimeboxScope) { //If the timebox scope is null, then just load all stories in the project scope.
-            this.onTimeboxUpdated(newTimeboxScope);
-        }
-     },
+        onTimeboxScopeChange: function(newTimeboxScope) {
+            this.logger.log('newTimeboxScope',newTimeboxScope);
+
+            if (((newTimeboxScope) && (newTimeboxScope.get('_type') === 'release'))){
+                this.selectedRelease = newTimeboxScope;
+                this.onTimeboxUpdated(newTimeboxScope, this.selectedIteration);
+            }
+            if (((newTimeboxScope) && (newTimeboxScope.get('_type') === 'iteration'))) {
+                this.selectedIteration = newTimeboxScope
+                this.onTimeboxUpdated(this.selectedRelease, newTimeboxScope);
+            }
+        },
 
         getReleaseFilters: function(release){
 
@@ -57,15 +65,30 @@ Ext.define("work-item-field-issues", {
                 value: Rally.util.DateTime.toIsoString(release.get('ReleaseDate'))
             }];
         },
+        getIterationFilters: function(iteration){
+            if (!iteration){
+                return [];
+            }
+            return [{
+                property: 'Iteration.Name',
+                value: iteration.get('Name')
+            },{
+                property: 'Iteration.StartDate',
+                value: Rally.util.DateTime.toIsoString(iteration.get('StartDate'))
+            },{
+                property: 'Iteration.EndDate',
+                value: Rally.util.DateTime.toIsoString(iteration.get('EndDate'))
+            }];
+        },
 
-        onTimeboxUpdated: function(release){
-            this.logger.log('onReleaseUpdated',release);
+        onTimeboxUpdated: function(release, iteration){
+            this.logger.log('onTimeboxUpdated',release, iteration);
             this.getBody().removeAll();
 
             this.setLoading(true);
             var promises = [
                 this._fetchData(this.portfolioItemFeature, this.featureFetchFields, this.getReleaseFilters(release)),
-                this._fetchData('HierarchicalRequirement', this.storyFetchFields, this.getReleaseFilters(release))
+                this._fetchData('HierarchicalRequirement', this.storyFetchFields, this.getReleaseFilters(release).concat(this.getIterationFilters(iteration)))
             ];
 
             Deft.Promise.all(promises).then({
@@ -83,7 +106,9 @@ Ext.define("work-item-field-issues", {
                             records: records[0]
                         });
 
-                    var storyRules = Ext.create('Rally.technicalservices.UserStoryValidationRules',{}),
+                    var storyRules = Ext.create('Rally.technicalservices.UserStoryValidationRules',{
+                            features: records[0]
+                        }),
                         storyValidator = Ext.create('Rally.technicalservices.Validator',{
                             validationRuleObj: storyRules,
                             records: records[1]
@@ -104,15 +129,9 @@ Ext.define("work-item-field-issues", {
         _createSummaryHeader: function(validatorData){
             this.logger.log('_createSummaryHeader',validatorData);
 
-            var ct_summary = this.getBody().add({
+            var ct_chart = this.getBody().add({
                 xtype: 'container',
-                layout: {type: 'hbox'}
-            });
-
-            var ct_chart = ct_summary.add({
-                xtype: 'container',
-                flex: 1,
-                minHeight: 300
+                flex: 1
             });
 
             this._createSummaryChart(ct_chart, validatorData);
@@ -122,32 +141,6 @@ Ext.define("work-item-field-issues", {
             });
             this._createDetailGrid(ct_detail_grid, validatorData);
 
-        },
-        _onPointSelect: function(thisApp, thisPoint){
-            thisApp.logger.log('_onPointSelect', thisPoint);
-
-           var ruleName = thisPoint.id;
-           var grid = thisApp.down('#detail-grid');
-
-            grid.getStore().clearFilter(true);
-
-            grid.getStore().filterBy(function(rec){
-                var violations = rec.get('violations'),
-                    filter = false;
-                if (violations){
-                    _.each(violations, function(v){
-                        if (v.rule == ruleName){
-                            filter = true;
-                        }
-                    });
-                }
-                return filter;
-            });
-        },
-        _onPointUnselect: function(thisApp, fromPoint){
-            if (fromPoint.selected){
-                thisApp.down('#detail-grid').getStore().clearFilter();
-            }
         },
         _createSummaryChart: function(ct,validatorData){
 
@@ -193,25 +186,16 @@ Ext.define("work-item-field-issues", {
                         name: Rally.technicalservices.ValidationRules.getUserFriendlyRuleLabel(r),
                         data: data,
                         stack: t,
-                        showInLegend: Ext.Array.sum(data) > 0,
-                        point: {
-                            events: {
-                                select: function () {
-                                    me._onPointSelect(me, this);
-                                },
-                                unselect: function () {
-                                    me._onPointUnselect(me, this);
-                                }
-                            }
-                        }
+                        showInLegend: Ext.Array.sum(data) > 0
                     });
                 });
             });
 
-            var grid = this.down('#detail-grid');
+            var subtitle_text = (this.selectedRelease ? 'Release <b>' + this.selectedRelease.get('Name')  + '</b>': 'All Releases') +
+                ', ' +
+                (this.selectedIteration ? 'Iteration <b>' + this.selectedIteration.get('Name') + '</b>' : 'All Iterations');
 
-            var me = this;
-            ct.add({
+            var chart = ct.add({
                 xtype: 'rallychart',
                 itemId: 'summary-chart',
                 loadMask: false,
@@ -223,7 +207,12 @@ Ext.define("work-item-field-issues", {
                     chart: {
                         type: 'column'
                     },
-                    title: 'Work Item Field Issues',
+                    title: {
+                        text: 'Work Item Field Issues'
+                    },
+                    subtitle: {
+                        text: subtitle_text
+                    },
                     legend: {
                         align: 'center',
                         verticalAlign: 'bottom'
@@ -241,6 +230,7 @@ Ext.define("work-item-field-issues", {
                         }
                     }
                 });
+            ct.setSize(chart.getWidth(), chart.getHeight());
         },
         _createDetailGrid: function(ct, violationData){
 
@@ -275,9 +265,6 @@ Ext.define("work-item-field-issues", {
                 dataIndex: 'FormattedID',
                 text: 'FormattedID',
                 renderer: this._artifactRenderer
-            },{
-                dataIndex: 'Project',
-                text: 'Project'
             },{
                 dataIndex: 'violations',
                 text:'Issues',
@@ -352,7 +339,6 @@ Ext.define("work-item-field-issues", {
      /* Overrides for App class
      /*
      /********************************************/
-    //getSettingsFields:  Override for App
     getSettingsFields: function() {
         return [
             {
@@ -367,7 +353,7 @@ Ext.define("work-item-field-issues", {
     isExternal: function(){
         return typeof(this.getAppId()) == 'undefined';
     },
-    //showSettings:  Override
+
     showSettings: function(options) {
         this._appSettings = Ext.create('Rally.app.AppSettings', Ext.apply({
             fields: this.getSettingsFields(),
@@ -395,32 +381,25 @@ Ext.define("work-item-field-issues", {
         this._hideSettings();
         this.onSettingsUpdate(settings);
     },
-    //onSettingsUpdate:  Override
+
     onSettingsUpdate: function (settings){
         this.logger.log('onSettingsUpdate',settings);
         Ext.apply(this, settings);
 
-        var release = null;
+        var release = null, iteration = null;
 
         if ( this.getSetting('showScopeSelector') || this.getSetting('showScopeSelector') == "true" ) {
             var tb = this.getHeader().add({
                 xtype : 'timebox-selector',
-                context : this.getContext(),
-                listeners: {
-                    releasechange: function(release){
-                        this.onTimeboxScopeChange(release);
-                    },
-                    //iterationchange: function(iteration){
-                    //    this.onTimeboxScopeChange(iteration);
-                    //},
-                    scope: this
-                }
+                context : this.getContext()
             });
+            tb.on('releasechange', this.onTimeboxScopeChange, this);
+            tb.on('iterationchange', this.onTimeboxScopeChange, this);
             release = tb.getReleaseRecord();
-            //iteration = tb.getIterationRecord();
-            this.onTimeboxScopeChange(release);
+            iteration = tb.getIterationRecord();
+            this.onTimeboxScopeChange(release, iteration);
         } else {
-            this.onTimeboxScopeChange(release);
+            this.onTimeboxScopeChange(release, iteration);
             this.subscribe(this, 'timeboxReleaseChanged', this.onTimeboxScopeChange, this);
             this.subscribe(this, 'timeboxIterationChanged', this.onTimeboxScopeChange, this);
             this.publish('requestTimebox', this);

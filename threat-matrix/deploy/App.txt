@@ -3,11 +3,11 @@
 <head>
     <title>Threat Matrix</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Sat Jun 06 2015 10:19:17 GMT-0600 (MDT) -->
+    <!--  Build Date: Sat Jun 06 2015 13:35:05 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Sat Jun 06 2015 10:19:17 GMT-0600 (MDT)";
-        var CHECKSUM = 43118966379;
+        var APP_BUILD_DATE = "Sat Jun 06 2015 13:35:05 GMT-0600 (MDT)";
+        var CHECKSUM = 43124248581;
     </script>
 
    <script type="text/javascript" src="/apps/2.0rc3/sdk.js"></script>
@@ -861,8 +861,8 @@ Ext.define("threat-matrix", {
         var ct2 = ct_legend.add({
             xtype: 'container',
             padding: 10,
-            html: '<div class="tslegendtext">Types:  </div><div class="tslegend-square">&nbsp;&nbsp;</div><div class="tslegendtext">&nbsp;&nbsp;Feature</div><span class="tslegendspacer">&nbsp;</span>' +
-                '<div class="tslegend-circle">&nbsp;&nbsp;</div><div class="tslegendtext">&nbsp;&nbsp;Story (more transparent)</div><span class="tslegendspacer">&nbsp;</span>'
+            html: '<div class="tslegendtext">Types:  </div><div class="tslegend-square">&nbsp;&nbsp;</div><div class="tslegendtext">&nbsp;&nbsp;Feature (Solid)</div><span class="tslegendspacer">&nbsp;</span>' +
+                '<div class="tslegend-circle">&nbsp;&nbsp;</div><div class="tslegendtext">&nbsp;&nbsp;Story (Translucent)</div><span class="tslegendspacer">&nbsp;</span>'
         });
         ct.setSize(this.getWidth() *.95);
 

@@ -11,7 +11,6 @@ Ext.define('CustomApp', {
         }
     },
 
-
     launch: function() {
 
         console.log("launch");
@@ -252,20 +251,9 @@ Ext.define('CustomApp', {
                 fieldLabel: '',
                 margin: '0 0 25 200',
                 boxLabel: 'Show Scope Selector<br/><span style="color:#999999;"><i>Tick to use this to broadcast settings.</i></span>'
-            },
-            {
-                name: 'zoomToIteration',
-                xtype: 'rallycheckboxfield',
-                boxLabelAlign: 'after',
-                fieldLabel: '',
-                margin: '0 0 25 200',
-                boxLabel: 'Show by Iteration<br/><span style="color:#999999;"><i>If <strong>not</strong> ticked, show by iterations in the selected release.</i></span>'
             }
         ];
     },
-
-
-
 
 
 });

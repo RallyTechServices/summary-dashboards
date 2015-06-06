@@ -13,10 +13,6 @@ Ext.define('CustomApp', {
 
     launch: function() {
 
-        console.log("launch");
-
-        console.log("up",this.up(".x-portlet"));
-
         if (this.isExternal()){
             this.showSettings(this.config);
         } else {

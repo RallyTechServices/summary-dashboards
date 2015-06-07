@@ -64,6 +64,8 @@ Ext.define('CustomApp', {
 
         var that = this;
 
+        this.setLoading("Loading Stories in Project...");
+        
         var pr = Ext.create( "ProjectStories", {
             ctx : that.getContext(),
             filter : that.rallyFunctions.createFilter(releaseName,iterationName)
@@ -154,7 +156,8 @@ Ext.define('CustomApp', {
     createChart : function(categories,seriesData,callback) {
 
         var that = this;
-
+        that.setLoading(false);
+        
         if (!_.isUndefined(that.chart)) {
             that.remove(that.chart);
         }

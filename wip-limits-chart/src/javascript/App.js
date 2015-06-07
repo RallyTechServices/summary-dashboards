@@ -6,6 +6,9 @@ Ext.define('CustomApp', {
         {xtype:'container', itemId:'selector_box' }
     ],
 
+    release: null,
+    iteration: null,
+    
     config: {
         defaultSettings : { 
             stacking : true,
@@ -53,11 +56,15 @@ Ext.define('CustomApp', {
     },
 
     _changeRelease: function(release) {
-        this.run(release.get("Name"),null);
+        if ( this.release !== release ) {
+            this.run(release.get("Name"),null);
+        }
     },
 
     _changeIteration: function(iteration) {
-        this.run(null,iteration.get("Name"),null);
+        if ( iteration !== this.iteration ) {
+            this.run(null,iteration.get("Name"),null);
+        }
     },
 
 

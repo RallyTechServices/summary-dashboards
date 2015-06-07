@@ -7,14 +7,11 @@ Ext.define("TSWorkQueue", {
         {xtype:'container',itemId:'settings_box'},
         {xtype:'container',itemId:'selector_box'},
         {xtype:'tsinfolink', minHeight: 18},
-        {xtype:'container',itemId:'display_box', layout: { type: 'hbox' }, items: [
-            { xtype: 'container', itemId: 'self_chart' },
-            { xtype: 'container', itemId: 'team_chart' }
-        ] }
+        {xtype:'container',itemId:'display_box', layout: { type: 'hbox' } }
     ],
     config: {
         defaultSettings: {
-            zoomToIteration:  false
+            showScopeSelector :  false
         }
     },
     
@@ -62,12 +59,20 @@ Ext.define("TSWorkQueue", {
         
         this._setInfo(); 
                 
-        var base_filter = [{property:'Iteration.Name',value:iteration.get('Name')}];
+        var base_filter = [  {property:'Iteration.Name',value:iteration.get('Name')}];
         
         var team_story_filters = Ext.Array.push([],base_filter);
         team_story_filters.push({property:'ScheduleState',value:'In-Progress'});
-
-        var team_task_filters = Ext.Array.push([],base_filter);
+        team_story_filters = Rally.data.wsapi.Filter.and(team_story_filters);
+        
+        var team_task_filters = Rally.data.wsapi.Filter.and( Ext.Array.push([],base_filter) );
+        
+        var project_filter = Ext.create('Rally.data.wsapi.Filter',{property:'Project.ObjectID',value:this.getContext().getProject().ObjectID}).or(
+            Ext.create('Rally.data.wsapi.Filter',{property:'Project.Parent.ObjectID',value:this.getContext().getProject().ObjectID})
+        );
+        team_task_filters = team_task_filters.and(project_filter);
+        team_story_filters = team_story_filters.and(project_filter);
+        
         var task_fields = ['Estimate','FormattedID','WorkProduct','PlanEstimate','Blocked','State','Owner','ObjectID'];
         var story_fields = ['PlanEstimate','FormattedID','Blocked','Owner','ObjectID'];
         
@@ -120,20 +125,17 @@ Ext.define("TSWorkQueue", {
 
         this.logger.log("_makePies", inside_records, outside_records);
         
-        container.down('#self_chart').removeAll();
-        container.down('#team_chart').removeAll();
+        container.removeAll();
         
         if ( inside_records.length == 0 && outside_records.length == 0 ) {
-            container.down('#self_chart').add({xtype:'container',html:'No items in selection'});
+            container.add({xtype:'container',html:'No items in selection'});
         } else {
     
-            container.down('#self_chart').add({
+            container.add({
                 xtype: 'tsdoughnut',
                 title: 'Self',
                 itemId: 'selfie',
-                width: 200,
-                height: 200,
-                margin: 10,
+                margin: '0 10 0 0',
                 highlight_owner: this.getContext().getUser().ObjectID,
                 remove_non_highlighted: true,
                 inside_records: inside_records,
@@ -141,18 +143,18 @@ Ext.define("TSWorkQueue", {
                 outside_records: outside_records,
                 outside_size_field: 'Estimate'
             });
-            container.down('#team_chart').add( {
+            container.add( {
                 xtype: 'tsdoughnut',
                 title: 'Team',
-                width: 200,
-                heigh: 200,
-                margin: 10,
+                margin: '0 10 0 5',
                 itemId: 'team',
                 inside_records: inside_records,
                 inside_size_field: 'PlanEstimate',
                 outside_records: outside_records,
                 outside_size_field: 'Estimate'
             });
+            
+            //container.getBody().setSize(this.getWidth() * 0.95, container.getHeight() * 0.75);
         }
     },
     

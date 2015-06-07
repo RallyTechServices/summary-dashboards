@@ -10,15 +10,11 @@
         var CHECKSUM = [%= checksum %];
     </script>
     
-<!--[if IE]>
-<script type="text/javascript" src="//rally1.rallydev.com/apps/2.0rc3/sdk.js"></script>
-<![endif]-->
-<![if !IE]>
-<script type="text/javascript" src="/apps/2.0rc3/sdk.js"></script>
-<![endif]>
-
-
     <script type="text/javascript">
+        if (!window.location.origin) {
+            window.location.origin = window.location.protocol + "//" + window.location.hostname + (window.location.port ? ':' + window.location.port: '');
+        }
+        
         Rally.onReady(function() {
             <%= js_contents %>
             

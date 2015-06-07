@@ -64,6 +64,8 @@ Ext.define('CustomApp', {
 
         var that = this;
 
+        console.log("run progress-by-project:", releaseName, iterationName);
+        
         this.setLoading("Loading Stories in Project...");
         
         var pr = Ext.create( "ProjectStories", {

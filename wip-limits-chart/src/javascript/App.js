@@ -65,6 +65,8 @@ Ext.define('CustomApp', {
 
         var that = this;
 
+        this.setLoading("Loading...");
+        
         that.rallyFunctions = Ext.create("RallyFunctions");
 
         var pr = Ext.create( "ProjectStories", {
@@ -199,7 +201,8 @@ Ext.define('CustomApp', {
     createChart : function(categories,seriesData,callback) {
 
         var that = this;
-
+        this.setLoading(false);
+        
         if (!_.isUndefined(that.chart)) {
             that.remove(that.chart);
         }

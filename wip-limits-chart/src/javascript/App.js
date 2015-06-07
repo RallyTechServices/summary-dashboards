@@ -6,6 +6,9 @@ Ext.define('CustomApp', {
         {xtype:'container', itemId:'selector_box' }
     ],
 
+    release: null,
+    iteration: null,
+    
     config: {
         defaultSettings : { 
             stacking : true,
@@ -53,11 +56,17 @@ Ext.define('CustomApp', {
     },
 
     _changeRelease: function(release) {
-        this.run(release.get("Name"),null);
+        if ( this.release !== release ) {
+            this.release = release;
+            this.run(release.get("Name"),null);
+        }
     },
 
     _changeIteration: function(iteration) {
-        this.run(null,iteration.get("Name"),null);
+        if ( iteration !== this.iteration ) {
+            this.iteration = iteration;
+            this.run(null,iteration.get("Name"),null);
+        }
     },
 
 
@@ -65,6 +74,8 @@ Ext.define('CustomApp', {
 
         var that = this;
 
+        this.setLoading("Loading...");
+        
         that.rallyFunctions = Ext.create("RallyFunctions");
 
         var pr = Ext.create( "ProjectStories", {
@@ -199,7 +210,8 @@ Ext.define('CustomApp', {
     createChart : function(categories,seriesData,callback) {
 
         var that = this;
-
+        this.setLoading(false);
+        
         if (!_.isUndefined(that.chart)) {
             that.remove(that.chart);
         }
@@ -215,10 +227,23 @@ Ext.define('CustomApp', {
 
         var chart = this.down("#rally-chart");
         var p = Ext.get(chart.id);
-        elems = p.query("div.x-mask");
-        _.each(elems, function(e) { e.remove(); });
+        var elems = p.query("div.x-mask");
+        _.each(elems, function(e) { 
+            if ( Ext.isIE9 ) { 
+                e.removeNode(); 
+            } else { 
+                e.remove(); 
+            }
+        });
         var elems = p.query("div.x-mask-msg");
-        _.each(elems, function(e) { e.remove(); });
+        _.each(elems, function(e) { 
+            if ( Ext.isIE9 ) { 
+                e.removeNode(); 
+            } else { 
+                e.remove(); 
+            }
+        });
+        
     },
 
 

@@ -7,7 +7,8 @@ Ext.define("TSWorkQueue", {
         {xtype:'container',itemId:'settings_box'},
         {xtype:'container',itemId:'selector_box'},
         {xtype:'tsinfolink', minHeight: 18},
-        {xtype:'container',itemId:'display_box', layout: { type: 'hbox' } }
+        {xtype:'container',itemId:'display_box', layout: { type: 'hbox' } },
+        {xtype:'container',itemId:'legend_box' }
     ],
     config: {
         defaultSettings: {
@@ -26,6 +27,9 @@ Ext.define("TSWorkQueue", {
     _launch: function(settings) {
         var me = this;
         this.logger.log("launch",settings);
+        
+        this._addLegend(this.down('#legend_box'));
+        
         if ( settings.showScopeSelector == true || settings.showScopeSelector == "true" ) {
             this.down('#selector_box').add({
                 xtype : 'timebox-selector',
@@ -96,6 +100,7 @@ Ext.define("TSWorkQueue", {
             me.setLoading(false);
         });
     },
+    
     _loadAStoreWithAPromise: function(model_name, model_fields,filters){
         var deferred = Ext.create('Deft.Deferred');
         var me = this;
@@ -120,6 +125,21 @@ Ext.define("TSWorkQueue", {
         return deferred.promise;
     },
 
+    _addLegend: function(container) {
+        var color_data = [
+            { color: 'red', label: 'Red indicates blocked' },
+            { color: 'black', color2: 'gray', color3: 'lightgray',  label: 'Task color gradients indicate the state of the task (lighter is closer to complete)' }
+        ];
+        
+        var ct = container.add({
+            xtype: 'container',
+            padding: 10,
+            tpl: '<div class="tslegendtext">Legend:  </div><tpl for="."><div class="tslegend" style="background-color:{color}">&nbsp;</div><tpl if="color2"><div class="tslegend" style="background-color:{color2}">&nbsp;</div></tpl><tpl if="color3"><div class="tslegend" style="background-color:{color3}">&nbsp;</div></tpl><div class="tslegendtext">&nbsp;&nbsp;{label}</div><span class="tslegendspacer">&nbsp;</span></tpl>'
+        });
+        
+        ct.update(color_data);
+    },
+    
     _makePies: function(inside_records,outside_records){
         var container =  this.down('#display_box');
 
@@ -154,7 +174,6 @@ Ext.define("TSWorkQueue", {
                 outside_size_field: 'Estimate'
             });
             
-            //container.getBody().setSize(this.getWidth() * 0.95, container.getHeight() * 0.75);
         }
     },
     

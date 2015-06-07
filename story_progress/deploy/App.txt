@@ -3,21 +3,20 @@
 <head>
     <title>Work Queue</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Sat Jun 06 2015 11:15:22 GMT-0700 (PDT) -->
+    <!--  Build Date: Sat Jun 06 2015 21:19:12 GMT-0700 (PDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Sat Jun 06 2015 11:15:22 GMT-0700 (PDT)";
-        var CHECKSUM = 17135245031;
+        var APP_BUILD_DATE = "Sat Jun 06 2015 21:19:12 GMT-0700 (PDT)";
+        var CHECKSUM = 19930758149;
     </script>
-    
-<!--[if IE]>
-<script type="text/javascript" src="//rally1.rallydev.com/apps/2.0rc3/sdk.js"></script>
-<![endif]-->
-<![if !IE]>
-<script type="text/javascript" src="/apps/2.0rc3/sdk.js"></script>
-<![endif]>
+
+    <script type="text/javascript" src="/apps/2.0rc2/sdk.js"></script>
 
     <script type="text/javascript">
+        if (!window.location.origin) {
+            window.location.origin = window.location.protocol + "//" + window.location.hostname + (window.location.port ? ':' + window.location.port: '');
+        }
+        
         Rally.onReady(function() {
              
 Ext.define('timebox-selector', {
@@ -69,6 +68,7 @@ Ext.define('timebox-selector', {
                 {
                     var release = t.getRecord();
                     this.fireEvent('releasechange',release);
+                    console.log("Publishing Release:", release);
                     this.publish('timeboxReleaseChanged', release);
                     this._updateIterationCombo(release);
                 },
@@ -635,11 +635,12 @@ Ext.define("TSWorkQueue", {
         {xtype:'container',itemId:'settings_box'},
         {xtype:'container',itemId:'selector_box'},
         {xtype:'tsinfolink', minHeight: 18},
-        {xtype:'container',itemId:'display_box', layout: { type: 'hbox' } }
+        {xtype:'container',itemId:'display_box', layout: { type: 'hbox' } },
+        {xtype:'container',itemId:'legend_box' }
     ],
     config: {
         defaultSettings: {
-            zoomToIteration:  false
+            showScopeSelector :  false
         }
     },
     
@@ -654,6 +655,9 @@ Ext.define("TSWorkQueue", {
     _launch: function(settings) {
         var me = this;
         this.logger.log("launch",settings);
+        
+        this._addLegend(this.down('#legend_box'));
+        
         if ( settings.showScopeSelector == true || settings.showScopeSelector == "true" ) {
             this.down('#selector_box').add({
                 xtype : 'timebox-selector',
@@ -724,6 +728,7 @@ Ext.define("TSWorkQueue", {
             me.setLoading(false);
         });
     },
+    
     _loadAStoreWithAPromise: function(model_name, model_fields,filters){
         var deferred = Ext.create('Deft.Deferred');
         var me = this;
@@ -748,6 +753,21 @@ Ext.define("TSWorkQueue", {
         return deferred.promise;
     },
 
+    _addLegend: function(container) {
+        var color_data = [
+            { color: 'red', label: 'Red indicates blocked' },
+            { color: 'black', color2: 'gray', color3: 'lightgray',  label: 'Task color gradients indicate the state of the task (lighter is closer to complete)' }
+        ];
+        
+        var ct = container.add({
+            xtype: 'container',
+            padding: 10,
+            tpl: '<div class="tslegendtext">Legend:  </div><tpl for="."><div class="tslegend" style="background-color:{color}">&nbsp;</div><tpl if="color2"><div class="tslegend" style="background-color:{color2}">&nbsp;</div></tpl><tpl if="color3"><div class="tslegend" style="background-color:{color3}">&nbsp;</div></tpl><div class="tslegendtext">&nbsp;&nbsp;{label}</div><span class="tslegendspacer">&nbsp;</span></tpl>'
+        });
+        
+        ct.update(color_data);
+    },
+    
     _makePies: function(inside_records,outside_records){
         var container =  this.down('#display_box');
 
@@ -782,7 +802,6 @@ Ext.define("TSWorkQueue", {
                 outside_size_field: 'Estimate'
             });
             
-            //container.getBody().setSize(this.getWidth() * 0.95, container.getHeight() * 0.75);
         }
     },
     
@@ -876,6 +895,10 @@ Ext.define("TSWorkQueue", {
     font: bold 16px arial,sans-serif;
 }
 
+.legend { 
+    text-align: center;
+}
+
 .tsinfolink {
     position:absolute;
     right:0px;
@@ -891,6 +914,53 @@ Ext.define("TSWorkQueue", {
     margin-right: 15px;
     cursor: pointer;
 }
+
+.tslegend {
+    width: 18px;
+    height: 14px;
+    border-radius: 4px;
+    text-align: center;
+    color: white;
+    border-style: solid;
+    border-width: 1px;
+    display: inline-block;
+}
+
+.tslegendtext {
+    font-family: 'Lucida Grande', 'Lucida Sans Unicode', Verdana, Arial, Helvetica, sans-serif;
+    font-size: '14px'!important;
+    color: #274b6d;
+    display: inline
+}
+.tslegendspacer {
+    padding: 15px;
+    display: inline;
+}
+
+.tslegend-square {
+    width: 14px;
+    height: 14px;
+    text-align: center;
+    border-radius: 7px;
+    color: rgba(103,103,103,1);;
+    background-color: rgba(103,103,103,1);
+    border-style: solid;
+    border-width: 1px;
+    display: inline-block;
+}
+
+.tslegend-circle {
+    width: 14px;
+    height: 14px;
+    text-align: center;
+    border-radius: 7px;
+    color: rgba(103,103,103,.5);
+    background-color: rgba(103,103,103,.5);
+    border-style: solid;
+    border-width: 1px;
+    display: inline-block;
+}
+
     </style>
 
 </head>

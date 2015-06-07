@@ -3,11 +3,11 @@
 <head>
     <title>Countdown</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Sat Jun 06 2015 20:21:24 GMT-0700 (PDT) -->
+    <!--  Build Date: Sat Jun 06 2015 20:40:14 GMT-0700 (PDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Sat Jun 06 2015 20:21:24 GMT-0700 (PDT)";
-        var CHECKSUM = 8654752960;
+        var APP_BUILD_DATE = "Sat Jun 06 2015 20:40:14 GMT-0700 (PDT)";
+        var CHECKSUM = 8901710331;
     </script>
     
     <script type="text/javascript" src="/apps/2.0rc3/sdk.js"></script>
@@ -290,8 +290,9 @@ Ext.define('Rally.technicalservices.CountDownClock',{
     alias: 'widget.tscountdown',
     padding: 5,
     defaults: { margin: '0 7 0 7' },
-    layout: { type: 'table', columns: 4 },
-
+    layout: { type: 'table', columns: 4, tableAttrs:{style:{width:'100%'} } },
+    cls: 'clock',
+    
     config: {
         /**
          * @cfg {Date} 
@@ -460,8 +461,11 @@ Ext.define("TSCountdown", {
     items: [
         {xtype:'container',itemId:'settings_box'},
         {xtype:'container', itemId:'selector_box' },
-        {xtype:'tscountdown',itemId:'release_counter',fieldLabel:'Program Increment'},
-        {xtype:'tscountdown',itemId:'iteration_counter',fieldLabel:'Sprint/Iteration'},
+        {xtype:'container', layout:{ type:'table', columns: 3, tableAttrs:{style:{width:'100%', 'table-layout': 'fixed'}} }, items:[
+            {xtype:'tscountdown',itemId:'release_counter',fieldLabel:'Program Increment'},
+            {xtype:'container', flex: 1, html: ' ' },
+            {xtype:'tscountdown',itemId:'iteration_counter',fieldLabel:'Sprint/Iteration'}
+        ]},
         {xtype:'tsinfolink'}
     ],
     config: {

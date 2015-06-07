@@ -3,8 +3,9 @@ Ext.define('Rally.technicalservices.CountDownClock',{
     alias: 'widget.tscountdown',
     padding: 5,
     defaults: { margin: '0 7 0 7' },
-    layout: { type: 'table', columns: 4 },
-
+    layout: { type: 'table', columns: 4, tableAttrs:{style:{width:'100%'} } },
+    cls: 'clock',
+    
     config: {
         /**
          * @cfg {Date} 

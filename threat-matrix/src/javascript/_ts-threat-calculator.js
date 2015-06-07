@@ -114,24 +114,40 @@ Ext.define('Rally.technicalservices.ThreatCalculator', {
             f.set('predecessorFids', []);
         }, this);
 
-        Deft.Promise.all(promises).then({
-            scope: this,
-            success: function(){
-                var artifacts = features.concat(stories);
-                this.logger.log('predecessors loaded', artifacts);
-                var series = [];
-                _.each(artifacts, function(a){
-                    if (this._includeInChart(a)){
-                        series.push(this._getSeries(a));
-                    }
-                }, this);
-                this.logger.log('predecessors loaded -- series', series);
-                deferred.resolve({series: series});
-            },
-            failure: function(operation){
-                deferred.reject(operation);
-            }
-        });
+        if (promises.length > 0){
+            Deft.Promise.all(promises).then({
+                scope: this,
+                success: function(){
+                    var artifacts = features.concat(stories);
+                    this.logger.log('predecessors loaded', artifacts);
+                    var series = [];
+                    _.each(artifacts, function(a){
+                        if (this._includeInChart(a)){
+                            series.push(this._getSeries(a));
+                        }
+                    }, this);
+                    this.logger.log('predecessors loaded -- series', series);
+                    deferred.resolve({series: series});
+                },
+                failure: function(operation){
+                    deferred.reject(operation);
+                }
+            });
+        } else {
+
+            var artifacts = features.concat(stories);
+            this.logger.log('predecessors loaded', artifacts);
+
+            var series = [];
+            _.each(artifacts, function(a){
+                if (this._includeInChart(a)){
+                    series.push(this._getSeries(a));
+                }
+            }, this);
+            this.logger.log('predecessors loaded -- series', series);
+            deferred.resolve({series: series});
+
+        }
         return deferred;
         //return {series: series};
     },

@@ -333,7 +333,8 @@ Ext.define('Rally.technicalservices.ThreatCalculator', {
                             .attr({
                                 'stroke-width': 1,
                                 stroke: thisColor,
-                                'stroke-opacity': 0.5
+                                'stroke-opacity': 0.5,
+                                itemId: 'path-' + thisName
                             })
                             .add());
                     }
@@ -343,7 +344,10 @@ Ext.define('Rally.technicalservices.ThreatCalculator', {
 
             if (evt.type == 'unselect'){
                 _.each(this.paths, function(p) {
-                    p.element.remove();
+                    console.log('p', p.element.parentNode)
+                    var parent = p.element.parentNode;
+                    parent.removeChild(p.element);
+                    //p.element.remove();
                 });
                 this.paths = [];
             }

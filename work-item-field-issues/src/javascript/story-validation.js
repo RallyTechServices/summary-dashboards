@@ -75,8 +75,8 @@ Ext.define('Rally.technicalservices.UserStoryValidationRules',{
     ruleFn_storyRelaseDoesNotMatchFeatureRelease: function(r){
         var msg = null;
 
-        if (r.get('Feature')){
-            var release = r.get('Release');
+        var release = r.get('Release');
+        if (r.get('Feature') && release){
 
             if (!r.get('Feature').Release || r.get('Feature').Release.Name != release.Name ||
                 r.get('Feature').Release.ReleaseStartDate != release.ReleaseStartDate ||

@@ -3,11 +3,11 @@
 <head>
     <title>Work Item Field Issues</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Sat Jun 06 2015 16:32:58 GMT-0600 (MDT) -->
+    <!--  Build Date: Sat Jun 06 2015 21:08:18 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Sat Jun 06 2015 16:32:58 GMT-0600 (MDT)";
-        var CHECKSUM = 23410567396;
+        var APP_BUILD_DATE = "Sat Jun 06 2015 21:08:18 GMT-0600 (MDT)";
+        var CHECKSUM = 24316655996;
     </script>
     
     <script type="text/javascript" src="/apps/2.0rc3/sdk.js"></script>
@@ -300,6 +300,7 @@ Ext.define("work-item-field-issues", {
         selectedIteration: null,
 
         launch: function() {
+
             if (this.isExternal()){
                 this.showSettings(this.config);
             } else {
@@ -312,12 +313,12 @@ Ext.define("work-item-field-issues", {
 
             if (((newTimeboxScope) && (newTimeboxScope.get('_type') === 'release'))){
                 this.selectedRelease = newTimeboxScope;
-                this.onTimeboxUpdated(newTimeboxScope, this.selectedIteration);
+
             }
             if (((newTimeboxScope) && (newTimeboxScope.get('_type') === 'iteration'))) {
                 this.selectedIteration = newTimeboxScope
-                this.onTimeboxUpdated(this.selectedRelease, newTimeboxScope);
             }
+            this.onTimeboxUpdated(this.selectedRelease, this.selectedIteration);
         },
 
         getReleaseFilters: function(release){
@@ -355,48 +356,52 @@ Ext.define("work-item-field-issues", {
 
         onTimeboxUpdated: function(release, iteration){
             this.logger.log('onTimeboxUpdated',release, iteration);
-            this.getBody().removeAll();
 
-            this.setLoading(true);
-            var promises = [
-                this._fetchData(this.portfolioItemFeature, this.featureFetchFields, this.getReleaseFilters(release)),
-                this._fetchData('HierarchicalRequirement', this.storyFetchFields, this.getReleaseFilters(release).concat(this.getIterationFilters(iteration)))
-            ];
+            if (release == this.selectedRelease && iteration == this.selectedIteration){
+                this.getBody().removeAll();
 
-            Deft.Promise.all(promises).then({
-                scope: this,
-                success: function(records){
-                    this.setLoading(false);
-                    this.logger.log('_fetchData success', records);
+                this.setLoading(true);
+                var promises = [
+                    this._fetchData(this.portfolioItemFeature, this.featureFetchFields, this.getReleaseFilters(release)),
+                    this._fetchData('HierarchicalRequirement', this.storyFetchFields, this.getReleaseFilters(release).concat(this.getIterationFilters(iteration)))
+                ];
 
-                    var featureRules = Ext.create('Rally.technicalservices.FeatureValidationRules',{
-                            stories: records[1],
-                            iterations: records[2]
-                        }),
-                        featureValidator = Ext.create('Rally.technicalservices.Validator',{
-                            validationRuleObj: featureRules,
-                            records: records[0]
-                        });
+                Deft.Promise.all(promises).then({
+                    scope: this,
+                    success: function(records){
+                        this.setLoading(false);
+                        this.logger.log('_fetchData success', records);
 
-                    var storyRules = Ext.create('Rally.technicalservices.UserStoryValidationRules',{
-                            features: records[0]
-                        }),
-                        storyValidator = Ext.create('Rally.technicalservices.Validator',{
-                            validationRuleObj: storyRules,
-                            records: records[1]
-                        });
+                        var featureRules = Ext.create('Rally.technicalservices.FeatureValidationRules',{
+                                stories: records[1],
+                                iterations: records[2]
+                            }),
+                            featureValidator = Ext.create('Rally.technicalservices.Validator',{
+                                validationRuleObj: featureRules,
+                                records: records[0]
+                            });
 
-                    this.logger.log('featureStats',featureValidator.ruleViolationData, storyValidator.ruleViolationData);
+                        var storyRules = Ext.create('Rally.technicalservices.UserStoryValidationRules',{
+                                features: records[0]
+                            }),
+                            storyValidator = Ext.create('Rally.technicalservices.Validator',{
+                                validationRuleObj: storyRules,
+                                records: records[1]
+                            });
 
-                    this.validatorData = featureValidator.ruleViolationData.concat(storyValidator.ruleViolationData);
-                    this._createSummaryHeader(this.validatorData);
+                        this.logger.log('featureStats',featureValidator.ruleViolationData, storyValidator.ruleViolationData);
 
-                },
-                failure: function(operation){
-                    this.setLoading(false);
-                    this.logger.log('_fetchData failure', operation);
-                }
-            });
+                        this.validatorData = featureValidator.ruleViolationData.concat(storyValidator.ruleViolationData);
+                        this._createSummaryHeader(this.validatorData);
+
+                    },
+                    failure: function(operation){
+                        this.setLoading(false);
+                        this.logger.log('_fetchData failure', operation);
+                    }
+                });
+
+            }
         },
         _createSummaryHeader: function(validatorData){
             this.logger.log('_createSummaryHeader',validatorData);
@@ -439,7 +444,7 @@ Ext.define("work-item-field-issues", {
                 });
             });
 
-            console.log('data',validatorData, dataHash, projects, types, rules);
+            this.logger.log('data',validatorData, dataHash, projects, types, rules);
             projects.sort();
 
             var series = [];
@@ -508,6 +513,8 @@ Ext.define("work-item-field-issues", {
 
             ct.removeAll();
 
+
+
             var store = Ext.create('Rally.data.custom.Store',{
                 data: violationData,
                 pageSize: violationData.length,
@@ -530,7 +537,31 @@ Ext.define("work-item-field-issues", {
                     groupHeaderTpl: '{name} ({rows.length})',
                     startCollapsed: true
                 }]
+
             });
+
+            //ct.add({
+            //    xtype: 'rallybutton',
+            //    text: 'Show Details',
+            //    scope: this,
+            //    handler: function(btn){
+            //        if (btn.text == 'Show Details'){
+            //            height = 1000;
+            //            btn.text = 'Hide Details';
+            //        } else {
+            //            height = 200;
+            //            btn.text = 'Show Details';
+            //        }
+            //        console.log(
+            //            'this. show details', height, this.getEl(), this.up('x-rally-resizable-proxy')
+            //        )
+            //        if (this.up('x-rally-resizable-proxy')){
+            //            this.up('x-rally-resizable-proxy').setHeight(height, true);
+            //        }
+            //    }
+            //});
+
+
         },
         _getColumnCfgs: function(){
             return [{
@@ -669,9 +700,9 @@ Ext.define("work-item-field-issues", {
             tb.on('iterationchange', this.onTimeboxScopeChange, this);
             release = tb.getReleaseRecord();
             iteration = tb.getIterationRecord();
-            this.onTimeboxScopeChange(release, iteration);
+          //  this.onTimeboxScopeChange(release, iteration);
         } else {
-            this.onTimeboxScopeChange(release, iteration);
+            //this.onTimeboxScopeChange(release, iteration);
             this.subscribe(this, 'timeboxReleaseChanged', this.onTimeboxScopeChange, this);
             this.subscribe(this, 'timeboxIterationChanged', this.onTimeboxScopeChange, this);
             this.publish('requestTimebox', this);
@@ -819,8 +850,8 @@ Ext.define('Rally.technicalservices.UserStoryValidationRules',{
     ruleFn_storyRelaseDoesNotMatchFeatureRelease: function(r){
         var msg = null;
 
-        if (r.get('Feature')){
-            var release = r.get('Release');
+        var release = r.get('Release');
+        if (r.get('Feature') && release){
 
             if (!r.get('Feature').Release || r.get('Feature').Release.Name != release.Name ||
                 r.get('Feature').Release.ReleaseStartDate != release.ReleaseStartDate ||

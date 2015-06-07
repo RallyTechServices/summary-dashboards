@@ -28,6 +28,7 @@ Ext.define("work-item-field-issues", {
         selectedIteration: null,
 
         launch: function() {
+
             if (this.isExternal()){
                 this.showSettings(this.config);
             } else {
@@ -84,52 +85,51 @@ Ext.define("work-item-field-issues", {
         onTimeboxUpdated: function(release, iteration){
             this.logger.log('onTimeboxUpdated',release, iteration);
 
-            this.getBody().removeAll();
+            if (release == this.selectedRelease && iteration == this.selectedIteration){
+                this.getBody().removeAll();
 
-            this.setLoading(true);
-            var promises = [
-                this._fetchData(this.portfolioItemFeature, this.featureFetchFields, this.getReleaseFilters(release)),
-                this._fetchData('HierarchicalRequirement', this.storyFetchFields, this.getReleaseFilters(release).concat(this.getIterationFilters(iteration)))
-            ];
+                this.setLoading(true);
+                var promises = [
+                    this._fetchData(this.portfolioItemFeature, this.featureFetchFields, this.getReleaseFilters(release)),
+                    this._fetchData('HierarchicalRequirement', this.storyFetchFields, this.getReleaseFilters(release).concat(this.getIterationFilters(iteration)))
+                ];
 
-            Deft.Promise.all(promises).then({
-                scope: this,
-                success: function(records){
-                    this.setLoading(false);
-                    this.logger.log('_fetchData success', records);
+                Deft.Promise.all(promises).then({
+                    scope: this,
+                    success: function(records){
+                        this.setLoading(false);
+                        this.logger.log('_fetchData success', records);
 
-                    var featureRules = Ext.create('Rally.technicalservices.FeatureValidationRules',{
-                            stories: records[1],
-                            iterations: records[2]
-                        }),
-                        featureValidator = Ext.create('Rally.technicalservices.Validator',{
-                            validationRuleObj: featureRules,
-                            records: records[0]
-                        });
+                        var featureRules = Ext.create('Rally.technicalservices.FeatureValidationRules',{
+                                stories: records[1],
+                                iterations: records[2]
+                            }),
+                            featureValidator = Ext.create('Rally.technicalservices.Validator',{
+                                validationRuleObj: featureRules,
+                                records: records[0]
+                            });
 
-                    var storyRules = Ext.create('Rally.technicalservices.UserStoryValidationRules',{
-                            features: records[0]
-                        }),
-                        storyValidator = Ext.create('Rally.technicalservices.Validator',{
-                            validationRuleObj: storyRules,
-                            records: records[1]
-                        });
+                        var storyRules = Ext.create('Rally.technicalservices.UserStoryValidationRules',{
+                                features: records[0]
+                            }),
+                            storyValidator = Ext.create('Rally.technicalservices.Validator',{
+                                validationRuleObj: storyRules,
+                                records: records[1]
+                            });
 
-                    this.logger.log('featureStats',featureValidator.ruleViolationData, storyValidator.ruleViolationData);
+                        this.logger.log('featureStats',featureValidator.ruleViolationData, storyValidator.ruleViolationData);
 
-                    this.validatorData = featureValidator.ruleViolationData.concat(storyValidator.ruleViolationData);
-                    this._createSummaryHeader(this.validatorData);
+                        this.validatorData = featureValidator.ruleViolationData.concat(storyValidator.ruleViolationData);
+                        this._createSummaryHeader(this.validatorData);
 
-                    if (this.selectedRelease != release || this.selectedIteration != iteration){
-                        this.on
+                    },
+                    failure: function(operation){
+                        this.setLoading(false);
+                        this.logger.log('_fetchData failure', operation);
                     }
+                });
 
-                },
-                failure: function(operation){
-                    this.setLoading(false);
-                    this.logger.log('_fetchData failure', operation);
-                }
-            });
+            }
         },
         _createSummaryHeader: function(validatorData){
             this.logger.log('_createSummaryHeader',validatorData);
@@ -172,7 +172,7 @@ Ext.define("work-item-field-issues", {
                 });
             });
 
-            console.log('data',validatorData, dataHash, projects, types, rules);
+            this.logger.log('data',validatorData, dataHash, projects, types, rules);
             projects.sort();
 
             var series = [];
@@ -241,6 +241,8 @@ Ext.define("work-item-field-issues", {
 
             ct.removeAll();
 
+
+
             var store = Ext.create('Rally.data.custom.Store',{
                 data: violationData,
                 pageSize: violationData.length,
@@ -263,7 +265,31 @@ Ext.define("work-item-field-issues", {
                     groupHeaderTpl: '{name} ({rows.length})',
                     startCollapsed: true
                 }]
+
             });
+
+            //ct.add({
+            //    xtype: 'rallybutton',
+            //    text: 'Show Details',
+            //    scope: this,
+            //    handler: function(btn){
+            //        if (btn.text == 'Show Details'){
+            //            height = 1000;
+            //            btn.text = 'Hide Details';
+            //        } else {
+            //            height = 200;
+            //            btn.text = 'Show Details';
+            //        }
+            //        console.log(
+            //            'this. show details', height, this.getEl(), this.up('x-rally-resizable-proxy')
+            //        )
+            //        if (this.up('x-rally-resizable-proxy')){
+            //            this.up('x-rally-resizable-proxy').setHeight(height, true);
+            //        }
+            //    }
+            //});
+
+
         },
         _getColumnCfgs: function(){
             return [{
@@ -402,9 +428,9 @@ Ext.define("work-item-field-issues", {
             tb.on('iterationchange', this.onTimeboxScopeChange, this);
             release = tb.getReleaseRecord();
             iteration = tb.getIterationRecord();
-            this.onTimeboxScopeChange(release, iteration);
+          //  this.onTimeboxScopeChange(release, iteration);
         } else {
-            this.onTimeboxScopeChange(release, iteration);
+            //this.onTimeboxScopeChange(release, iteration);
             this.subscribe(this, 'timeboxReleaseChanged', this.onTimeboxScopeChange, this);
             this.subscribe(this, 'timeboxIterationChanged', this.onTimeboxScopeChange, this);
             this.publish('requestTimebox', this);

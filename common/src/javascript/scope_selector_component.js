@@ -47,6 +47,7 @@ Ext.define('timebox-selector', {
                 {
                     var release = t.getRecord();
                     this.fireEvent('releasechange',release);
+                    console.log("Publishing Release:", release);
                     this.publish('timeboxReleaseChanged', release);
                     this._updateIterationCombo(release);
                 },

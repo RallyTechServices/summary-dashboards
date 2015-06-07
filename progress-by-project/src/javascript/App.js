@@ -175,10 +175,21 @@ Ext.define('CustomApp', {
         var chart = this.down("#rally-chart");
         var p = Ext.get(chart.id);
         elems = p.query("div.x-mask");
-        _.each(elems, function(e) { e.remove(); });
+        _.each(elems, function(e) { 
+            if ( Ext.isIE9 ) { 
+                e.removeNode(); 
+            } else { 
+                e.remove(); 
+            }
+        });
         var elems = p.query("div.x-mask-msg");
-        _.each(elems, function(e) { e.remove(); });
-
+        _.each(elems, function(e) { 
+            if ( Ext.isIE9 ) { 
+                e.removeNode(); 
+            } else { 
+                e.remove(); 
+            }
+        });
     },
 
     // utilities below here ... 

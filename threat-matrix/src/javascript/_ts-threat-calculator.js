@@ -114,24 +114,40 @@ Ext.define('Rally.technicalservices.ThreatCalculator', {
             f.set('predecessorFids', []);
         }, this);
 
-        Deft.Promise.all(promises).then({
-            scope: this,
-            success: function(){
-                var artifacts = features.concat(stories);
-                this.logger.log('predecessors loaded', artifacts);
-                var series = [];
-                _.each(artifacts, function(a){
-                    if (this._includeInChart(a)){
-                        series.push(this._getSeries(a));
-                    }
-                }, this);
-                this.logger.log('predecessors loaded -- series', series);
-                deferred.resolve({series: series});
-            },
-            failure: function(operation){
-                deferred.reject(operation);
-            }
-        });
+        if (promises.length > 0){
+            Deft.Promise.all(promises).then({
+                scope: this,
+                success: function(){
+                    var artifacts = features.concat(stories);
+                    this.logger.log('predecessors loaded', artifacts);
+                    var series = [];
+                    _.each(artifacts, function(a){
+                        if (this._includeInChart(a)){
+                            series.push(this._getSeries(a));
+                        }
+                    }, this);
+                    this.logger.log('predecessors loaded -- series', series);
+                    deferred.resolve({series: series});
+                },
+                failure: function(operation){
+                    deferred.reject(operation);
+                }
+            });
+        } else {
+
+            var artifacts = features.concat(stories);
+            this.logger.log('predecessors loaded', artifacts);
+
+            var series = [];
+            _.each(artifacts, function(a){
+                if (this._includeInChart(a)){
+                    series.push(this._getSeries(a));
+                }
+            }, this);
+            this.logger.log('predecessors loaded -- series', series);
+            deferred.resolve({series: series});
+
+        }
         return deferred;
         //return {series: series};
     },
@@ -317,7 +333,8 @@ Ext.define('Rally.technicalservices.ThreatCalculator', {
                             .attr({
                                 'stroke-width': 1,
                                 stroke: thisColor,
-                                'stroke-opacity': 0.5
+                                'stroke-opacity': 0.5,
+                                itemId: 'path-' + thisName
                             })
                             .add());
                     }
@@ -327,7 +344,10 @@ Ext.define('Rally.technicalservices.ThreatCalculator', {
 
             if (evt.type == 'unselect'){
                 _.each(this.paths, function(p) {
-                    p.element.remove();
+                    console.log('p', p.element.parentNode)
+                    var parent = p.element.parentNode;
+                    parent.removeChild(p.element);
+                    //p.element.remove();
                 });
                 this.paths = [];
             }

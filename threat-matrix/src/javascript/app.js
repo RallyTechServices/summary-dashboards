@@ -148,19 +148,29 @@ Ext.define("threat-matrix", {
                             this.setLoading(false);
                             this.logger.log('runCalculation success series', chartData)
 
-                            var chart = this.getBody().add({
-                                xtype: 'tsthreatchart',
-                                itemId: 'rally-chart',
-                                loadMask: false,
-                                chartData: chartData,
-                                maxWidth: 600,
-                                title: 'Threat Matrix'
+                            if (chartData && chartData.series && chartData.series.length > 0) {
+                                var chart = this.getBody().add({
+                                    xtype: 'tsthreatchart',
+                                    itemId: 'rally-chart',
+                                    loadMask: false,
+                                    chartData: chartData,
+                                    maxWidth: 600,
+                                    title: 'Threat Matrix'
 
-                            });
-
-                            this.getBody().setSize(this.getWidth() * 0.95);
-
-                            this._addLegend(calc.projectLabelColorMap);
+                                });
+                                this.getBody().setSize(this.getWidth() * 0.95);
+                                this._addLegend(calc.projectLabelColorMap);
+                            } else {
+                                this.getBody().add({
+                                    xtype: 'container',
+                                    html: 'No data found.  Please check the Project Scope, Release and/or iteration and try again',
+                                    flex: 1,
+                                    style: {
+                                        textAlign: 'center'
+                                    },
+                                    align: 'center'
+                                });
+                            }
 
 
                         },
@@ -260,56 +270,56 @@ Ext.define("threat-matrix", {
                     scope: this
                 }
             });
+
             this._addButton();
             this.getHeader().setSize(this.getWidth() * 0.95);
             release = tb.getReleaseRecord();
             iteration = tb.getIterationRecord();
             this.onTimeboxScopeChange(release,iteration);
         } else {
+
             this._addButton();
-            this.onTimeboxScopeChange(release,iteration);
+            this.getHeader().setSize(this.getWidth() * 0.95);
+            //this.onTimeboxScopeChange(release,iteration);
             this.subscribe(this, 'timeboxReleaseChanged', this.onTimeboxScopeChange, this);
             this.subscribe(this, 'timeboxIterationChanged', this.onTimeboxScopeChange, this);
-
             this.publish('requestTimebox', this);
         }
-
 
     },
     _addButton: function(){
         this.getHeader().add({
             xtype: 'rallybutton',
             itemId: 'bt-dependency',
-            cls: 'small-icon secondary rly-small',
-            width: 135,
+            cls: 'rly-small secondary',
+            width: 145,
             iconCls: 'icon-predecessor',
             text: 'Show Dependencies',
+            pressedCls: 'rly-small primary',
             scope: this,
-            handler: this._toggleDependencies,
-            tooltip: 'Show first level dependency relationships'
-        });
+            enableToggle: true,
+            listeners: {
+                scope: this,
+                toggle: this._toggleDependencies
+            }
+         });
     },
-    _toggleDependencies: function(btn){
-        this.logger.log('_toggleDependencies', btn.cls.toString(), btn.cls.indexOf("primary"));
-        var hideDependencies = btn.cls.indexOf("primary") > -1;
+    _toggleDependencies: function(btn, showDependencies){
+        this.logger.log('_toggleDependencies', showDependencies);
 
-        if (hideDependencies){
-            btn.cls = 'small-icon secondary rly-small';
-            btn.removeCls('primary');
-            btn.addCls('secondary');
-            btn.setText('Show Dependencies');
-            btn.tooltip = 'Show first level dependency relationships';
-        } else {
-            btn.removeCls('secondary');
+        if (showDependencies){
             btn.addCls('primary');
-            btn.cls = 'small-icon primary rly-small';
-            btn.setText('Hide Dependencies'),
-            btn.tooltip = 'Hide first level dependency relationships';
+            btn.removeCls('secondary');
+            btn.btnInnerEl.update('Hide Dependencies');
+         } else {
+            btn.addCls('secondary');
+            btn.removeCls('primary');
+            btn.btnInnerEl.update('Show Dependencies');
         }
 
         var chart = this.down('#rally-chart').items.items[1].items.items[0];
         _.each(chart.chart.series, function(s){
-            s.data[0].select(hideDependencies != true, hideDependencies != true);
+            s.data[0].select(showDependencies, showDependencies);
         });
     },
     getIterationRecord: function(){

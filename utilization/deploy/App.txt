@@ -3,22 +3,21 @@
 <head>
     <title>Utilization</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Fri Jun 05 2015 23:41:53 GMT-0700 (PDT) -->
+    <!--  Build Date: Sat Jun 06 2015 22:30:00 GMT-0700 (PDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Fri Jun 05 2015 23:41:53 GMT-0700 (PDT)";
-        var CHECKSUM = 30709367868;
+        var APP_BUILD_DATE = "Sat Jun 06 2015 22:30:00 GMT-0700 (PDT)";
+        var CHECKSUM = 33022881048;
     </script>
     
-<!--[if IE]>
-<script type="text/javascript" src="//rally1.rallydev.com/apps/2.0rc3/sdk.js"></script>
-<![endif]-->
-<![if !IE]>
-<script type="text/javascript" src="/apps/2.0rc3/sdk.js"></script>
-<![endif]>
+        <script type="text/javascript" src="/apps/2.0rc3/sdk.js"></script>
 
 
     <script type="text/javascript">
+        if (!window.location.origin) {
+            window.location.origin = window.location.protocol + "//" + window.location.hostname + (window.location.port ? ':' + window.location.port: '');
+        }
+        
         Rally.onReady(function() {
              
 Ext.define('timebox-selector', {
@@ -70,6 +69,7 @@ Ext.define('timebox-selector', {
                 {
                     var release = t.getRecord();
                     this.fireEvent('releasechange',release);
+                    console.log("Publishing Release:", release);
                     this.publish('timeboxReleaseChanged', release);
                     this._updateIterationCombo(release);
                 },
@@ -295,6 +295,7 @@ Ext.define("TSUtilization", {
     },
     
     launch: function() {
+        
         if (this.isExternal()){
             this.showSettings(this.config);
         } else {
@@ -457,7 +458,6 @@ Ext.define("TSUtilization", {
                     } else {
                         var iteration =  me.iteration_objects_by_project[team];
                         var planned = 0;
-                        console.log("iteration:", iteration);
                         
                         if ( iteration && iteration.length > 0 && iteration[0].get('PlannedVelocity')) {
                             planned = iteration[0].get('PlannedVelocity') || 0;
@@ -490,13 +490,13 @@ Ext.define("TSUtilization", {
                         chart_series.push(this._getSeriesFromDailyHash(team + ': Total / Stability', iteration_total_each_day, { color: color, marker: { symbol:'circle'} } ));
                         chart_series.push(this._getSeriesFromDailyHash(team + ': Ideal Burn', ideal_each_day, { color: color,marker: { symbol: 'triangle' } }));
                         chart_series.push(this._getSeriesFromDailyHash(team + ': Actual Burn', iteration_remaining_each_day, { color: color,marker: { symbol: 'triangle-down' } } ));
-                        table_series.push(this._getTableRowFrom('iteration', team, iteration_total_each_day, iteration_remaining_each_day, planned_each_day ));
+                        table_series.push(this._getTableRowFrom('iteration', team, iteration_total_each_day, iteration_remaining_each_day, planned_each_day, [iteration] ));
                     } else {
                         chart_series.push(this._getSeriesFromDailyHash(team + ': Total / Stability', release_total_each_day , { color: color,marker: { symbol: 'circle' } }));
                         chart_series.push(this._getSeriesFromDailyHash(team + ': Ideal Burn', ideal_each_day, { color: color,marker: { symbol: 'triangle' } }));
                         chart_series.push(this._getSeriesFromDailyHash(team + ': Actual Burn', release_remaining_each_day, { color: color,marker: { symbol: 'triangle-down' } } ));
                         chart_series.push(this._getSeriesFromDailyHash(team + ': Potential', planned_each_day, { color: color,marker: { symbol: 'square' } } ));
-                        table_series.push(this._getTableRowFrom('release', team, release_total_each_day, release_remaining_each_day, planned_each_day ));
+                        table_series.push(this._getTableRowFrom('release', team, release_total_each_day, release_remaining_each_day, planned_each_day, iterations ));
                     }
                 },this);
                 
@@ -663,6 +663,8 @@ Ext.define("TSUtilization", {
         ]).then({
             success: function(iterations) {
                 var iterations_by_start = {};
+                me.iterations_by_team = {};
+                
                 Ext.Array.each(iterations, function(iteration){
                     var name = iteration.get('Name');
                     var planned = iteration.get('PlannedVelocity') || 0;
@@ -670,12 +672,18 @@ Ext.define("TSUtilization", {
                     var start_date = iteration.get('StartDate');
                     
                     if ( !iterations_by_start[start_date] ) {
-                        iteration.set('PlannedVelocity', 0);
+                        iteration.set('PotentialVelocity', 0);
                         iterations_by_start[start_date] = iteration;
                     }
                     
+                    if ( !me.iterations_by_team[iteration.get('Project').Name] ) {
+                        me.iterations_by_team[iteration.get('Project').Name] = [];
+                    }
+                    me.iterations_by_team[iteration.get('Project').Name].push(iteration);
+                    console.log("ITERATION:",me.iterations_by_team);
+                    
                     var saved_plan =  iterations_by_start[start_date].get('PlannedVelocity') || 0 ;
-                    iterations_by_start[start_date].set('PlannedVelocity',saved_plan+planned);
+                    iterations_by_start[start_date].set('PotentialVelocity',saved_plan+planned);
                 });
                 
                 deferred.resolve(iterations_by_start);
@@ -847,34 +855,48 @@ Ext.define("TSUtilization", {
         
     },
         
-    _getTableRowFrom: function(timebox_type, team, total_each_day, remaining_each_day, planned_each_day) {
+    _getTableRowFrom: function(timebox_type, team, total_each_day, remaining_each_day, planned_each_day, iterations) {
         var rows = [];
-        console.log('planned:', planned_each_day);
+        var me = this;
         
         var days = Ext.Object.getKeys(total_each_day);
         
         if ( timebox_type == "iteration" ) {
-            rows.push({
-                team: team,
-                start_date: days[0],
-                end_date: days[days.length - 1],
-                total_start: total_each_day[days[0]] || 0,
-                total_end: total_each_day[days[days.length-1]],
-                velocity: total_each_day[days[days.length-1]] - remaining_each_day[days[days.length-1]],
-                planned: planned_each_day[days[0]]
+            Ext.Array.each(Ext.Array.flatten(iterations), function(iteration) {
+                console.log('iteration:', iteration);
+                
+                iteration.set('team',team);
+                iteration.set('total_start',total_each_day[days[0]] || 0 );
+                iteration.set('total_end', total_each_day[days[days.length-1]]);
+                iteration.set('velocity', total_each_day[days[days.length-1]] - remaining_each_day[days[days.length-1]]);
+                
+                rows.push(iteration);
             });
         }
         
         if ( timebox_type == "release" ) {
-            rows.push({
-                team: team,
-                start_date: days[0],
-                end_date: days[days.length - 1],
-                total_start: total_each_day[days[0]] || 0,
-                total_end: total_each_day[days[days.length-1]],
-                velocity: total_each_day[days[days.length-1]] - remaining_each_day[days[days.length-1]],
-                planned: planned_each_day[days[0]]
+            console.log("-----",me.iterations_by_team);
+            
+            Ext.Array.each(me.iterations_by_team[team], function(iteration) {
+                console.log('iteration:', iteration);
+                
+                iteration.set('team',team);
+                iteration.set('total_start',total_each_day[days[0]] || 0 );
+                iteration.set('total_end', total_each_day[days[days.length-1]]);
+                iteration.set('velocity', total_each_day[days[days.length-1]] - remaining_each_day[days[days.length-1]]);
+                
+                rows.push(iteration);
             });
+            
+//            rows.push({
+//                team: team,
+//                start_date: days[0],
+//                end_date: days[days.length - 1],
+//                total_start: total_each_day[days[0]] || 0,
+//                total_end: total_each_day[days[days.length-1]],
+//                velocity: total_each_day[days[days.length-1]] - remaining_each_day[days[days.length-1]],
+//                planned: planned_each_day[days[0]]
+//            });
         }
         
         
@@ -882,20 +904,21 @@ Ext.define("TSUtilization", {
     },
     
     _getColumns: function(timebox_type) {
-        var columns = [{dataIndex:'team', text: 'Team' }];
+        var columns = [{dataIndex:'team', text: 'Team', flex: 1 }];
+
+        if ( timebox_type == 'release') {
+            columns.push({dataIndex:'Name', text:'Iteration'});
+        }
         
-//        columns.push({dataIndex:'start_date', text:'Start'});
-//        columns.push({dataIndex:'end_date', text:'End'});
+        columns.push({dataIndex:'StartDate', text:'Start', renderer: function(value) { return Ext.util.Format.date(value,'Y-m-d'); }});
+        columns.push({dataIndex:'EndDate', text:'End', renderer: function(value) { return Ext.util.Format.date(value,'Y-m-d'); }});
         
+        columns.push({dataIndex:'PlannedVelocity', text:'Potential', editor: 'rallynumberfield'});
+
         columns.push({dataIndex:'total_start', text:'Total at Start' });
         columns.push({dataIndex:'total_end', text:'Total at End' });
+        columns.push({dataIndex:'velocity', text:'Accepted at End', width: 125});
 
-        columns.push({dataIndex:'velocity', text:'Accepted at End' });
-
-        //if ( timebox_type == 'release' ) {
-            columns.push({dataIndex:'planned', text:'Potential'});
-        //}
-            
         return columns;
     },
     
@@ -907,14 +930,10 @@ Ext.define("TSUtilization", {
         } );
         var columns =  this._getColumns(timebox_type);
         
-        this.logger.log("Table rows:", table_series);
-        this.logger.log("Table cols:", columns);
-        this.logger.log("Table store:", store);
-        
-        
         this.down('#grid_box').add({
             xtype:'rallygrid',
             store: store,
+            margin: '0 10 0 10',
             columnCfgs: columns
             
         });

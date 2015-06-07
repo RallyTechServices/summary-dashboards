@@ -9,7 +9,7 @@ Ext.define("TSCountdown", {
         {xtype:'container', layout:{ type:'table', columns: 3, tableAttrs:{style:{width:'100%', 'table-layout': 'fixed'}} }, items:[
             {xtype:'tscountdown',itemId:'release_counter',fieldLabel:'Program Increment'},
             {xtype:'container', flex: 1, html: ' ' },
-            {xtype:'tscountdown',itemId:'iteration_counter',fieldLabel:'Sprint/Iteration'}
+            {xtype:'tscountdown',itemId:'iteration_counter',fieldLabel:'Sprint/Iteration', cls: 'blue_text'}
         ]},
         {xtype:'tsinfolink'}
     ],

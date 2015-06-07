@@ -27,5 +27,9 @@
 }
 
 .border-bottom {
-    border-bottom: solid blue;
+    border-bottom: solid blue ;
+}
+
+.blue_text {
+    color: blue !important;
 }

@@ -3,11 +3,11 @@
 <head>
     <title>Countdown</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Sat Jun 06 2015 20:40:14 GMT-0700 (PDT) -->
+    <!--  Build Date: Sat Jun 06 2015 20:46:36 GMT-0700 (PDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Sat Jun 06 2015 20:40:14 GMT-0700 (PDT)";
-        var CHECKSUM = 8901710331;
+        var APP_BUILD_DATE = "Sat Jun 06 2015 20:46:36 GMT-0700 (PDT)";
+        var CHECKSUM = 8967386692;
     </script>
     
     <script type="text/javascript" src="/apps/2.0rc3/sdk.js"></script>
@@ -464,7 +464,7 @@ Ext.define("TSCountdown", {
         {xtype:'container', layout:{ type:'table', columns: 3, tableAttrs:{style:{width:'100%', 'table-layout': 'fixed'}} }, items:[
             {xtype:'tscountdown',itemId:'release_counter',fieldLabel:'Program Increment'},
             {xtype:'container', flex: 1, html: ' ' },
-            {xtype:'tscountdown',itemId:'iteration_counter',fieldLabel:'Sprint/Iteration'}
+            {xtype:'tscountdown',itemId:'iteration_counter',fieldLabel:'Sprint/Iteration', cls: 'blue_text'}
         ]},
         {xtype:'tsinfolink'}
     ],
@@ -654,7 +654,11 @@ Ext.define("TSCountdown", {
 }
 
 .border-bottom {
-    border-bottom: solid blue;
+    border-bottom: solid blue ;
+}
+
+.blue_text {
+    color: blue !important;
 }
     </style>
 

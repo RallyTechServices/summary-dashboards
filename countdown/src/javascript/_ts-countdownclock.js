@@ -1,10 +1,10 @@
 Ext.define('Rally.technicalservices.CountDownClock',{
     extend: 'Ext.Container',
     alias: 'widget.tscountdown',
-    layout: { type: 'table', columns: 4 },
     padding: 5,
     defaults: { margin: '0 7 0 7' },
-    
+    layout: { type: 'table', columns: 4 },
+
     config: {
         /**
          * @cfg {Date} 
@@ -15,7 +15,12 @@ Ext.define('Rally.technicalservices.CountDownClock',{
          * @cfg {String}
          * A message to show on click of the whole thing
          */
-        text: ''
+        text: '',
+        /**
+         * @cfg String
+         * A label to go above the clock
+         */
+        fieldLabel: ''
     },
     
     constructor: function(config) {
@@ -94,6 +99,16 @@ Ext.define('Rally.technicalservices.CountDownClock',{
     _buildItems: function() {
         var items = [];
         
+        if ( !Ext.isEmpty(this.fieldLabel) ){
+            items.push({
+                xtype: 'container',
+                cellCls: 'clock-label',
+                html: this.fieldLabel,
+                padding: '0 0 5 0',
+                colspan: 4
+            });
+        }
+        
         items.push({ 
             xtype: 'container', 
             itemId:'days',
@@ -146,7 +161,6 @@ Ext.define('Rally.technicalservices.CountDownClock',{
             cellCls: 'clock-label',
             html: 'SECONDS'
         });
-
         
         return items;
     }

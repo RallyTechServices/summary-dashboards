@@ -3,11 +3,11 @@
 <head>
     <title>Countdown</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Sat Jun 06 2015 19:03:58 GMT-0700 (PDT) -->
+    <!--  Build Date: Sat Jun 06 2015 20:46:36 GMT-0700 (PDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Sat Jun 06 2015 19:03:58 GMT-0700 (PDT)";
-        var CHECKSUM = 8350112578;
+        var APP_BUILD_DATE = "Sat Jun 06 2015 20:46:36 GMT-0700 (PDT)";
+        var CHECKSUM = 8967386692;
     </script>
     
     <script type="text/javascript" src="/apps/2.0rc3/sdk.js"></script>
@@ -288,9 +288,10 @@ Ext.define('Rally.technicalservices.Logger',{
 Ext.define('Rally.technicalservices.CountDownClock',{
     extend: 'Ext.Container',
     alias: 'widget.tscountdown',
-    layout: { type: 'table', columns: 4 },
     padding: 5,
     defaults: { margin: '0 7 0 7' },
+    layout: { type: 'table', columns: 4, tableAttrs:{style:{width:'100%'} } },
+    cls: 'clock',
     
     config: {
         /**
@@ -302,7 +303,12 @@ Ext.define('Rally.technicalservices.CountDownClock',{
          * @cfg {String}
          * A message to show on click of the whole thing
          */
-        text: ''
+        text: '',
+        /**
+         * @cfg String
+         * A label to go above the clock
+         */
+        fieldLabel: ''
     },
     
     constructor: function(config) {
@@ -381,6 +387,16 @@ Ext.define('Rally.technicalservices.CountDownClock',{
     _buildItems: function() {
         var items = [];
         
+        if ( !Ext.isEmpty(this.fieldLabel) ){
+            items.push({
+                xtype: 'container',
+                cellCls: 'clock-label',
+                html: this.fieldLabel,
+                padding: '0 0 5 0',
+                colspan: 4
+            });
+        }
+        
         items.push({ 
             xtype: 'container', 
             itemId:'days',
@@ -433,7 +449,6 @@ Ext.define('Rally.technicalservices.CountDownClock',{
             cellCls: 'clock-label',
             html: 'SECONDS'
         });
-
         
         return items;
     }
@@ -446,8 +461,11 @@ Ext.define("TSCountdown", {
     items: [
         {xtype:'container',itemId:'settings_box'},
         {xtype:'container', itemId:'selector_box' },
-        {xtype:'tscountdown',itemId:'release_counter',cls:'border-bottom'},
-        {xtype:'tscountdown',itemId:'iteration_counter'},
+        {xtype:'container', layout:{ type:'table', columns: 3, tableAttrs:{style:{width:'100%', 'table-layout': 'fixed'}} }, items:[
+            {xtype:'tscountdown',itemId:'release_counter',fieldLabel:'Program Increment'},
+            {xtype:'container', flex: 1, html: ' ' },
+            {xtype:'tscountdown',itemId:'iteration_counter',fieldLabel:'Sprint/Iteration', cls: 'blue_text'}
+        ]},
         {xtype:'tsinfolink'}
     ],
     config: {
@@ -632,10 +650,15 @@ Ext.define("TSCountdown", {
 .clock-label {
     text-align: center;
     font: 8px Arial, Helvetica, sans-serif;
+    margin: 0px 0px 8px 0px;
 }
 
 .border-bottom {
-    border-bottom: solid blue;
+    border-bottom: solid blue ;
+}
+
+.blue_text {
+    color: blue !important;
 }
     </style>
 

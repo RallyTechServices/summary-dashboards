@@ -64,6 +64,10 @@ Ext.define('CustomApp', {
 
         var that = this;
 
+        console.log("run progress-by-project:", releaseName, iterationName);
+        
+        this.setLoading("Loading Stories in Project...");
+        
         var pr = Ext.create( "ProjectStories", {
             ctx : that.getContext(),
             filter : that.rallyFunctions.createFilter(releaseName,iterationName)
@@ -154,7 +158,8 @@ Ext.define('CustomApp', {
     createChart : function(categories,seriesData,callback) {
 
         var that = this;
-
+        that.setLoading(false);
+        
         if (!_.isUndefined(that.chart)) {
             that.remove(that.chart);
         }
@@ -170,10 +175,21 @@ Ext.define('CustomApp', {
         var chart = this.down("#rally-chart");
         var p = Ext.get(chart.id);
         elems = p.query("div.x-mask");
-        _.each(elems, function(e) { e.remove(); });
+        _.each(elems, function(e) { 
+            if ( Ext.isIE9 ) { 
+                e.removeNode(); 
+            } else { 
+                e.remove(); 
+            }
+        });
         var elems = p.query("div.x-mask-msg");
-        _.each(elems, function(e) { e.remove(); });
-
+        _.each(elems, function(e) { 
+            if ( Ext.isIE9 ) { 
+                e.removeNode(); 
+            } else { 
+                e.remove(); 
+            }
+        });
     },
 
     // utilities below here ... 

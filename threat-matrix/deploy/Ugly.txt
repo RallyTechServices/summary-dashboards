@@ -3,10 +3,10 @@
 <head>
     <title>Threat Matrix</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Sat Jun 06 2015 13:35:05 GMT-0600 (MDT) -->
+    <!--  Build Date: Sat Jun 06 2015 18:38:02 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Sat Jun 06 2015 13:35:05 GMT-0600 (MDT)";
+        var APP_BUILD_DATE = "Sat Jun 06 2015 18:38:02 GMT-0600 (MDT)";
         var CHECKSUM = [%= checksum %];
     </script>
     
@@ -88,7 +88,17 @@
     display: inline-block;
 }
 
-
+.tslegend-hollow-circle {
+    width: 14px;
+    height: 14px;
+    text-align: center;
+    border-radius: 7px;
+    color: black;
+    background-color: rgba(103,103,103,.5);
+    border-style: solid;
+    border-width: 2px;
+    display: inline-block;
+}
     </style>
 
 </head>

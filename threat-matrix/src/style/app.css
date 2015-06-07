@@ -62,3 +62,14 @@
     display: inline-block;
 }
 
+.tslegend-hollow-circle {
+    width: 14px;
+    height: 14px;
+    text-align: center;
+    border-radius: 7px;
+    color: black;
+    background-color: rgba(103,103,103,.5);
+    border-style: solid;
+    border-width: 2px;
+    display: inline-block;
+}

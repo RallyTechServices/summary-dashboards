@@ -9,12 +9,15 @@ Ext.define('Rally.technicalservices.ThreatChart',{
         chart: {
 
             type: 'scatter',
-            zoom: 'xy',
-            events: {
-                load: function(){
-                    console.log('chart load', this);
-                }
-            }
+            zoom: 'xy'
+            //events: {
+            //    load: function(){
+            //        _.each(this.series, function(s){
+            //            console.log('chart load', s);
+            //        });
+            //
+            //    }
+            //}
         },
         title: {
             text: 'Threat Matrix'

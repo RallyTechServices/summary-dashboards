@@ -30,8 +30,8 @@ Ext.define("threat-matrix", {
     riskField: 'c_Risk',
     ageGranularity: 'day',
 
-    selectedIteration: undefined,
-    selectedRelease: undefined,
+    selectedIteration: null,
+    selectedRelease: null,
 
     launch: function() {
          if (this.isExternal()){
@@ -63,22 +63,26 @@ Ext.define("threat-matrix", {
         this.logger.log('getStoryFilters',release,iteration);
         var filters = this.getReleaseFilters(release);
 
-        var iteration_start_date = Rally.util.DateTime.toIsoString(iteration.get('StartDate')),
-            iteration_end_date = Rally.util.DateTime.toIsoString(iteration.get('EndDate'));
-
         filters = filters.concat([{
-            property: 'Iteration.StartDate',
-            value: iteration_start_date
-        },{
-            property: 'Iteration.EndDate',
-            value: iteration_end_date
-        },{
-            property: 'Iteration.Name',
-            value: iteration.get('Name')
-        },{
             property: 'ScheduleState',
             value: 'In-Progress'
         }]);
+
+        if (iteration){
+            var iteration_start_date = Rally.util.DateTime.toIsoString(iteration.get('StartDate')),
+                iteration_end_date = Rally.util.DateTime.toIsoString(iteration.get('EndDate'));
+
+            filters = filters.concat([{
+                property: 'Iteration.StartDate',
+                value: iteration_start_date
+            },{
+                property: 'Iteration.EndDate',
+                value: iteration_end_date
+            },{
+                property: 'Iteration.Name',
+                value: iteration.get('Name')
+            }]);
+        }
 
         filters = Rally.data.wsapi.Filter.and(filters);
 
@@ -94,39 +98,22 @@ Ext.define("threat-matrix", {
         if ((newTimeboxScope) && (newTimeboxScope.get('_type') === 'release')) {
             this.selectedRelease = newTimeboxScope;
         }
-        if (this.selectedIteration && this.selectedRelease){
+        if (this.selectedIteration || this.selectedRelease){
             this.run(this.selectedRelease, this.selectedIteration);
         } else {
-
-            var msg = '';
-            if (!this.selectedRelease){
-                msg += 'a Release'
-            }
-            if (!this.selectedIteration){
-                if (msg.length > 0){
-                    msg += ' and Iteration';
-                } else {
-                    msg += 'an Iteration';
-                }
-            }
-
             this.getBody().add({
                 xtype: 'container',
-                html: Ext.String.format('Please select {0} to view the Threat Matrix', msg)
+                html: Ext.String.format('Please select Release to view the Threat Matrix')
             });
         }
-
     },
 
     run: function(release, iteration){
 
         this.logger.log('run',release, iteration);
-        if (release && iteration){
+        if (release){
             this.getBody().removeAll();
             this.setLoading(true);
-
-            var days_in_iteration = Rally.util.DateTime.getDifference(new Date(iteration.get('EndDate')),new Date(iteration.get('StartDate')), 'hour')/24;
-            var days_in_release = Rally.util.DateTime.getDifference(new Date(release.get('ReleaseDate')),new Date(release.get('ReleaseStartDate')), 'hour')/24;
 
             var promises = [
                 this._fetchData(this.portfolioItemFeature, this.featureFetchFields, this.getReleaseFilters(release)),
@@ -151,8 +138,6 @@ Ext.define("threat-matrix", {
                         featureSizeMultiplier: this.getSetting('featureSizeMultiplier'),
                         storySizeMultiplier: this.getSetting('storySizeMultiplier'),
                         riskMultiplier: this.getSetting('riskMultiplier'),
-                        iterationDays: days_in_iteration,
-                        releaseDays: days_in_release,
                         showDataLabels: this.getSetting('showDataLabels'),
                         showDependencyColors: this.getSetting('showDependencyColors')
                     });
@@ -220,8 +205,10 @@ Ext.define("threat-matrix", {
             xtype: 'container',
             padding: 10,
             html: '<div class="tslegendtext">Types:  </div><div class="tslegend-square">&nbsp;&nbsp;</div><div class="tslegendtext">&nbsp;&nbsp;Feature (Solid)</div><span class="tslegendspacer">&nbsp;</span>' +
-                '<div class="tslegend-circle">&nbsp;&nbsp;</div><div class="tslegendtext">&nbsp;&nbsp;Story (Translucent)</div><span class="tslegendspacer">&nbsp;</span>'
+                '<div class="tslegend-circle">&nbsp;&nbsp;</div><div class="tslegendtext">&nbsp;&nbsp;Story (Translucent)</div><span class="tslegendspacer">&nbsp;</span>' +
+                 '<div class="tslegend-hollow-circle">&nbsp;&nbsp;</div><div class="tslegendtext">&nbsp;&nbsp;Predecessor Stories are outlined</div><span class="tslegendspacer">&nbsp;</span>'
         });
+
         ct.setSize(this.getWidth() *.95);
 
 
@@ -294,8 +281,9 @@ Ext.define("threat-matrix", {
             xtype: 'rallybutton',
             itemId: 'bt-dependency',
             cls: 'small-icon secondary rly-small',
-            width: 35,
+            width: 135,
             iconCls: 'icon-predecessor',
+            text: 'Show Dependencies',
             scope: this,
             handler: this._toggleDependencies,
             tooltip: 'Show first level dependency relationships'
@@ -309,11 +297,13 @@ Ext.define("threat-matrix", {
             btn.cls = 'small-icon secondary rly-small';
             btn.removeCls('primary');
             btn.addCls('secondary');
+            btn.setText('Show Dependencies');
             btn.tooltip = 'Show first level dependency relationships';
         } else {
             btn.removeCls('secondary');
             btn.addCls('primary');
             btn.cls = 'small-icon primary rly-small';
+            btn.setText('Hide Dependencies'),
             btn.tooltip = 'Hide first level dependency relationships';
         }
 
@@ -482,7 +472,6 @@ Ext.define("threat-matrix", {
     onSettingsUpdate: function (settings){
         this.logger.log('onSettingsUpdate',settings);
         Ext.apply(this, settings);
-        console.log('--');
         this.addComponents();
     }
 });

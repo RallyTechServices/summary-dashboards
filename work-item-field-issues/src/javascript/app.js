@@ -40,12 +40,12 @@ Ext.define("work-item-field-issues", {
 
             if (((newTimeboxScope) && (newTimeboxScope.get('_type') === 'release'))){
                 this.selectedRelease = newTimeboxScope;
-                this.onTimeboxUpdated(newTimeboxScope, this.selectedIteration);
+
             }
             if (((newTimeboxScope) && (newTimeboxScope.get('_type') === 'iteration'))) {
                 this.selectedIteration = newTimeboxScope
-                this.onTimeboxUpdated(this.selectedRelease, newTimeboxScope);
             }
+            this.onTimeboxUpdated(this.selectedRelease, this.selectedIteration);
         },
 
         getReleaseFilters: function(release){
@@ -83,6 +83,7 @@ Ext.define("work-item-field-issues", {
 
         onTimeboxUpdated: function(release, iteration){
             this.logger.log('onTimeboxUpdated',release, iteration);
+
             this.getBody().removeAll();
 
             this.setLoading(true);
@@ -118,6 +119,10 @@ Ext.define("work-item-field-issues", {
 
                     this.validatorData = featureValidator.ruleViolationData.concat(storyValidator.ruleViolationData);
                     this._createSummaryHeader(this.validatorData);
+
+                    if (this.selectedRelease != release || this.selectedIteration != iteration){
+                        this.on
+                    }
 
                 },
                 failure: function(operation){

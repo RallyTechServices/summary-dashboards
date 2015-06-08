@@ -1,3 +1,14 @@
+/**
+ * the loading mask wasn't going away!
+ */
+
+Ext.override(Rally.ui.chart.Chart,{
+    onRender: function () {
+        this.callParent(arguments);
+        this._unmask();
+    }
+});
+
 Ext.define('CustomApp', {
     extend: 'Rally.app.App',
     componentCls: 'app',
@@ -200,7 +211,8 @@ Ext.define('CustomApp', {
         var summary = {
             "Backlog" : ["Defined"],
             "In-Progress" : ["In-Progress"],
-            "Completed/Accepted" : ["Completed","Accepted"]
+            "Complete":  ["Completed"],
+            "Accepted" : ["Accepted"]
         };
 
         // add initial and last states if necessary
@@ -265,7 +277,7 @@ Ext.define('CustomApp', {
                 boxLabel: 'Show Scope Selector<br/><span style="color:#999999;"><i>Tick to use this to broadcast settings.</i></span>'
             }
         ];
-    },
+    }
 
 
 });

@@ -242,6 +242,7 @@ Ext.define('CustomApp', {
 
             ren.label("Only first 3 top ranked features are shown", 5, 285)
             .css({
+                'textAlign': 'center',
                 fontWeight: 'normal',
                 fontSize: '85%'
             })
@@ -274,11 +275,13 @@ Ext.define('CustomApp', {
                             var scope = this.point.y;
                             var completed = this.point.series.options.completedData[this.point.index];
                             var pct = Math.round( scope > 0 ? (completed/scope)*100 : 0);
-                            return " [" + completed + "/" + scope + "] ("+pct+"%) " + 
+                            return " [" + completed + "/" + scope + "] ("+pct+"%) <br/>" + 
                                 _.last(this.point.name.split(">"));
                         },
                         softConnector: true,
-                        distance : 10/*,
+                        distance : 5,
+                        overflow: 'none',
+                        crop: false/*,
                         style: { width: '100%' }*/
                     }
                 }

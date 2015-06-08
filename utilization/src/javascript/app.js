@@ -6,7 +6,7 @@ Ext.define("TSUtilization", {
     items: [
         {xtype:'container',itemId:'settings_box'},
         {xtype:'container',itemId:'selector_box'},
-        {xtype:'container',itemId:'chart_box'},
+        {xtype:'container',itemId:'chart_box', padding: 5},
         {xtype:'container',itemId:'grid_box'},
         {xtype:'tsinfolink'}
     ],
@@ -626,7 +626,7 @@ Ext.define("TSUtilization", {
     },
     
     _getColumns: function(timebox_type) {
-        var columns = [{dataIndex:'team', text: 'Team', flex: 1 }];
+        var columns = [{dataIndex:'team', text: 'Program/Stream -- Stream/Team', flex: 1 }];
 
         if ( timebox_type == 'release') {
             columns.push({dataIndex:'Name', text:'Iteration'});
@@ -635,10 +635,10 @@ Ext.define("TSUtilization", {
         columns.push({dataIndex:'StartDate', text:'Start', renderer: function(value) { return Ext.util.Format.date(value,'Y-m-d'); }});
         columns.push({dataIndex:'EndDate', text:'End', renderer: function(value) { return Ext.util.Format.date(value,'Y-m-d'); }});
         
-        columns.push({dataIndex:'PlannedVelocity', text:'Potential', editor: 'rallynumberfield'});
+        columns.push({dataIndex:'PlannedVelocity', text:'Potential (Planned)', editor: 'rallynumberfield'});
 
-        columns.push({dataIndex:'total_start', text:'Total at Start' });
-        columns.push({dataIndex:'total_end', text:'Total at End' });
+        columns.push({dataIndex:'total_start', text:'Points at Start (Stability)' });
+        columns.push({dataIndex:'total_end', text:'Points at End (Stability)' });
         columns.push({dataIndex:'velocity', text:'Accepted at End', width: 125});
 
         return columns;
@@ -650,11 +650,19 @@ Ext.define("TSUtilization", {
         var store = Ext.create('Rally.data.custom.Store', { 
             data: Ext.Array.flatten(table_series)
         } );
+        
+        var page_size = store.data.length + 1;
         var columns =  this._getColumns(timebox_type);
+       
         
         this.down('#grid_box').add({
             xtype:'rallygrid',
             store: store,
+            pagingToolbarCfg: {
+                store: store,
+                pageSizes: [5, 25, 50]
+            },
+            pageSize: page_size,
             margin: '0 10 0 10',
             columnCfgs: columns
             
@@ -663,6 +671,11 @@ Ext.define("TSUtilization", {
 
     _makeChart: function(categories, chart_series) {
         this.down('#chart_box').removeAll();
+        
+        var title = "Sprints in Program Increment";
+        if ( this.settings.zoomToIteration == true || this.settings.zoomToIteration == "true" ) {
+            title = "Days in Sprint";
+        }
         
         var chartColors = Ext.Array.map(chart_series, function(series){ return series.color });
         this.down('#chart_box').add({
@@ -681,14 +694,15 @@ Ext.define("TSUtilization", {
                     align: 'center'
                 },
                 xAxis: [{
-                    categories:  categories/*,
+                    categories:  categories,
+                    title: { text: title }/*,
                     labels: {
                         align: 'left',
                         rotation: 70
                     }*/
                 }],
                 yAxis: [{
-                    title: 'Points',
+                    title: { text: 'Points' },
                     min: 0
                 }],
                 plotOptions: {

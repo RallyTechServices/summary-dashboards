@@ -3,11 +3,11 @@
 <head>
     <title>Utilization</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Sat Jun 06 2015 22:30:00 GMT-0700 (PDT) -->
+    <!--  Build Date: Sun Jun 07 2015 20:22:13 GMT-0700 (PDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Sat Jun 06 2015 22:30:00 GMT-0700 (PDT)";
-        var CHECKSUM = 33022881048;
+        var APP_BUILD_DATE = "Sun Jun 07 2015 20:22:13 GMT-0700 (PDT)";
+        var CHECKSUM = 33160098071;
     </script>
     
         <script type="text/javascript" src="/apps/2.0rc3/sdk.js"></script>
@@ -904,7 +904,7 @@ Ext.define("TSUtilization", {
     },
     
     _getColumns: function(timebox_type) {
-        var columns = [{dataIndex:'team', text: 'Team', flex: 1 }];
+        var columns = [{dataIndex:'team', text: 'Program/Stream -- Stream/Team', flex: 1 }];
 
         if ( timebox_type == 'release') {
             columns.push({dataIndex:'Name', text:'Iteration'});
@@ -913,10 +913,10 @@ Ext.define("TSUtilization", {
         columns.push({dataIndex:'StartDate', text:'Start', renderer: function(value) { return Ext.util.Format.date(value,'Y-m-d'); }});
         columns.push({dataIndex:'EndDate', text:'End', renderer: function(value) { return Ext.util.Format.date(value,'Y-m-d'); }});
         
-        columns.push({dataIndex:'PlannedVelocity', text:'Potential', editor: 'rallynumberfield'});
+        columns.push({dataIndex:'PlannedVelocity', text:'Potential (Planned)', editor: 'rallynumberfield'});
 
-        columns.push({dataIndex:'total_start', text:'Total at Start' });
-        columns.push({dataIndex:'total_end', text:'Total at End' });
+        columns.push({dataIndex:'total_start', text:'Points at Start (Stability)' });
+        columns.push({dataIndex:'total_end', text:'Points at End (Stability)' });
         columns.push({dataIndex:'velocity', text:'Accepted at End', width: 125});
 
         return columns;

@@ -626,7 +626,7 @@ Ext.define("TSUtilization", {
     },
     
     _getColumns: function(timebox_type) {
-        var columns = [{dataIndex:'team', text: 'Team', flex: 1 }];
+        var columns = [{dataIndex:'team', text: 'Program/Stream -- Stream/Team', flex: 1 }];
 
         if ( timebox_type == 'release') {
             columns.push({dataIndex:'Name', text:'Iteration'});
@@ -635,10 +635,10 @@ Ext.define("TSUtilization", {
         columns.push({dataIndex:'StartDate', text:'Start', renderer: function(value) { return Ext.util.Format.date(value,'Y-m-d'); }});
         columns.push({dataIndex:'EndDate', text:'End', renderer: function(value) { return Ext.util.Format.date(value,'Y-m-d'); }});
         
-        columns.push({dataIndex:'PlannedVelocity', text:'Potential', editor: 'rallynumberfield'});
+        columns.push({dataIndex:'PlannedVelocity', text:'Potential (Planned)', editor: 'rallynumberfield'});
 
-        columns.push({dataIndex:'total_start', text:'Total at Start' });
-        columns.push({dataIndex:'total_end', text:'Total at End' });
+        columns.push({dataIndex:'total_start', text:'Points at Start (Stability)' });
+        columns.push({dataIndex:'total_end', text:'Points at End (Stability)' });
         columns.push({dataIndex:'velocity', text:'Accepted at End', width: 125});
 
         return columns;

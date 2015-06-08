@@ -16,6 +16,8 @@ Ext.define('CustomApp', {
 
         console.log("launch");
 
+        console.log(this.getContext().getProject());
+
         if (this.isExternal()){
             this.showSettings(this.config);
         } else {

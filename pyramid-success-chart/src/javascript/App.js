@@ -264,7 +264,8 @@ Ext.define('CustomApp', {
             },
             plotOptions: {
                 pyramid : {
-                    allowPointSelect : true
+                    allowPointSelect : true,
+                    width: '45%'
                 },
                 series: {
                     dataLabels: {
@@ -277,7 +278,8 @@ Ext.define('CustomApp', {
                                 _.last(this.point.name.split(">"));
                         },
                         softConnector: true,
-                        distance : 10
+                        distance : 10/*,
+                        style: { width: '100%' }*/
                     }
                 }
             },

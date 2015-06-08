@@ -3,11 +3,11 @@
 <head>
     <title>Work Queue</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Sat Jun 06 2015 21:19:12 GMT-0700 (PDT) -->
+    <!--  Build Date: Sun Jun 07 2015 18:51:20 GMT-0700 (PDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Sat Jun 06 2015 21:19:12 GMT-0700 (PDT)";
-        var CHECKSUM = 19930758149;
+        var APP_BUILD_DATE = "Sun Jun 07 2015 18:51:20 GMT-0700 (PDT)";
+        var CHECKSUM = 20195607982;
     </script>
 
     <script type="text/javascript" src="/apps/2.0rc2/sdk.js"></script>
@@ -626,6 +626,17 @@ Ext.define('Rally.technicalservices.Logger',{
      }
 
 });
+/**
+ * the loading mask wasn't going away!
+ */
+
+Ext.override(Rally.ui.chart.Chart,{
+    onRender: function () {
+        this.callParent(arguments);
+        this._unmask();
+    }
+});
+
 Ext.define("TSWorkQueue", {
     extend: 'Rally.app.App',
     componentCls: 'app',

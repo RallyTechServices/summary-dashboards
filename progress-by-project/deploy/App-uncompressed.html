@@ -413,7 +413,18 @@ Ext.define("ProjectStories", function() {
         return null;
     }
 });
-                Ext.define('CustomApp', {
+                /**
+ * the loading mask wasn't going away!
+ */
+
+Ext.override(Rally.ui.chart.Chart,{
+    onRender: function () {
+        this.callParent(arguments);
+        this._unmask();
+    }
+});
+
+Ext.define('CustomApp', {
     extend: 'Rally.app.App',
     componentCls: 'app',
     items: [
@@ -589,7 +600,7 @@ Ext.define("ProjectStories", function() {
 
         var chart = this.down("#rally-chart");
         var p = Ext.get(chart.id);
-        elems = p.query("div.x-mask");
+        var elems = p.query("div.x-mask");
         _.each(elems, function(e) { 
             if ( Ext.isIE9 ) { 
                 e.removeNode(); 
@@ -597,7 +608,7 @@ Ext.define("ProjectStories", function() {
                 e.remove(); 
             }
         });
-        var elems = p.query("div.x-mask-msg");
+        elems = p.query("div.x-mask-msg");
         _.each(elems, function(e) { 
             if ( Ext.isIE9 ) { 
                 e.removeNode(); 
@@ -615,7 +626,8 @@ Ext.define("ProjectStories", function() {
         var summary = {
             "Backlog" : ["Defined"],
             "In-Progress" : ["In-Progress"],
-            "Completed/Accepted" : ["Completed","Accepted"]
+            "Complete":  ["Completed"],
+            "Accepted" : ["Accepted"]
         };
 
         // add initial and last states if necessary
@@ -680,7 +692,7 @@ Ext.define("ProjectStories", function() {
                 boxLabel: 'Show Scope Selector<br/><span style="color:#999999;"><i>Tick to use this to broadcast settings.</i></span>'
             }
         ];
-    },
+    }
 
 
 });
@@ -694,7 +706,7 @@ Ext.define("ProjectStories", function() {
     loadMask: false,
     chartColors : [],
     chartConfig: {
-        colors : ["#E0E0E0","#00a9e0","#8dc63f"],
+        colors : ["#E0E0E0","#00a9e0","#fad200","#8dc63f"],
         chart: {
             type: 'bar'
         },

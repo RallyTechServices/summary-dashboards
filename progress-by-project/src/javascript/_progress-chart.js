@@ -7,7 +7,7 @@ Ext.define('Rally.technicalservices.progressChart',{
     loadMask: false,
     chartColors : [],
     chartConfig: {
-        colors : ["#E0E0E0","#00a9e0","#8dc63f"],
+        colors : ["#E0E0E0","#00a9e0","#fad200","#8dc63f"],
         chart: {
             type: 'bar'
         },

@@ -344,10 +344,8 @@ Ext.define('Rally.technicalservices.ThreatCalculator', {
 
             if (evt.type == 'unselect'){
                 _.each(this.paths, function(p) {
-                    console.log('p', p.element.parentNode)
                     var parent = p.element.parentNode;
                     parent.removeChild(p.element);
-                    //p.element.remove();
                 });
                 this.paths = [];
             }

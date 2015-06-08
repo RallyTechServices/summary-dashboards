@@ -325,6 +325,7 @@ Ext.define("ProjectStories", function() {
                 {
                     var release = t.getRecord();
                     this.fireEvent('releasechange',release);
+                    console.log("Publishing Release:", release);
                     this.publish('timeboxReleaseChanged', release);
                     this._updateIterationCombo(release);
                 },
@@ -477,7 +478,7 @@ Ext.define("ProjectStories", function() {
 
     run : function(releaseName,iterationName) {
         this.setLoading('loading data...');
-        console.log("run:",releaseName,iterationName);
+        console.log("run: ",releaseName,iterationName);
         
         var that = this;
 
@@ -657,7 +658,7 @@ Ext.define("ProjectStories", function() {
             ren.label("Only first 3 top ranked features are shown", 5, 285)
             .css({
                 fontWeight: 'normal',
-                fontSize: '60%'
+                fontSize: '85%'
             })
             .add();
         };

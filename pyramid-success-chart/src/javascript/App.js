@@ -63,7 +63,7 @@ Ext.define('CustomApp', {
 
     run : function(releaseName,iterationName) {
         this.setLoading('loading data...');
-        console.log("run:",releaseName,iterationName);
+        console.log("run: ",releaseName,iterationName);
         
         var that = this;
 
@@ -243,7 +243,7 @@ Ext.define('CustomApp', {
             ren.label("Only first 3 top ranked features are shown", 5, 285)
             .css({
                 fontWeight: 'normal',
-                fontSize: '60%'
+                fontSize: '85%'
             })
             .add();
         };

@@ -1,3 +1,14 @@
+/**
+ * the loading mask wasn't going away!
+ */
+
+Ext.override(Rally.ui.chart.Chart,{
+    onRender: function () {
+        this.callParent(arguments);
+        this._unmask();
+    }
+});
+
 Ext.define("TSWorkQueue", {
     extend: 'Rally.app.App',
     componentCls: 'app',
@@ -128,13 +139,15 @@ Ext.define("TSWorkQueue", {
     _addLegend: function(container) {
         var color_data = [
             { color: 'red', label: 'Red indicates blocked' },
-            { color: 'black', color2: 'gray', color3: 'lightgray',  label: 'Task color gradients indicate the state of the task (lighter is closer to complete)' }
+            { color: 'black', color2: 'gray', color3: 'lightgray',  label: 'Gradients indicate the state of the task (lighter is closer to Completed)' },
+            { color: 'white', label: 'White tasks on the Self chart are owned by others' }
         ];
         
         var ct = container.add({
             xtype: 'container',
             padding: 10,
-            tpl: '<div class="tslegendtext">Legend:  </div><tpl for="."><div class="tslegend" style="background-color:{color}">&nbsp;</div><tpl if="color2"><div class="tslegend" style="background-color:{color2}">&nbsp;</div></tpl><tpl if="color3"><div class="tslegend" style="background-color:{color3}">&nbsp;</div></tpl><div class="tslegendtext">&nbsp;&nbsp;{label}</div><span class="tslegendspacer">&nbsp;</span></tpl>'
+            tpl: '<tpl for="."><div class="tslegend" style="background-color:{color}">&nbsp;</div><tpl if="color2"><div class="tslegend" style="background-color:{color2}">&nbsp;</div></tpl><tpl if="color3"><div class="tslegend" style="background-color:{color3}">&nbsp;</div></tpl><div class="tslegendtext">&nbsp;&nbsp;{label}</div><span class="tslegendspacer">&nbsp;</span><br/></tpl>'
+//            tpl: '<div class="tslegendtext">Legend:  </div><tpl for="."><div class="tslegend" style="background-color:{color}">&nbsp;</div><tpl if="color2"><div class="tslegend" style="background-color:{color2}">&nbsp;</div></tpl><tpl if="color3"><div class="tslegend" style="background-color:{color3}">&nbsp;</div></tpl><div class="tslegendtext">&nbsp;&nbsp;{label}</div><span class="tslegendspacer">&nbsp;</span><br/></tpl>'
         });
         
         ct.update(color_data);

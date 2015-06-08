@@ -184,7 +184,11 @@ Ext.define('CustomApp', {
             return [ project, 
                 summarize(features[index],false),
                 summarize(features[index],true),
-                _.map(features[index],function(feature){ return feature.get("FormattedID") + " " + feature.get("c_ValueMetricKPI") /* ("c_ValueMetricKPI") */; })
+                _.map(features[index],function(feature){ 
+                    var kpi = feature.get("c_ValueMetricKPI");
+                    return (!_.isUndefined(kpi) && !_.isNull(kpi) && kpi !== "")
+                        ? feature.get("FormattedID") + " " + feature.get("c_ValueMetricKPI") /* ("c_ValueMetricKPI") */
+                        : null; })
             ];
         });
         var sortedData = data.sort(function(a,b) { return b[1] - a[1]; }) ;
@@ -214,40 +218,7 @@ Ext.define('CustomApp', {
 
         var that = this;
 
-        // draws the 'words' on the pyramid chart
-        var load = function() {
-
-            var ren = this.renderer;
-            var wordHeight = 11;
-            var series = _.first(this.series);
-            console.log("series",series);
-
-            _.each(series.points,function(point,index) {
-                var featureWords = series.options.featureWords[index].slice(0,4);
-                var y = point.plotY - (( featureWords.length * wordHeight)/2);
-                _.each(featureWords,function(fw,x) {
-                    // var word = fw.split(' ').slice(0,2).join(' ');
-                    var word = fw;
-                    ren.label(word, 5, y + (x*wordHeight))
-                    .css({
-                        fontWeight: 'normal',
-                        fontSize: '75%'
-                    })
-                    .attr({
-                        zIndex : 9
-                    })
-                    .add();
-                });
-            });
-
-            ren.label("Only first 3 top ranked features are shown", 5, 285)
-            .css({
-                'textAlign': 'center',
-                fontWeight: 'normal',
-                fontSize: '85%'
-            })
-            .add();
-        };
+        
 
         var chartConfig = {
             credits: { enabled: false }, 
@@ -257,7 +228,7 @@ Ext.define('CustomApp', {
                 type: 'pyramid',
                 marginRight : 100,
                 events : {
-                    load : load
+                    load : that.renderFeatureWords
                 }
             },
             title: {
@@ -310,6 +281,42 @@ Ext.define('CustomApp', {
 
         if (!isEmpty(seriesData))
             that.add(that.x);
+    },
+
+    renderFeatureWords : function() {
+
+        var ren = this.renderer;
+        var wordHeight = 11;
+        var series = _.first(this.series);
+        console.log("series",series);
+
+        _.each(series.points,function(point,index) {
+            var numWords = series.length <= 6 ? 3 : 1;
+            var featureWords = _.compact(series.options.featureWords[index]).slice(0,numWords);
+            var y = point.plotY - (( featureWords.length * wordHeight)/2);
+            _.each(featureWords,function(fw,x) {
+                // var word = fw.split(' ').slice(0,2).join(' ');
+                var word = fw;
+                ren.label(word, 5, y + (x*wordHeight))
+                .css({
+                    fontWeight: 'normal',
+                    fontSize: '75%'
+                })
+                .attr({
+                    zIndex : 9
+                })
+                .add();
+            });
+        });
+
+        ren.label("Only up to the first 3 top ranked kpi's are shown", 5, 285)
+        .css({
+            'textAlign': 'center',
+            fontWeight: 'normal',
+            fontSize: '85%'
+        })
+        .add();
+
     },
 
 

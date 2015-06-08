@@ -6,7 +6,7 @@ Ext.define("TSUtilization", {
     items: [
         {xtype:'container',itemId:'settings_box'},
         {xtype:'container',itemId:'selector_box'},
-        {xtype:'container',itemId:'chart_box'},
+        {xtype:'container',itemId:'chart_box', padding: 5},
         {xtype:'container',itemId:'grid_box'},
         {xtype:'tsinfolink'}
     ],
@@ -672,6 +672,11 @@ Ext.define("TSUtilization", {
     _makeChart: function(categories, chart_series) {
         this.down('#chart_box').removeAll();
         
+        var title = "Sprints in Program Increment";
+        if ( this.settings.zoomToIteration == true || this.settings.zoomToIteration == "true" ) {
+            title = "Days in Sprint";
+        }
+        
         var chartColors = Ext.Array.map(chart_series, function(series){ return series.color });
         this.down('#chart_box').add({
             xtype:'rallychart',
@@ -689,14 +694,15 @@ Ext.define("TSUtilization", {
                     align: 'center'
                 },
                 xAxis: [{
-                    categories:  categories/*,
+                    categories:  categories,
+                    title: { text: title }/*,
                     labels: {
                         align: 'left',
                         rotation: 70
                     }*/
                 }],
                 yAxis: [{
-                    title: 'Points',
+                    title: { text: 'Points' },
                     min: 0
                 }],
                 plotOptions: {

@@ -3,11 +3,11 @@
 <head>
     <title>Work Queue</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Sun Jun 07 2015 18:51:20 GMT-0700 (PDT) -->
+    <!--  Build Date: Sun Jun 07 2015 18:57:58 GMT-0700 (PDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Sun Jun 07 2015 18:51:20 GMT-0700 (PDT)";
-        var CHECKSUM = 20195607982;
+        var APP_BUILD_DATE = "Sun Jun 07 2015 18:57:58 GMT-0700 (PDT)";
+        var CHECKSUM = 21010509147;
     </script>
 
     <script type="text/javascript" src="/apps/2.0rc2/sdk.js"></script>
@@ -767,13 +767,15 @@ Ext.define("TSWorkQueue", {
     _addLegend: function(container) {
         var color_data = [
             { color: 'red', label: 'Red indicates blocked' },
-            { color: 'black', color2: 'gray', color3: 'lightgray',  label: 'Task color gradients indicate the state of the task (lighter is closer to complete)' }
+            { color: 'black', color2: 'gray', color3: 'lightgray',  label: 'Gradients indicate the state of the task (lighter is closer to Completed)' },
+            { color: 'white', label: 'White tasks on the Self chart are owned by others' }
         ];
         
         var ct = container.add({
             xtype: 'container',
             padding: 10,
-            tpl: '<div class="tslegendtext">Legend:  </div><tpl for="."><div class="tslegend" style="background-color:{color}">&nbsp;</div><tpl if="color2"><div class="tslegend" style="background-color:{color2}">&nbsp;</div></tpl><tpl if="color3"><div class="tslegend" style="background-color:{color3}">&nbsp;</div></tpl><div class="tslegendtext">&nbsp;&nbsp;{label}</div><span class="tslegendspacer">&nbsp;</span></tpl>'
+            tpl: '<tpl for="."><div class="tslegend" style="background-color:{color}">&nbsp;</div><tpl if="color2"><div class="tslegend" style="background-color:{color2}">&nbsp;</div></tpl><tpl if="color3"><div class="tslegend" style="background-color:{color3}">&nbsp;</div></tpl><div class="tslegendtext">&nbsp;&nbsp;{label}</div><span class="tslegendspacer">&nbsp;</span><br/></tpl>'
+//            tpl: '<div class="tslegendtext">Legend:  </div><tpl for="."><div class="tslegend" style="background-color:{color}">&nbsp;</div><tpl if="color2"><div class="tslegend" style="background-color:{color2}">&nbsp;</div></tpl><tpl if="color3"><div class="tslegend" style="background-color:{color3}">&nbsp;</div></tpl><div class="tslegendtext">&nbsp;&nbsp;{label}</div><span class="tslegendspacer">&nbsp;</span><br/></tpl>'
         });
         
         ct.update(color_data);

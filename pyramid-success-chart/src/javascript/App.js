@@ -249,6 +249,8 @@ Ext.define('CustomApp', {
         };
 
         var chartConfig = {
+            credits: { enabled: false }, 
+            
             colors : ["#3498db","#f1c40f","#c0392b","#9b59b6","#2ecc71"],
              chart: {
                 type: 'pyramid',

@@ -3,11 +3,11 @@
 <head>
     <title>Utilization</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Sun Jun 07 2015 20:22:13 GMT-0700 (PDT) -->
+    <!--  Build Date: Sun Jun 07 2015 20:27:34 GMT-0700 (PDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Sun Jun 07 2015 20:22:13 GMT-0700 (PDT)";
-        var CHECKSUM = 33160098071;
+        var APP_BUILD_DATE = "Sun Jun 07 2015 20:27:34 GMT-0700 (PDT)";
+        var CHECKSUM = 33416624900;
     </script>
     
         <script type="text/javascript" src="/apps/2.0rc3/sdk.js"></script>
@@ -928,11 +928,19 @@ Ext.define("TSUtilization", {
         var store = Ext.create('Rally.data.custom.Store', { 
             data: Ext.Array.flatten(table_series)
         } );
+        
+        var page_size = store.data.length + 1;
         var columns =  this._getColumns(timebox_type);
+       
         
         this.down('#grid_box').add({
             xtype:'rallygrid',
             store: store,
+            pagingToolbarCfg: {
+                store: store,
+                pageSizes: [5, 25, 50]
+            },
+            pageSize: page_size,
             margin: '0 10 0 10',
             columnCfgs: columns
             

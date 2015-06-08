@@ -650,11 +650,19 @@ Ext.define("TSUtilization", {
         var store = Ext.create('Rally.data.custom.Store', { 
             data: Ext.Array.flatten(table_series)
         } );
+        
+        var page_size = store.data.length + 1;
         var columns =  this._getColumns(timebox_type);
+       
         
         this.down('#grid_box').add({
             xtype:'rallygrid',
             store: store,
+            pagingToolbarCfg: {
+                store: store,
+                pageSizes: [5, 25, 50]
+            },
+            pageSize: page_size,
             margin: '0 10 0 10',
             columnCfgs: columns
             

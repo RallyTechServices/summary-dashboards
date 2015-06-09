@@ -84,7 +84,7 @@ Ext.define('CustomApp', {
             filter : that.rallyFunctions.createFilter(releaseName,iterationName)
         });
 
-        pr.readProjectStories(function(error, stories, projects, states) {
+        pr.readProjectWorkItems(function(error, stories, projects, states) {
             that.prepareChartData( stories, projects, states, function(error, categories, series) {
               that.createChart( categories, series );
             });
@@ -243,7 +243,7 @@ Ext.define('CustomApp', {
         this._appSettings.on('cancel', this._hideSettings, this);
         this._appSettings.on('save', this._onSettingsSaved, this);
         if (this.isExternal()){
-            if (this.down('#settings_box').getComponent(this._appSettings.id)==undefined){
+            if (this.down('#settings_box').getComponent(this._appSettings.id)===undefined){
                 this.down('#settings_box').add(this._appSettings);
             }
         } else {

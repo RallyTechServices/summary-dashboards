@@ -8,8 +8,7 @@
       "../common/src/javascript/project-stories.js",
       "../common/src/javascript/scope_selector_component.js",
       "src/javascript/App.js",
-      "src/javascript/_progress-chart.js",
-      "../common/src/javascript/async.min.js"
+      "src/javascript/_progress-chart.js"
    ],
    "css": [
       "src/css/app.css"

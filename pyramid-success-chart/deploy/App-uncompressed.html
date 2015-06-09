@@ -132,7 +132,6 @@ Ext.define("ProjectStories", function() {
 
             Deft.Chain.pipeline(fns,self).then({
                 success: function(workItems) {
-                    console.log("workItems",workItems);
                     callback( null, workItems, self.projects, self.scheduleStates);
                 },
                 failure: function(error) {
@@ -151,7 +150,6 @@ Ext.define("ProjectStories", function() {
                 success: function(model) {
                     model.getField('ScheduleState').getAllowedValueStore().load({
                         callback: function(records, operation, success) {
-                            console.log("records",records);
                             self.scheduleStates = _.map(records,function(r){ return r.get("StringValue");});
                             deferred.resolve(self.scheduleStates);
                         }
@@ -177,7 +175,6 @@ Ext.define("ProjectStories", function() {
                             fetch : ["ObjectID","Name","_ref","Parent","State"],
                             callback: function(records, operation, success) {
                                 self.projects = _.filter(records,function(r) { return r.get("State")!=="Closed"; });
-                                console.log("projects",self.projects);
                                 deferred.resolve(self.projects);
                             }
                         });
@@ -187,7 +184,6 @@ Ext.define("ProjectStories", function() {
         },    
 
         readStories : function(projects) {
-            console.log("in:projects",projects);
 
             var me = this;
 
@@ -226,16 +222,13 @@ Ext.define("ProjectStories", function() {
                     ).then({
                     scope: me,
                     success: function(types) {
-                        console.log("types",types)
-                        deferred.resolve(_.first(types).get("TypePath"))
+                        deferred.resolve(_.first(types).get("TypePath"));
                     }
                 });
                 return deferred.promise;
             };
 
             var readFeatures = function(type) {
-
-                console.log("type",type);
 
                 var promises = _.map(projects,function(project) {
                     var deferred = Ext.create('Deft.Deferred');
@@ -264,12 +257,35 @@ Ext.define("ProjectStories", function() {
             var deferred = Ext.create('Deft.Deferred');
             Deft.Chain.pipeline([readFeatureType,readFeatures],self).then({
                 success: function(results) {
-                    console.log("feature results",results)
                     deferred.resolve(results);
                 }
             });
             return deferred.promise;
 
+        },
+
+        readPreferenceValues : function(keys) {
+
+            var me = this;
+
+            var promises = _.map(keys,function(key) {
+                var deferred = Ext.create('Deft.Deferred');
+                self._loadAStoreWithAPromise(
+                        "Preference", 
+                        ["Name","Value"], 
+                        [{ property : "Name", operator : "=", value : key }]
+                    ).then({
+                        scope: me,
+                        success: function(values) {
+                            deferred.resolve(values);
+                        },
+                        failure: function(error) {
+                            deferred.resolve("");
+                        }
+                    });
+                return deferred.promise;
+            });
+            return Deft.Promise.all(promises);
         },
 
         _loadAStoreWithAPromise: function(model_name, model_fields, filters,ctx,order){
@@ -281,12 +297,12 @@ Ext.define("ProjectStories", function() {
                 fetch: model_fields,
                 filters: filters,
                 limit: 'Infinity'
-            }
+            };
             if (!_.isUndefined(ctx)&&!_.isNull(ctx)) {
-                config.context = ctx
+                config.context = ctx;
             }
             if (!_.isUndefined(order)&&!_.isNull(order)) {
-                config.order = order
+                config.order = order;
             }
 
             Ext.create('Rally.data.wsapi.Store', config ).load({
@@ -294,16 +310,13 @@ Ext.define("ProjectStories", function() {
                     if (successful){
                         deferred.resolve(records);
                     } else {
-                        console.log("Failed: ", operation);
                         deferred.reject('Problem loading: ' + operation.error.errors.join('. '));
                     }
                 }
             });
             return deferred.promise;
-        },  
-        
+        }
     };
-   
 });
                 Ext.define('timebox-selector', {
     extend : 'Ext.Container',

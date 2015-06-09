@@ -3,11 +3,11 @@
 <head>
     <title>Work Item Field Issues</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Sun Jun 07 2015 20:56:24 GMT-0600 (MDT) -->
+    <!--  Build Date: Tue Jun 09 2015 11:34:16 GMT-0700 (PDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Sun Jun 07 2015 20:56:24 GMT-0600 (MDT)";
-        var CHECKSUM = 24942845266;
+        var APP_BUILD_DATE = "Tue Jun 09 2015 11:34:16 GMT-0700 (PDT)";
+        var CHECKSUM = 25113389464;
     </script>
     
     <script type="text/javascript" src="/apps/2.0rc3/sdk.js"></script>
@@ -280,7 +280,7 @@ Ext.define("work-item-field-issues", {
          */
         allReleasesText: 'All Releases',
         portfolioItemFeature: 'PortfolioItem/Feature',
-        featureFetchFields: ['FormattedID','Name','Project','Release','State','AcceptedLeafStoryCount','LeafStoryCount','PlannedStartDate','PlannedEndDate','Owner','ActualStartDate','Parent','ValueScore','c_ValueMetricKPI','c_Risk','c_RiskDescription'],
+        featureFetchFields: ['FormattedID','Name','Project','Release','State','AcceptedLeafStoryCount','LeafStoryCount','PlannedStartDate','PlannedEndDate','Owner','ActualStartDate','Parent','ValueScore','c_ValueMetricKPI','c_Risk','c_RiskDescription','LeafStoryPlanEstimateTotal'],
         storyFetchFields: ['FormattedID','Name','Project','Iteration','Release','ScheduleState','Feature','Owner','PlanEstimate','Blocked','BlockedReason','Blocker','c_Risk','c_RiskDescription'],
 
 
@@ -730,7 +730,7 @@ Ext.define('Rally.technicalservices.FeatureValidationRules',{
 
     constructor: function(config){
         Ext.apply(this, config);
-        this.requiredFields = ['Owner','PlannedEndDate','PlannedStartDate','State','c_ValueMetricKPI','ValueScore'];
+        this.requiredFields = ['Owner','PlannedEndDate','PlannedStartDate','State','ValueScore']; // removed 'c_ValueMetricKPI'
 
     },
     ruleFn_noStoriesForFeature: function(r){
@@ -932,6 +932,7 @@ Ext.define('timebox-selector', {
                 {
                     var release = t.getRecord();
                     this.fireEvent('releasechange',release);
+                    console.log("Publishing Release:", release);
                     this.publish('timeboxReleaseChanged', release);
                     this._updateIterationCombo(release);
                 },

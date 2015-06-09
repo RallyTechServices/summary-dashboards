@@ -6,7 +6,7 @@ Ext.define('Rally.technicalservices.FeatureValidationRules',{
 
     constructor: function(config){
         Ext.apply(this, config);
-        this.requiredFields = ['Owner','PlannedEndDate','PlannedStartDate','State','c_ValueMetricKPI','ValueScore'];
+        this.requiredFields = ['Owner','PlannedEndDate','PlannedStartDate','State','ValueScore']; // removed 'c_ValueMetricKPI'
 
     },
     ruleFn_noStoriesForFeature: function(r){

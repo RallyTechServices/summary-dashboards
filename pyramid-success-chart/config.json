@@ -9,7 +9,6 @@
       "../common/src/javascript/scope_selector_component.js",
       "src/javascript/App.js",
       "../common/src/javascript/jquery-2.1.4.min.js",
-      "../common/src/javascript/async.min.js",
       "../common/src/javascript/highcharts.js",
       "../common/src/javascript/funnel.js"
    ],

@@ -78,12 +78,12 @@ Ext.define('CustomApp', {
         
         that.rallyFunctions = Ext.create("RallyFunctions");
 
-        var pr = Ext.create( "ProjectStories", {
+        that.projectStories = Ext.create( "ProjectStories", {
             ctx : that.getContext(),
             filter : that.rallyFunctions.createFilter(releaseName,iterationName)
         });
 
-        pr.readProjectStories(function(error, stories, projects, states){
+        that.projectStories.readProjectWorkItems(function(error, stories, projects, states){
             that.readWipValues(projects,function(error,wipLimits) {
                 that.prepareChartData(stories, projects, wipLimits, function(error, categories, series) {
                     that.createChart(categories,series);
@@ -138,18 +138,15 @@ Ext.define('CustomApp', {
             });
         }));
 
-        var configs = _.map(keys,function(key) {
-            return {
-                model : "Preference",
-                filters : [{property:"Name",operator:"=",value:key}],
-                fetch : true
-            };
+        that.projectStories.readPreferenceValues(keys).then( {
+            success: function(values) {
+                callback(null,_.flatten(values));
+            },
+            failure: function() {
+                //handle error
+            },
+            scope: this
         });
-
-        async.map(configs, that.rallyFunctions._wsapiQuery, function(error,results){
-            callback(null, _.flatten(results));
-        });
-
     },
 
     prepareChartData : function(stories,projects,wipLimits,callback) {
@@ -235,7 +232,7 @@ Ext.define('CustomApp', {
                 e.remove(); 
             }
         });
-        var elems = p.query("div.x-mask-msg");
+        elems = p.query("div.x-mask-msg");
         _.each(elems, function(e) { 
             if ( Ext.isIE9 ) { 
                 e.removeNode(); 

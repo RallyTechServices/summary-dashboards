@@ -32,7 +32,7 @@ Ext.define('Rally.technicalservices.UserStoryValidationRules',{
         var missingFields = [];
 
         _.each(this.requiredFields, function (f) {
-            if (!r.get(f)) {
+            if (!r.get(f) && r.getField(f)) {
                 var name = r.getField(f).displayName;
                 missingFields.push(name);
             }

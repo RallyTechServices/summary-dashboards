@@ -3,10 +3,10 @@
 <head>
     <title>Threat Matrix</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Sun Jun 07 2015 16:54:55 GMT-0600 (MDT) -->
+    <!--  Build Date: Sun Jun 07 2015 16:58:06 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Sun Jun 07 2015 16:54:55 GMT-0600 (MDT)";
+        var APP_BUILD_DATE = "Sun Jun 07 2015 16:58:06 GMT-0600 (MDT)";
         var CHECKSUM = [%= checksum %];
     </script>
     

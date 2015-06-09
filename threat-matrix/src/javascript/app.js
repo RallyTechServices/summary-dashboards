@@ -4,6 +4,7 @@ Ext.define("threat-matrix", {
     logger: new Rally.technicalservices.Logger(),
     defaults: { margin: 10 },
     items: [
+        {xtype:'tsinfolink',minHeight: 14},
         {xtype:'container',itemId:'settings_box'},
         {xtype:'container', itemId:'selector_box' }
     ],

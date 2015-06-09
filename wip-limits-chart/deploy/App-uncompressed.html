@@ -114,167 +114,209 @@ Ext.define("ProjectStories", function() {
             return this;
         },
 
-        readProjectStories : function(callback) {
+        readProjectWorkItems : function(callback) {
+
             var fns = [
-                self.readStates.bind(self),
-                self.readProjects.bind(self),
-                self.getReportProjects.bind(self),
-                self.readStories.bind(self)
+                self.readStates,
+                self.readProjects,
+                self.readStories
             ];
 
             if (self.featureFilter!==null) {
                 fns = [
-                    self.readStates.bind(self),
-                    self.readFeatureTypes.bind(self),
-                    self.readProjects.bind(self),
-                    self.getReportProjects.bind(self),
-                    self.readStories.bind(self),
-                    self.readFeatures.bind(self)
+                    self.readStates,
+                    self.readProjects,
+                    self.readFeatures
                 ];
             }
 
-            async.waterfall( fns , function(err,result) {
-                callback( null, self.stories, self.reportProjects, self.scheduleStates,self.features );
+            Deft.Chain.pipeline(fns,self).then({
+                success: function(workItems) {
+                    callback( null, workItems, self.projects, self.scheduleStates);
+                },
+                failure: function(error) {
+                    //oh noes!
+                    console.log("Error:",error);
+                }
             });
         },
 
-        readStates : function(callback) {
+        readStates : function() {
             var that = this;
+            var deferred = Ext.create('Deft.Deferred');
+
             Rally.data.ModelFactory.getModel({
                 type: 'UserStory',
                 success: function(model) {
                     model.getField('ScheduleState').getAllowedValueStore().load({
                         callback: function(records, operation, success) {
                             self.scheduleStates = _.map(records,function(r){ return r.get("StringValue");});
-                            callback(null);
+                            deferred.resolve(self.scheduleStates);
                         }
                     });
                 }
             });
+            return deferred.promise;
         },
 
-        readFeatureTypes : function(callback) {
+        readProjects : function(states) {
 
-            var that = this;
+            var deferred = Ext.create('Deft.Deferred');
+            var me = this;
 
-            var configs = [{ model : "TypeDefinition",
-                fetch : true,
-                filters : [ { property:"Ordinal", operator:"=", value:0} ]
-            }];
-
-            async.map(configs,self._wsapiQuery,function(err,results) {
-                self.featureType = _.first(_.first(results)).get("TypePath");
-                callback(null);
+            self._loadAStoreWithAPromise('Project', 
+                ["_ref","Parent","Children"], 
+                [
+                    {property : "ObjectID" , operator : "=", value : self.ctx.getProject().ObjectID }
+                ]).then({
+                    scope: me,
+                    success: function(projects) {
+                        _.first(projects).getCollection('Children').load({
+                            fetch : ["ObjectID","Name","_ref","Parent","State"],
+                            callback: function(records, operation, success) {
+                                self.projects = _.filter(records,function(r) { return r.get("State")!=="Closed"; });
+                                deferred.resolve(self.projects);
+                            }
+                        });
+                    }
             });
-
-        },
-
-        readProjects : function(callback) {
-            var that = this;
-            var config = { model : "Project", fetch : true, filters : [] };
-            self._wsapiQuery( config, callback );
+            return deferred.promise;
         },    
 
-        // child projects are what we graph
-        getReportProjects : function(projects,callback) {
+        readStories : function(projects) {
 
-           self.projects = projects;
+            var me = this;
 
-            // filter to projects which are child of the current context project
-            self.reportProjects = _.filter(projects, function(project) {
-                return self._isChildOf( project, self.ctx.getProject() );
-            });
-
-            // if no children add self
-            if (self.reportProjects.length ===0) {
-                self.reportProjects.push(_.find(self.projects,function(project) {
-                    return project.get("ObjectID") === self.ctx.getProject().ObjectID;
-                }));
-            }
-
-            callback(null);
-        },
-
-        readStories : function(callback) {
-
-            var configs = _.map(self.reportProjects,function(project) {
-                return {
-                    model : "HierarchicalRequirement",
-                    filters : [self.filter],
-                    fetch : ["ObjectID","ScheduleState","PlanEstimate","Project"],
-                    context : {
-                        project: project.get("_ref"),
+            var promises = _.map(projects,function(project) {
+                var deferred = Ext.create('Deft.Deferred');
+                self._loadAStoreWithAPromise(
+                    'HierarchicalRequirement', 
+                    ["ObjectID","ScheduleState","PlanEstimate","Project"], 
+                    [self.filter],
+                    {   project: project.get("_ref"),
                         projectScopeUp: false,
                         projectScopeDown: true
+                    }).then({
+                    scope: me,
+                    success: function(stories) {
+                        deferred.resolve(stories);
                     }
-                };
+                });
+                return deferred.promise;
             });
 
-            // read stories for each reporting project
-            async.map(configs,self._wsapiQuery,function(error,results) {
-                self.stories = results;
-                callback(null);
-            });
+            return Deft.Promise.all(promises);
+
         },
 
-        readFeatures : function(callback) {
+        readFeatures : function(projects) {
 
-            var configs = _.map(self.reportProjects,function(project) {
-                return {
-                    model : self.featureType,
-                    filters : [self.featureFilter],
-                    fetch : ["FormattedID","Name","ObjectID","LeafStoryCount","LeafStoryPlanEstimateTotal",
-                        "PreliminaryEstimate", "AcceptedLeafStoryCount", "AcceptedLeafStoryPlanEstimateTotal",
-                        "PercentDoneByStoryCount","c_ValueMetricKPI","Rank"],
-                    order : [ { property : 'DragAndDropRank', direction : 'ASC' } ],
-                    context : {
-                        project: project.get("_ref"),
-                        projectScopeUp: false,
-                        projectScopeDown: true
+            var me = this;
+
+            var readFeatureType = function() {
+                var deferred = Ext.create('Deft.Deferred');
+                self._loadAStoreWithAPromise(
+                    'TypeDefinition', 
+                    ["TypePath"], 
+                    [ { property:"Ordinal", operator:"=", value:0} ]
+                    ).then({
+                    scope: me,
+                    success: function(types) {
+                        deferred.resolve(_.first(types).get("TypePath"));
                     }
-                };
-            });
-
-            // read stories for each reporting project
-            async.map(configs,self._wsapiQuery,function(error,results) {
-                self.features = results;
-                callback(null);
-            });
-        },
-
-        _wsapiQuery : function( config , callback ) {
-
-            var storeConfig = {
-                autoLoad : true,
-                limit : "Infinity",
-                model : config.model,
-                fetch : config.fetch,
-                filters : config.filters,
-                listeners : {
-                    scope : this,
-                    load : function(store, data) {
-                        callback(null,data);
-                    }
-                }
+                });
+                return deferred.promise;
             };
 
-            if (!_.isUndefined(config.context)) {
-                storeConfig.context = config.context;
-            }
-            if (!_.isUndefined(config.order)) {
-                storeConfig.order = config.order;
-            }
+            var readFeatures = function(type) {
 
-            Ext.create('Rally.data.WsapiDataStore', storeConfig);
+                var promises = _.map(projects,function(project) {
+                    var deferred = Ext.create('Deft.Deferred');
+                    self._loadAStoreWithAPromise(
+                        type, 
+                        ["FormattedID","Name","ObjectID","LeafStoryCount","LeafStoryPlanEstimateTotal",
+                        "PreliminaryEstimate", "AcceptedLeafStoryCount", "AcceptedLeafStoryPlanEstimateTotal",
+                        "PercentDoneByStoryCount","c_ValueMetricKPI","Rank"], 
+                        [self.featureFilter],
+                        {   project: project.get("_ref"),
+                            projectScopeUp: false,
+                            projectScopeDown: true
+                        },
+                        [ { property : 'DragAndDropRank', direction : 'ASC' } ]).then({
+                        scope: me,
+                        success: function(stories) {
+                            deferred.resolve(stories);
+                        }
+                    });
+                    return deferred.promise;
+                });
+
+                return Deft.Promise.all(promises);
+            };
+
+            var deferred = Ext.create('Deft.Deferred');
+            Deft.Chain.pipeline([readFeatureType,readFeatures],self).then({
+                success: function(results) {
+                    deferred.resolve(results);
+                }
+            });
+            return deferred.promise;
+
         },
 
-        _isChildOf : function( child, parent ) {
-            var childParentRef = !_.isNull(child.get("Parent")) ? child.get("Parent")._ref : "null";
-            return parent._ref.indexOf( childParentRef ) > -1;
+        readPreferenceValues : function(keys) {
+
+            var me = this;
+
+            var promises = _.map(keys,function(key) {
+                var deferred = Ext.create('Deft.Deferred');
+                self._loadAStoreWithAPromise(
+                        "Preference", 
+                        ["Name","Value"], 
+                        [{ property : "Name", operator : "=", value : key }]
+                    ).then({
+                        scope: me,
+                        success: function(values) {
+                            deferred.resolve(values);
+                        },
+                        failure: function(error) {
+                            deferred.resolve("");
+                        }
+                    });
+                return deferred.promise;
+            });
+            return Deft.Promise.all(promises);
+        },
+
+        _loadAStoreWithAPromise: function(model_name, model_fields, filters,ctx,order){
+            var deferred = Ext.create('Deft.Deferred');
+            var me = this;
+              
+            var config = {
+                model: model_name,
+                fetch: model_fields,
+                filters: filters,
+                limit: 'Infinity'
+            };
+            if (!_.isUndefined(ctx)&&!_.isNull(ctx)) {
+                config.context = ctx;
+            }
+            if (!_.isUndefined(order)&&!_.isNull(order)) {
+                config.order = order;
+            }
+
+            Ext.create('Rally.data.wsapi.Store', config ).load({
+                callback : function(records, operation, successful) {
+                    if (successful){
+                        deferred.resolve(records);
+                    } else {
+                        deferred.reject('Problem loading: ' + operation.error.errors.join('. '));
+                    }
+                }
+            });
+            return deferred.promise;
         }
-        
     };
-   
 });
                 Ext.define('timebox-selector', {
     extend : 'Ext.Container',
@@ -493,12 +535,12 @@ Ext.define("ProjectStories", function() {
         
         that.rallyFunctions = Ext.create("RallyFunctions");
 
-        var pr = Ext.create( "ProjectStories", {
+        that.projectStories = Ext.create( "ProjectStories", {
             ctx : that.getContext(),
             filter : that.rallyFunctions.createFilter(releaseName,iterationName)
         });
 
-        pr.readProjectStories(function(error, stories, projects, states){
+        that.projectStories.readProjectWorkItems(function(error, stories, projects, states){
             that.readWipValues(projects,function(error,wipLimits) {
                 that.prepareChartData(stories, projects, wipLimits, function(error, categories, series) {
                     that.createChart(categories,series);
@@ -553,18 +595,15 @@ Ext.define("ProjectStories", function() {
             });
         }));
 
-        var configs = _.map(keys,function(key) {
-            return {
-                model : "Preference",
-                filters : [{property:"Name",operator:"=",value:key}],
-                fetch : true
-            };
+        that.projectStories.readPreferenceValues(keys).then( {
+            success: function(values) {
+                callback(null,_.flatten(values));
+            },
+            failure: function() {
+                //handle error
+            },
+            scope: this
         });
-
-        async.map(configs, that.rallyFunctions._wsapiQuery, function(error,results){
-            callback(null, _.flatten(results));
-        });
-
     },
 
     prepareChartData : function(stories,projects,wipLimits,callback) {
@@ -650,7 +689,7 @@ Ext.define("ProjectStories", function() {
                 e.remove(); 
             }
         });
-        var elems = p.query("div.x-mask-msg");
+        elems = p.query("div.x-mask-msg");
         _.each(elems, function(e) { 
             if ( Ext.isIE9 ) { 
                 e.removeNode(); 
@@ -768,14 +807,6 @@ Ext.define("ProjectStories", function() {
         }
     }
 });
-                /*!
- * async
- * https://github.com/caolan/async
- *
- * Copyright 2010-2014 Caolan McMahon
- * Released under the MIT license
- */
-(function(){var w={};function F(){}var k,C;if(typeof window=="object"&&this===window){k=window}else{if(typeof global=="object"&&this===global){k=global}else{k=this}}if(k!=null){C=k.async}w.noConflict=function(){k.async=C;return w};function b(K){var L=false;return function(){if(L){throw new Error("Callback was already called.")}L=true;K.apply(this,arguments)}}function j(K){var L=false;return function(){if(L){return}L=true;K.apply(this,arguments)}}var r=Object.prototype.toString;var G=Array.isArray||function(K){return r.call(K)==="[object Array]"};function A(K){return G(K)||(typeof K.length==="number"&&K.length>=0&&K.length%1===0)}function B(K,L){return A(K)?E(K,L):H(K,L)}function E(K,M){var L=-1,N=K.length;while(++L<N){M(K[L],L,K)}}function n(L,N){var M=-1,O=L.length,K=Array(O);while(++M<O){K[M]=N(L[M],M,L)}return K}function e(K){return n(Array(K),function(L,M){return M})}function o(K,M,L){E(K,function(N,P,O){L=M(L,N,P,O)});return L}function H(K,L){E(m(K),function(M){L(K[M],M)})}var m=Object.keys||function(M){var L=[];for(var K in M){if(M.hasOwnProperty(K)){L.push(K)}}return L};function g(M){var L=-1;var K;var O;if(A(M)){K=M.length;return function N(){L++;return L<K?L:null}}else{O=m(M);K=O.length;return function N(){L++;return L<K?O[L]:null}}}function q(L,O){O=O||0;var M=-1;var N=L.length;if(O){N-=O;N=N<0?0:N}var K=Array(N);while(++M<N){K[M]=L[M+O]}return K}function c(K){return function(M,L,N){return K(M,N)}}var h;if(typeof setImmediate==="function"){h=setImmediate}if(typeof process==="undefined"||!(process.nextTick)){if(h){w.nextTick=function(K){h(K)};w.setImmediate=w.nextTick}else{w.nextTick=function(K){setTimeout(K,0)};w.setImmediate=w.nextTick}}else{w.nextTick=process.nextTick;if(h){w.setImmediate=function(K){h(K)}}else{w.setImmediate=w.nextTick}}w.forEach=w.each=function(K,L,M){return w.eachOf(K,c(L),M)};w.forEachSeries=w.eachSeries=function(K,L,M){return w.eachOfSeries(K,c(L),M)};w.forEachLimit=w.eachLimit=function(K,L,M,N){return z(L)(K,c(M),N)};w.forEachOf=w.eachOf=function(L,O,P){P=j(P||F);L=L||[];var M=A(L)?L.length:m(L).length;var N=0;if(!M){return P(null)}B(L,function(R,Q){O(L[Q],Q,b(K))});function K(Q){if(Q){P(Q)}else{N+=1;if(N>=M){P(null)}}}};w.forEachOfSeries=w.eachOfSeries=function(N,M,O){O=j(O||F);N=N||[];var K=g(N);function L(){var Q=true;var P=K();if(P===null){return O(null)}M(N[P],P,function(R){if(R){O(R)}else{if(Q){w.nextTick(L)}else{L()}}});Q=false}L()};w.forEachOfLimit=w.eachOfLimit=function(M,K,L,N){z(K)(M,L,N)};function z(K){return function(Q,P,S){S=j(S||F);Q=Q||[];var L=g(Q);if(K<=0){return S(null)}var M=false;var N=0;var O=false;(function R(){if(M&&N<=0){return S(null)}while(N<K&&!O){var T=L();if(T===null){M=true;if(N<=0){S(null)}return}N+=1;P(Q[T],T,function(U){N-=1;if(U){S(U);O=true}else{R()}})}})()}}function s(K){return function(M,L,N){return K(w.eachOf,M,L,N)}}function a(K,L){return function(N,M,O){return L(z(K),N,M,O)}}function y(K){return function(M,L,N){return K(w.eachOfSeries,M,L,N)}}function p(N,K,M,O){O=j(O||F);var L=[];N(K,function(Q,P,R){M(Q,function(T,S){L[P]=S;R(T)})},function(P){O(P,L)})}w.map=s(p);w.mapSeries=y(p);w.mapLimit=function(K,L,M,N){return f(L)(K,M,N)};function f(K){return a(K,p)}w.inject=w.foldl=w.reduce=function(K,L,M,N){w.eachOfSeries(K,function(O,P,Q){M(L,O,function(S,R){L=R;Q(S)})},function(O){N(O||null,L)})};w.foldr=w.reduceRight=function(K,L,M,O){var N=n(K,function(P){return P}).reverse();w.reduce(N,L,M,O)};function D(N,K,M,O){var L=[];K=n(K,function(P,Q){return{index:Q,value:P}});N(K,function(P,Q,R){M(P.value,function(S){if(S){L.push(P)}R()})},function(){O(n(L.sort(function(Q,P){return Q.index-P.index}),function(P){return P.value}))})}w.select=w.filter=s(D);w.selectSeries=w.filterSeries=y(D);function v(N,K,M,O){var L=[];K=n(K,function(P,Q){return{index:Q,value:P}});N(K,function(P,Q,R){M(P.value,function(S){if(!S){L.push(P)}R()})},function(){O(n(L.sort(function(Q,P){return Q.index-P.index}),function(P){return P.value}))})}w.reject=s(v);w.rejectSeries=y(v);function t(M,K,L,N){M(K,function(O,P,Q){L(O,function(R){if(R){N(O);N=F}else{Q()}})},function(){N()})}w.detect=s(t);w.detectSeries=y(t);w.any=w.some=function(K,L,M){w.eachOf(K,function(N,O,P){L(N,function(Q){if(Q){M(true);M=F}P()})},function(){M(false)})};w.all=w.every=function(K,L,M){w.eachOf(K,function(N,O,P){L(N,function(Q){if(!Q){M(false);M=F}P()})},function(){M(true)})};w.sortBy=function(K,M,N){w.map(K,function(O,P){M(O,function(Q,R){if(Q){P(Q)}else{P(null,{value:O,criteria:R})}})},function(P,O){if(P){return N(P)}else{N(null,n(O.sort(L),function(Q){return Q.value}))}});function L(R,Q){var P=R.criteria,O=Q.criteria;return P<O?-1:P>O?1:0}};w.auto=function(M,R){R=j(R||F);var S=m(M);var L=S.length;if(!L){return R(null)}var O={};var Q=[];function K(T){Q.unshift(T)}function N(U){for(var T=0;T<Q.length;T+=1){if(Q[T]===U){Q.splice(T,1);return}}}function P(){L--;E(Q.slice(0),function(T){T()})}K(function(){if(!L){R(null,O)}});E(S,function(V){var U=G(M[V])?M[V]:[M[V]];function aa(ad){var ab=q(arguments,1);if(ab.length<=1){ab=ab[0]}if(ad){var ac={};E(m(O),function(ae){ac[ae]=O[ae]});ac[V]=ab;R(ad,ac)}else{O[V]=ab;w.setImmediate(P)}}var X=U.slice(0,Math.abs(U.length-1))||[];var T=X.length;var Z;while(T--){if(!(Z=M[X[T]])){throw new Error("Has inexistant dependency")}if(G(Z)&&!!~Z.indexOf(V)){throw new Error("Has cyclic dependencies")}}function W(){return o(X,function(ac,ab){return(ac&&O.hasOwnProperty(ab))},true)&&!O.hasOwnProperty(V)}if(W()){U[U.length-1](aa,O)}else{K(Y)}function Y(){if(W()){N(Y);U[U.length-1](aa,O)}}})};w.retry=function(O,K,P){var M=5;var L=[];if(typeof O==="function"){P=K;K=O;O=M}O=parseInt(O,10)||M;function N(S,Q){function R(T,U){return function(V){T(function(X,W){V(!X||U,{err:X,result:W})},Q)}}while(O){L.push(R(K,!(O-=1)))}w.series(L,function(T,U){U=U[U.length-1];(S||P)(U.err,U.result)})}return P?N():N};w.waterfall=function(N,M){M=j(M||F);if(!G(N)){var K=new Error("First argument to waterfall must be an array of functions");return M(K)}if(!N.length){return M()}function L(O){return function(R){if(R){M.apply(null,arguments)}else{var P=q(arguments,1);var Q=O.next();if(Q){P.push(L(Q))}else{P.push(M)}J(O).apply(null,P)}}}L(w.iterator(N))()};function l(L,N,M){M=M||F;var K=A(N)?[]:{};L(N,function(O,P,Q){O(function(S){var R=q(arguments,1);if(R.length<=1){R=R[0]}K[P]=R;Q(S)})},function(O){M(O,K)})}w.parallel=function(L,K){l(w.eachOf,L,K)};w.parallelLimit=function(M,K,L){l(z(K),M,L)};w.series=function(M,L){L=L||F;var K=A(M)?[]:{};w.eachOfSeries(M,function(N,O,P){N(function(R){var Q=q(arguments,1);if(Q.length<=1){Q=Q[0]}K[O]=Q;P(R)})},function(N){L(N,K)})};w.iterator=function(L){function K(M){function N(){if(L.length){L[M].apply(null,arguments)}return N.next()}N.next=function(){return(M<L.length-1)?K(M+1):null};return N}return K(0)};w.apply=function(L){var K=q(arguments,1);return function(){return L.apply(null,K.concat(q(arguments)))}};function x(N,L,M,O){var K=[];N(L,function(Q,R,P){M(Q,function(S,T){K=K.concat(T||[]);P(S)})},function(P){O(P,K)})}w.concat=s(x);w.concatSeries=y(x);w.whilst=function(M,K,L){if(M()){K(function(N){if(N){return L(N)}w.whilst(M,K,L)})}else{L(null)}};w.doWhilst=function(K,M,L){K(function(O){if(O){return L(O)}var N=q(arguments,1);if(M.apply(null,N)){w.doWhilst(K,M,L)}else{L(null)}})};w.until=function(M,K,L){if(!M()){K(function(N){if(N){return L(N)}w.until(M,K,L)})}else{L(null)}};w.doUntil=function(K,M,L){K(function(O){if(O){return L(O)}var N=q(arguments,1);if(!M.apply(null,N)){w.doUntil(K,M,L)}else{L(null)}})};function d(Q,N,P){if(N==null){N=1}else{if(N===0){throw new Error("Concurrency must not be zero")}}function K(S,R,U,T){if(T!=null&&typeof T!=="function"){throw new Error("task callback must be a function")}S.started=true;if(!G(R)){R=[R]}if(R.length===0&&S.idle()){return w.setImmediate(function(){S.drain()})}E(R,function(V){var W={data:V,callback:T||F};if(U){S.tasks.unshift(W)}else{S.tasks.push(W)}if(S.tasks.length===S.concurrency){S.saturated()}});w.setImmediate(S.process)}function M(R,S){return function(){L-=1;var T=arguments;E(S,function(U){U.callback.apply(U,T)});if(R.tasks.length+L===0){R.drain()}R.process()}}var L=0;var O={tasks:[],concurrency:N,saturated:F,empty:F,drain:F,started:false,paused:false,push:function(R,S){K(O,R,false,S)},kill:function(){O.drain=F;O.tasks=[]},unshift:function(R,S){K(O,R,true,S)},process:function(){if(!O.paused&&L<O.concurrency&&O.tasks.length){while(L<O.concurrency&&O.tasks.length){var T=P?O.tasks.splice(0,P):O.tasks.splice(0,O.tasks.length);var S=n(T,function(U){return U.data});if(O.tasks.length===0){O.empty()}L+=1;var R=b(M(O,T));Q(S,R)}}},length:function(){return O.tasks.length},running:function(){return L},idle:function(){return O.tasks.length+L===0},pause:function(){O.paused=true},resume:function(){if(O.paused===false){return}O.paused=false;var S=Math.min(O.concurrency,O.tasks.length);for(var R=1;R<=S;R++){w.setImmediate(O.process)}}};return O}w.queue=function(M,K){var L=d(function(O,N){M(O[0],N)},K,1);return L};w.priorityQueue=function(P,N){function M(R,Q){return R.priority-Q.priority}function L(V,T,U){var S=-1,Q=V.length-1;while(S<Q){var R=S+((Q-S+1)>>>1);if(U(T,V[R])>=0){S=R}else{Q=R-1}}return S}function K(S,R,Q,T){if(T!=null&&typeof T!=="function"){throw new Error("task callback must be a function")}S.started=true;if(!G(R)){R=[R]}if(R.length===0){return w.setImmediate(function(){S.drain()})}E(R,function(U){var V={data:U,priority:Q,callback:typeof T==="function"?T:F};S.tasks.splice(L(S.tasks,V,M)+1,0,V);if(S.tasks.length===S.concurrency){S.saturated()}w.setImmediate(S.process)})}var O=w.queue(P,N);O.push=function(R,Q,S){K(O,R,Q,S)};delete O.unshift;return O};w.cargo=function(L,K){return d(L,1,K)};function I(K){return function(M){var L=q(arguments,1);M.apply(null,L.concat([function(O){var N=q(arguments,1);if(typeof console!=="undefined"){if(O){if(console.error){console.error(O)}}else{if(console[K]){E(N,function(P){console[K](P)})}}}}]))}}w.log=I("log");w.dir=I("dir");w.memoize=function(O,M){var L={};var N={};M=M||function(P){return P};function K(){var P=q(arguments);var R=P.pop();var Q=M.apply(null,P);if(Q in L){w.nextTick(function(){R.apply(null,L[Q])})}else{if(Q in N){N[Q].push(R)}else{N[Q]=[R];O.apply(null,P.concat([function(){L[Q]=q(arguments);var U=N[Q];delete N[Q];for(var T=0,S=U.length;T<S;T++){U[T].apply(null,arguments)}}]))}}}K.memo=L;K.unmemoized=O;return K};w.unmemoize=function(K){return function(){return(K.unmemoized||K).apply(null,arguments)}};function u(K){return function(M,L,N){K(e(M),L,N)}}w.times=u(w.map);w.timesSeries=u(w.mapSeries);w.timesLimit=function(M,K,L,N){return w.mapLimit(e(M),K,L,N)};w.seq=function(){var K=arguments;return function(){var M=this;var L=q(arguments);var N=L.slice(-1)[0];if(typeof N=="function"){L.pop()}else{N=F}w.reduce(K,L,function(P,Q,O){Q.apply(M,P.concat([function(){var S=arguments[0];var R=q(arguments,1);O(S,R)}]))},function(P,O){N.apply(M,[P].concat(O))})}};w.compose=function(){return w.seq.apply(null,Array.prototype.reverse.call(arguments))};function i(N,L){function M(){var P=this;var O=q(arguments);var Q=O.pop();return N(L,function(T,S,R){T.apply(P,O.concat([R]))},Q)}if(arguments.length>2){var K=q(arguments,2);return M.apply(this,K)}else{return M}}w.applyEach=function(){var K=q(arguments);return i.apply(null,[w.eachOf].concat(K))};w.applyEachSeries=function(){var K=q(arguments);return i.apply(null,[w.eachOfSeries].concat(K))};w.forever=function(N,O){var K=b(O||F);var L=J(N);function M(P){if(P){return K(P)}L(M)}M()};function J(K){return function(){var L=q(arguments);var N=L.pop();L.push(function(){var O=arguments;if(M){w.setImmediate(function(){N.apply(null,O)})}else{N.apply(null,O)}});var M=true;K.apply(this,L);M=false}}w.ensureAsync=J;if(typeof module!=="undefined"&&module.exports){module.exports=w}else{if(typeof define!=="undefined"&&define.amd){define([],function(){return w})}else{k.async=w}}}());
 
             Rally.launchApp('CustomApp', {
                 name:"wip-limits-chart",
@@ -784,6 +815,7 @@ Ext.define("ProjectStories", function() {
 
         });
     </script>
+
 
 
     <style type="text/css">

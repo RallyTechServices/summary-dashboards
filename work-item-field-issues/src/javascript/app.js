@@ -134,16 +134,23 @@ Ext.define("work-item-field-issues", {
         _createSummaryHeader: function(validatorData){
             this.logger.log('_createSummaryHeader',validatorData);
 
-            var ct_chart = this.getBody().add({
-                xtype: 'container',
-                flex: 1
-            });
-
+            var ct_chart = this.down('#ct-chart');
+            if (!ct_chart){
+                var ct_chart = this.getBody().add({
+                    itemId: 'ct-chart',
+                    xtype: 'container',
+                    flex: 1
+                });
+            }
             this._createSummaryChart(ct_chart, validatorData);
 
-            var ct_detail_grid = this.getBody().add({
-                xtype: 'container'
-            });
+            var ct_detail_grid = this.down('#ct-grid');
+            if (!ct_detail_grid){
+                var ct_detail_grid = this.getBody().add({
+                    xtype: 'container',
+                    itemId: 'ct-grid'
+                });
+            }
             this._createDetailGrid(ct_detail_grid, validatorData);
 
         },
@@ -200,6 +207,9 @@ Ext.define("work-item-field-issues", {
                 ', ' +
                 (this.selectedIteration ? 'Iteration <b>' + this.selectedIteration.get('Name') + '</b>' : 'All Iterations');
 
+            if (this.down('#summary-chart')){
+                this.down('#summary-chart').destroy();
+            }
             var chart = ct.add({
                 xtype: 'rallychart',
                 itemId: 'summary-chart',
@@ -241,8 +251,6 @@ Ext.define("work-item-field-issues", {
 
             ct.removeAll();
 
-
-
             var store = Ext.create('Rally.data.custom.Store',{
                 data: violationData,
                 pageSize: violationData.length,
@@ -253,6 +261,10 @@ Ext.define("work-item-field-issues", {
                     return record.get('Project');
                 }
             });
+
+            if (this.down('#detail-grid')){
+                this.down('#detail-grid').destroy();
+            }
 
             ct.add({
                 xtype:'rallygrid',

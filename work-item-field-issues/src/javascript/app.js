@@ -91,7 +91,8 @@ Ext.define("work-item-field-issues", {
                 this.setLoading(true);
                 var promises = [
                     this._fetchData(this.portfolioItemFeature, this.featureFetchFields, this.getReleaseFilters(release)),
-                    this._fetchData('HierarchicalRequirement', this.storyFetchFields, this.getReleaseFilters(release).concat(this.getIterationFilters(iteration)))
+                    this._fetchData('HierarchicalRequirement', this.storyFetchFields, this.getReleaseFilters(release).concat(this.getIterationFilters(iteration))),
+                    this._fetchScheduleStates()
                 ];
 
                 Deft.Promise.all(promises).then({
@@ -101,8 +102,7 @@ Ext.define("work-item-field-issues", {
                         this.logger.log('_fetchData success', records);
 
                         var featureRules = Ext.create('Rally.technicalservices.FeatureValidationRules',{
-                                stories: records[1],
-                                iterations: records[2]
+                                stories: records[1]
                             }),
                             featureValidator = Ext.create('Rally.technicalservices.Validator',{
                                 validationRuleObj: featureRules,
@@ -110,7 +110,9 @@ Ext.define("work-item-field-issues", {
                             });
 
                         var storyRules = Ext.create('Rally.technicalservices.UserStoryValidationRules',{
-                                features: records[0]
+                                features: records[0],
+                                orderedScheduleStates: records[2],
+                                definedScheduleStateIndex: _.indexOf(records[2], 'Defined')
                             }),
                             storyValidator = Ext.create('Rally.technicalservices.Validator',{
                                 validationRuleObj: storyRules,
@@ -130,6 +132,31 @@ Ext.define("work-item-field-issues", {
                 });
 
             }
+        },
+        _fetchScheduleStates: function(){
+            var deferred = Ext.create('Deft.Deferred');
+            var scheduleStates = [];
+            Rally.data.ModelFactory.getModel({
+                type: 'UserStory',
+                fetch: ['ValueIndex','StringValue'],
+                sorters: [{
+                    property: 'ValueIndex',
+                    direction: 'ASC'
+                }],
+                success: function(model) {
+                    model.getField('ScheduleState').getAllowedValueStore().load({
+                        callback: function(records, operation, success) {
+                            Ext.Array.each(records, function(allowedValue) {
+                                //each record is an instance of the AllowedAttributeValue model
+                                scheduleStates.push(allowedValue.get('StringValue'));
+                            });
+                            deferred.resolve(scheduleStates);
+                        }
+                    });
+                }
+            });
+
+            return deferred;
         },
         _createSummaryHeader: function(validatorData){
             this.logger.log('_createSummaryHeader',validatorData);
@@ -279,28 +306,6 @@ Ext.define("work-item-field-issues", {
                 }]
 
             });
-
-            //ct.add({
-            //    xtype: 'rallybutton',
-            //    text: 'Show Details',
-            //    scope: this,
-            //    handler: function(btn){
-            //        if (btn.text == 'Show Details'){
-            //            height = 1000;
-            //            btn.text = 'Hide Details';
-            //        } else {
-            //            height = 200;
-            //            btn.text = 'Show Details';
-            //        }
-            //        console.log(
-            //            'this. show details', height, this.getEl(), this.up('x-rally-resizable-proxy')
-            //        )
-            //        if (this.up('x-rally-resizable-proxy')){
-            //            this.up('x-rally-resizable-proxy').setHeight(height, true);
-            //        }
-            //    }
-            //});
-
 
         },
         _getColumnCfgs: function(){

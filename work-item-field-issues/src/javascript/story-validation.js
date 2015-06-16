@@ -3,17 +3,22 @@ Ext.define('Rally.technicalservices.UserStoryValidationRules',{
     //ruleFnPrefix: 'ruleFn_',
     requiredFields: undefined, //
     features: undefined,
+    orderedScheduleStates: undefined,
+    definedScheduleStateIndex: undefined,
 
     constructor: function(config){
         Ext.apply(this, config);
         this.requiredFields = ['Owner','PlanEstimate'];
+        console.log('schedulestates', this.orderedScheduleStates, this.definedScheduleStateIndex);
     },
     ruleFn_unscheduledIterationScheduleState: function(r){
         /**
          * If Iteration = unscheduled and state In-Progress raise flag
          */
-        if (!r.get('Iteration') && r.get('ScheduleState') != 'Defined'){
-            return Ext.String.format('{0} is an invalid state for an unscheduled Iteration', r.get('ScheduleState'));
+        var scheduleStateIdx = _.indexOf(this.orderedScheduleStates, r.get('ScheduleState'));
+
+        if (!r.get('Iteration') && scheduleStateIdx > this.definedScheduleStateIndex){
+            return Ext.String.format('<li>{0} is an invalid state for an unscheduled Iteration', r.get('ScheduleState'));
         }
         return null;
     },

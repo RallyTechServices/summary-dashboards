@@ -1,16 +1,16 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Work Queue</title>
+    <title>Story Progress Pie</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Sun Jun 07 2015 18:57:58 GMT-0700 (PDT) -->
+    <!--  Build Date: Sun Jun 07 2015 23:26:03 GMT-0700 (PDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Sun Jun 07 2015 18:57:58 GMT-0700 (PDT)";
-        var CHECKSUM = 21010509147;
+        var APP_BUILD_DATE = "Sun Jun 07 2015 23:26:03 GMT-0700 (PDT)";
+        var CHECKSUM = 21055416128;
     </script>
 
-    <script type="text/javascript" src="/apps/2.0rc2/sdk.js"></script>
+    <script type="text/javascript" src="/apps/2.0rc3/sdk.js"></script>
 
     <script type="text/javascript">
         if (!window.location.origin) {
@@ -892,8 +892,8 @@ Ext.define("TSWorkQueue", {
 });
 
             
-               Rally.launchApp('TSWorkQueue', {
-                   name: 'Work Queue'
+               Rally.launchApp('TSStoryProgressPie', {
+                   name: 'Story Progress Pie'
                });
         });
     </script>

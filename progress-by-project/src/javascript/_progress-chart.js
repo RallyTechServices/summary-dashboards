@@ -39,7 +39,7 @@ Ext.define('Rally.technicalservices.progressChart',{
                     },
                     color: '#FFFFFF'
                 },
-                stacking: 'normal'
+                stacking: 'percent'
             }        
         }
     },

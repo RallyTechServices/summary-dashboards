@@ -93,7 +93,7 @@ Ext.define('Rally.technicalservices.UserStoryValidationRules',{
         return msg;
     },
     ruleFn_storyRiskDescription: function(r){
-        if (r.get('c_Risk') && !r.get('c_RiskDescription')){
+        if (r.get('c_Risk') && !r.get('c_RiskStatement')){
             return '<li>Story flagged as Risk has no Risk description.'
         }
         return null;

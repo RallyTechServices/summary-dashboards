@@ -54,8 +54,8 @@ Ext.define('Rally.technicalservices.FeatureValidationRules',{
         return null;
     },
     ruleFn_featureRiskDescription: function(r){
-        if (r.get('c_Risk') && !r.get('c_RiskStatement')){
-            return 'Feature flagged as Risk has no Risk description.'
+        if (r.get('c_Risk') && !r.get('c_RiskDescription')){
+            return '<i>Feature flagged as Risk has no Risk description.'
         }
         return null;
     }

@@ -230,6 +230,8 @@ Ext.define("work-item-field-issues", {
                 });
             });
 
+            var categories = Ext.Array.map(projects, function(project) { return _.last(project.split('>')); });
+            
             var subtitle_text = (this.selectedRelease ? 'Release <b>' + this.selectedRelease.get('Name')  + '</b>': 'All Releases') +
                 ', ' +
                 (this.selectedIteration ? 'Iteration <b>' + this.selectedIteration.get('Name') + '</b>' : 'All Iterations');
@@ -243,7 +245,7 @@ Ext.define("work-item-field-issues", {
                 loadMask: false,
                 chartData: {
                     series: series,
-                    categories: projects
+                    categories: categories
                 },
                 chartConfig: {
                     chart: {

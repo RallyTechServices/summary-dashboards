@@ -3,11 +3,11 @@
 <head>
     <title>Work Item Field Issues</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Mon Jun 22 2015 15:16:16 GMT-0700 (PDT) -->
+    <!--  Build Date: Mon Jun 22 2015 15:37:03 GMT-0700 (PDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Mon Jun 22 2015 15:16:16 GMT-0700 (PDT)";
-        var CHECKSUM = 26049311736;
+        var APP_BUILD_DATE = "Mon Jun 22 2015 15:37:03 GMT-0700 (PDT)";
+        var CHECKSUM = 26255590430;
     </script>
     
     <script type="text/javascript" src="/apps/2.0rc3/sdk.js"></script>
@@ -502,6 +502,8 @@ Ext.define("work-item-field-issues", {
                 });
             });
 
+            var categories = Ext.Array.map(projects, function(project) { return _.last(project.split('>')); });
+            
             var subtitle_text = (this.selectedRelease ? 'Release <b>' + this.selectedRelease.get('Name')  + '</b>': 'All Releases') +
                 ', ' +
                 (this.selectedIteration ? 'Iteration <b>' + this.selectedIteration.get('Name') + '</b>' : 'All Iterations');
@@ -515,7 +517,7 @@ Ext.define("work-item-field-issues", {
                 loadMask: false,
                 chartData: {
                     series: series,
-                    categories: projects
+                    categories: categories
                 },
                 chartConfig: {
                     chart: {

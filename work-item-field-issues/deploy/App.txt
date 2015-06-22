@@ -3,19 +3,19 @@
 <head>
     <title>Work Item Field Issues</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Mon Jun 22 2015 09:31:40 GMT-0600 (MDT) -->
+    <!--  Build Date: Mon Jun 22 2015 09:40:40 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Mon Jun 22 2015 09:31:40 GMT-0600 (MDT)";
-        var CHECKSUM = 26252606373;
+        var APP_BUILD_DATE = "Mon Jun 22 2015 09:40:40 GMT-0600 (MDT)";
+        var CHECKSUM = 26265790450;
     </script>
     
     <script type="text/javascript" src="/apps/2.0rc3/sdk.js"></script>
 
     <script type="text/javascript">
-        if (!window.location.origin) {
-            window.location.origin = window.location.protocol + "//" + window.location.hostname + (window.location.port ? ':' + window.location.port: '');
-        }
+//        if (!window.location.origin) {
+//            window.location.origin = window.location.protocol + "//" + window.location.hostname + (window.location.port ? ':' + window.location.port: '');
+//        }
         Rally.onReady(function() {
              
 /**

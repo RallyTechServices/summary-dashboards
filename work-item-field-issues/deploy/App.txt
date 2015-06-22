@@ -3,11 +3,11 @@
 <head>
     <title>Work Item Field Issues</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Mon Jun 22 2015 15:37:03 GMT-0700 (PDT) -->
+    <!--  Build Date: Mon Jun 22 2015 16:07:43 GMT-0700 (PDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Mon Jun 22 2015 15:37:03 GMT-0700 (PDT)";
-        var CHECKSUM = 26255590430;
+        var APP_BUILD_DATE = "Mon Jun 22 2015 16:07:43 GMT-0700 (PDT)";
+        var CHECKSUM = 28560197974;
     </script>
     
     <script type="text/javascript" src="/apps/2.0rc3/sdk.js"></script>
@@ -221,6 +221,8 @@ Ext.define('Rally.technicalservices.ValidationRules',{
                     return 'Story Risk has no Description';
                 case 'ruleFn_featureRiskDescription':
                     return 'Feature Risk has no Description';
+                case 'ruleFn_taskMissingFields':
+                    return 'Task fields Missing';
             }
             return ruleName;
         }
@@ -282,11 +284,13 @@ Ext.define("work-item-field-issues", {
         portfolioItemFeature: 'PortfolioItem/Feature',
         featureFetchFields: ['FormattedID','Name','Project','Release','State','AcceptedLeafStoryCount','LeafStoryCount','PlannedStartDate','PlannedEndDate','Owner','ActualStartDate','Parent','ValueScore','c_ValueMetricKPI','c_Risk','c_RiskDescription','LeafStoryPlanEstimateTotal'],
         storyFetchFields: ['FormattedID','Name','Project','Iteration','Release','ScheduleState','Feature','Owner','PlanEstimate','Blocked','BlockedReason','Blocker','c_Risk','c_RiskStatement'],
+        taskFetchFields: ['FormattedID','Name','Project','Iteration','Release','State','Owner'],
 
 
         typeMapping: {
             'portfolioitem/feature': 'Feature',
-            'hierarchicalrequirement': 'User Story'
+            'hierarchicalrequirement': 'User Story',
+            'task'                   : 'Task'
         },
 
         chartColors: [ '#2f7ed8', '#8bbc21', '#910000',
@@ -364,7 +368,8 @@ Ext.define("work-item-field-issues", {
                 var promises = [
                     this._fetchData(this.portfolioItemFeature, this.featureFetchFields, this.getReleaseFilters(release)),
                     this._fetchData('HierarchicalRequirement', this.storyFetchFields, this.getReleaseFilters(release).concat(this.getIterationFilters(iteration))),
-                    this._fetchScheduleStates()
+                    this._fetchScheduleStates(),
+                    this._fetchData('Task', this.taskFetchFields, this.getReleaseFilters(release).concat(this.getIterationFilters(iteration)))
                 ];
 
                 Deft.Promise.all(promises).then({
@@ -373,27 +378,37 @@ Ext.define("work-item-field-issues", {
                         this.setLoading(false);
                         this.logger.log('_fetchData success', records);
 
+                        var features        = records[0];
+                        var stories         = records[1];
+                        var schedule_states = records[2];
+                        var tasks           = records[3];
+                        
                         var featureRules = Ext.create('Rally.technicalservices.FeatureValidationRules',{
-                                stories: records[1]
+                                stories: stories
                             }),
                             featureValidator = Ext.create('Rally.technicalservices.Validator',{
                                 validationRuleObj: featureRules,
-                                records: records[0]
+                                records: features
                             });
 
                         var storyRules = Ext.create('Rally.technicalservices.UserStoryValidationRules',{
-                                features: records[0],
-                                orderedScheduleStates: records[2],
-                                definedScheduleStateIndex: _.indexOf(records[2], 'Defined')
+                                features: features,
+                                orderedScheduleStates: schedule_states,
+                                definedScheduleStateIndex: _.indexOf(schedule_states, 'Defined')
                             }),
                             storyValidator = Ext.create('Rally.technicalservices.Validator',{
                                 validationRuleObj: storyRules,
-                                records: records[1]
+                                records: stories
                             });
 
-                        this.logger.log('featureStats',featureValidator.ruleViolationData, storyValidator.ruleViolationData);
-
-                        this.validatorData = featureValidator.ruleViolationData.concat(storyValidator.ruleViolationData);
+                        var taskRules = Ext.create('Rally.technicalservices.TaskValidationRules',{ }),
+                            taskValidator = Ext.create('Rally.technicalservices.Validator',{
+                                validationRuleObj: taskRules,
+                                records: tasks
+                            });
+                       
+                        this.validatorData = featureValidator.ruleViolationData.concat(storyValidator.ruleViolationData).concat(taskValidator.ruleViolationData);
+                        this.logger.log("validationData:", this.validatorData);
                         this._createSummaryHeader(this.validatorData);
 
                     },
@@ -431,7 +446,6 @@ Ext.define("work-item-field-issues", {
             return deferred;
         },
         _createSummaryHeader: function(validatorData){
-            this.logger.log('_createSummaryHeader',validatorData);
 
             var ct_chart = this.down('#ct-chart');
             if (!ct_chart){
@@ -478,11 +492,16 @@ Ext.define("work-item-field-issues", {
                 });
             });
 
-            this.logger.log('data',validatorData, dataHash, projects, types, rules);
             projects.sort();
 
             var series = [];
 
+            var stack_by_type = {
+                'portfolioitem/feature': 'feature',
+                'hierarchicalrequirement': 'story',
+                'task': 'story' // want to stack stories and tasks together
+            };
+            
             _.each(types, function(t){
                 _.each(rules, function(r){
                     var data = [];
@@ -496,7 +515,7 @@ Ext.define("work-item-field-issues", {
                     series.push({
                         name: Rally.technicalservices.ValidationRules.getUserFriendlyRuleLabel(r),
                         data: data,
-                        stack: t,
+                        stack: stack_by_type[t],
                         showInLegend: Ext.Array.sum(data) > 0
                     });
                 });
@@ -860,7 +879,6 @@ Ext.define('Rally.technicalservices.UserStoryValidationRules',{
         return null;
     },
     ruleFn_storyBlockedWithoutReason: function(r){
-        console.log('blocked',r.get('FormattedID'), r.get('Blocked'), r.get('BlockedReason'), r.get('Blocker'));
         if (r.get('Blocked') && !r.get('BlockedReason')){
             if (r.get('Blocker')){
                 console.log('blocker', r.get('Blocker'));
@@ -891,6 +909,31 @@ Ext.define('Rally.technicalservices.UserStoryValidationRules',{
             return '<li>Story Risk has no Description'
         }
         return null;
+    }
+});
+
+
+Ext.define('Rally.technicalservices.TaskValidationRules',{
+    extend: 'Rally.technicalservices.ValidationRules',
+    //ruleFnPrefix: 'ruleFn_',
+    requiredFields: ['Owner'], //
+
+    constructor: function(config){
+        Ext.apply(this, config);
+    },
+    ruleFn_taskMissingFields: function(r) {
+        var missingFields = [];
+
+        _.each(this.requiredFields, function (f) {
+            if (!r.get(f) && r.getField(f)) {
+                var name = r.getField(f).displayName;
+                missingFields.push(name);
+            }
+        });
+        if (missingFields.length === 0) {
+            return null;
+        }
+        return Ext.String.format('<li>Task fields Missing: {0}', missingFields.join(','));
     }
 });
 

@@ -66,7 +66,6 @@ Ext.define('Rally.technicalservices.UserStoryValidationRules',{
         return null;
     },
     ruleFn_storyBlockedWithoutReason: function(r){
-        console.log('blocked',r.get('FormattedID'), r.get('Blocked'), r.get('BlockedReason'), r.get('Blocker'));
         if (r.get('Blocked') && !r.get('BlockedReason')){
             if (r.get('Blocker')){
                 console.log('blocker', r.get('Blocker'));

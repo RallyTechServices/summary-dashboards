@@ -3,11 +3,11 @@
 <head>
     <title>Work Item Field Issues</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Thu Jun 18 2015 21:04:17 GMT-0700 (PDT) -->
+    <!--  Build Date: Mon Jun 22 2015 09:31:40 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Thu Jun 18 2015 21:04:17 GMT-0700 (PDT)";
-        var CHECKSUM = 26237671857;
+        var APP_BUILD_DATE = "Mon Jun 22 2015 09:31:40 GMT-0600 (MDT)";
+        var CHECKSUM = 26252606373;
     </script>
     
     <script type="text/javascript" src="/apps/2.0rc3/sdk.js"></script>
@@ -280,7 +280,7 @@ Ext.define("work-item-field-issues", {
          */
         allReleasesText: 'All Releases',
         portfolioItemFeature: 'PortfolioItem/Feature',
-        featureFetchFields: ['FormattedID','Name','Project','Release','State','AcceptedLeafStoryCount','LeafStoryCount','PlannedStartDate','PlannedEndDate','Owner','ActualStartDate','Parent','ValueScore','c_ValueMetricKPI','c_Risk','c_RiskStatement','LeafStoryPlanEstimateTotal'],
+        featureFetchFields: ['FormattedID','Name','Project','Release','State','AcceptedLeafStoryCount','LeafStoryCount','PlannedStartDate','PlannedEndDate','Owner','ActualStartDate','Parent','ValueScore','c_ValueMetricKPI','c_Risk','c_RiskDescription','LeafStoryPlanEstimateTotal'],
         storyFetchFields: ['FormattedID','Name','Project','Iteration','Release','ScheduleState','Feature','Owner','PlanEstimate','Blocked','BlockedReason','Blocker','c_Risk','c_RiskStatement'],
 
 
@@ -783,8 +783,8 @@ Ext.define('Rally.technicalservices.FeatureValidationRules',{
         return null;
     },
     ruleFn_featureRiskDescription: function(r){
-        if (r.get('c_Risk') && !r.get('c_RiskStatement')){
-            return 'Feature flagged as Risk has no Risk description.'
+        if (r.get('c_Risk') && !r.get('c_RiskDescription')){
+            return '<i>Feature flagged as Risk has no Risk description.'
         }
         return null;
     }

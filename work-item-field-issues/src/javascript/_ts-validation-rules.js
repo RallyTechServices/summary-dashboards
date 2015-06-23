@@ -47,7 +47,7 @@ Ext.define('Rally.technicalservices.ValidationRules',{
                 case 'ruleFn_noStoriesForFeature':
                     return 'Feature has no Stories';
                 case 'ruleFn_FeatureHasNotBeenStarted':
-                    return 'Feature not started.';
+                    return 'Feature not started';
                 case 'ruleFn_featureHasNotBeenCompleted':
                     return 'Feature not completed.';
                 case 'ruleFn_featureMissingFields':
@@ -55,7 +55,7 @@ Ext.define('Rally.technicalservices.ValidationRules',{
                 case 'ruleFn_storyMissingFields':
                     return 'Story fields Missing';
                 case 'ruleFn_FeatureHasNoParent':
-                    return 'Feature has no parent.';
+                    return 'Feature has no parent';
                 case 'ruleFn_storyHasNoFeature':
                     return 'Story has no parent Feature';
                 case 'ruleFn_storyHasIterationWithoutRelease':
@@ -65,13 +65,19 @@ Ext.define('Rally.technicalservices.ValidationRules',{
                 case 'ruleFn_storyRelaseDoesNotMatchFeatureRelease':
                     return 'Story Release is not Feature Release';
                 case 'ruleFn_storyPlanEstimate':
-                    return 'Story has no points.';
+                    return 'Story has no points';
                 case 'ruleFn_featureHasNoPoints':
                     return 'Feature has no points';
                 case 'ruleFn_storyRiskDescription':
                     return 'Story Risk has no Description';
                 case 'ruleFn_featureRiskDescription':
                     return 'Feature Risk has no Description';
+                case 'ruleFn_taskMissingFields':
+                    return 'Task fields Missing';
+                case 'ruleFn_projectMissingWIP':
+                    return 'Project Missing WIP';
+                case 'ruleFn_iterationMissingFields':
+                    return 'Iteration fields Missing';
             }
             return ruleName;
         }

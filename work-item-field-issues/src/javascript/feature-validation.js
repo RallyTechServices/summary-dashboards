@@ -23,13 +23,13 @@ Ext.define('Rally.technicalservices.FeatureValidationRules',{
     },
     ruleFn_FeatureHasNotBeenStarted: function(r){
         if (!r.get('ActualStartDate')){
-            return Ext.String.format('<li>Feature has not been started.');
+            return Ext.String.format('<li>Feature has not started.');
         }
         return null;
     },
     ruleFn_featureHasNotBeenCompleted: function(r){
         if (!r.get('ActualEndDate')){
-            return Ext.String.format('<li>Feature has not been completed.');
+            return Ext.String.format('<li>Feature not completed.');
         }
         return null;
     },
@@ -45,7 +45,7 @@ Ext.define('Rally.technicalservices.FeatureValidationRules',{
         if (missingFields.length === 0) {
             return null;
         }
-        return Ext.String.format('<li>Missing fields: {0}', missingFields.join(','));
+        return Ext.String.format('<li>Feature fields Missing: {0}', missingFields.join(','));
     },
     ruleFn_FeatureHasNoParent: function(r) {
         if (!r.get('Parent')) {
@@ -55,7 +55,7 @@ Ext.define('Rally.technicalservices.FeatureValidationRules',{
     },
     ruleFn_featureRiskDescription: function(r){
         if (r.get('c_Risk') && !r.get('c_RiskDescription')){
-            return '<i>Feature flagged as Risk has no Risk description.'
+            return '<i>Feature Risk has no Description.'
         }
         return null;
     }

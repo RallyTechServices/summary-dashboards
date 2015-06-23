@@ -25,8 +25,6 @@ Ext.define('CustomApp', {
     },
 
     _launch: function(settings) {
-
-        console.log("_launch");
         var that = this;
 
         console.log("Settings:", settings);

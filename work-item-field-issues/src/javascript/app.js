@@ -68,6 +68,7 @@ Ext.define("work-item-field-issues", {
                 value: Rally.util.DateTime.toIsoString(release.get('ReleaseDate'))
             }];
         },
+        
         getIterationFilters: function(iteration){
             if (!iteration){
                 return [];
@@ -83,7 +84,33 @@ Ext.define("work-item-field-issues", {
                 value: Rally.util.DateTime.toIsoString(iteration.get('EndDate'))
             }];
         },
+        
+        getIterationFiltersForIterations:function(release){
+            if (!release){
+                return [];
+            }
 
+            return [{
+                property: 'StartDate',
+                operator: '>=',
+                value: Rally.util.DateTime.toIsoString(release.get('ReleaseStartDate'))
+            },{
+                property: 'EndDate',
+                operator: '<=',
+                value: Rally.util.DateTime.toIsoString(release.get('ReleaseDate'))
+            }];
+            
+        },
+        
+        getProjectFilters: function() {
+            var project_name = this.getContext().getProject().Name;
+            
+            return Rally.data.wsapi.Filter.or([
+                {property:'Name', value: project_name },
+                {property:'Parent.Name', value: project_name }
+            ]);
+        },
+        
         onTimeboxUpdated: function(release, iteration){
             this.logger.log('onTimeboxUpdated',release, iteration);
 
@@ -95,7 +122,10 @@ Ext.define("work-item-field-issues", {
                     this._fetchData(this.portfolioItemFeature, this.featureFetchFields, this.getReleaseFilters(release)),
                     this._fetchData('HierarchicalRequirement', this.storyFetchFields, this.getReleaseFilters(release).concat(this.getIterationFilters(iteration))),
                     this._fetchScheduleStates(),
-                    this._fetchData('Task', this.taskFetchFields, this.getReleaseFilters(release).concat(this.getIterationFilters(iteration)))
+                    this._fetchData('Task', this.taskFetchFields, this.getReleaseFilters(release).concat(this.getIterationFilters(iteration))),
+                    this._fetchData('Project', ['Name'], this.getProjectFilters()),
+                    this._fetchData('Preference',['Name','Value'], [{property:'Name',operator:'contains',value:'project-wip:'}]),
+                    this._fetchData('Iteration',['Name','PlannedVelocity','Project'], this.getIterationFiltersForIterations(release))
                 ];
 
                 Deft.Promise.all(promises).then({
@@ -108,6 +138,9 @@ Ext.define("work-item-field-issues", {
                         var stories         = records[1];
                         var schedule_states = records[2];
                         var tasks           = records[3];
+                        var projects        = records[4];
+                        var project_preferences = records[5];
+                        var iterations      = records[6];
                         
                         var featureRules = Ext.create('Rally.technicalservices.FeatureValidationRules',{
                                 stories: stories
@@ -133,8 +166,26 @@ Ext.define("work-item-field-issues", {
                                 records: tasks
                             });
                        
-                        this.validatorData = featureValidator.ruleViolationData.concat(storyValidator.ruleViolationData).concat(taskValidator.ruleViolationData);
-                        this.logger.log("validationData:", this.validatorData);
+                       var projectRules = Ext.create('Rally.technicalservices.ProjectValidationRules',{
+                                projectPrefs: project_preferences
+                            }),
+                            projectValidator = Ext.create('Rally.technicalservices.Validator',{
+                                validationRuleObj: projectRules,
+                                records: projects
+                            });
+                            
+                       var iterationRules = Ext.create('Rally.technicalservices.IterationValidationRules',{ }),
+                            iterationValidator = Ext.create('Rally.technicalservices.Validator',{
+                                validationRuleObj: iterationRules,
+                                records: iterations
+                            });
+                            
+                        this.validatorData = featureValidator.ruleViolationData
+                            .concat(    storyValidator.ruleViolationData)
+                            .concat(     taskValidator.ruleViolationData)
+                            .concat(  projectValidator.ruleViolationData)
+                            .concat(iterationValidator.ruleViolationData);
+                            
                         this._createSummaryHeader(this.validatorData);
 
                     },
@@ -223,6 +274,8 @@ Ext.define("work-item-field-issues", {
             var series = [];
 
             var stack_by_type = {
+                'project': 'project',
+                'iteration': 'project',
                 'portfolioitem/feature': 'feature',
                 'hierarchicalrequirement': 'story',
                 'task': 'story' // want to stack stories and tasks together
@@ -340,6 +393,9 @@ Ext.define("work-item-field-issues", {
             }];
         },
         _artifactRenderer: function(v,m,r){
+            if ( r.get('_type') == 'iteration' ) {
+                return r.get('Name');
+            }
             return Rally.nav.DetailLink.getLink({
                 record: r,
                 text: v

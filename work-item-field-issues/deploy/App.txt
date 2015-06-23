@@ -3,11 +3,11 @@
 <head>
     <title>Work Item Field Issues</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Mon Jun 22 2015 16:07:43 GMT-0700 (PDT) -->
+    <!--  Build Date: Mon Jun 22 2015 17:21:41 GMT-0700 (PDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Mon Jun 22 2015 16:07:43 GMT-0700 (PDT)";
-        var CHECKSUM = 28560197974;
+        var APP_BUILD_DATE = "Mon Jun 22 2015 17:21:41 GMT-0700 (PDT)";
+        var CHECKSUM = 37225727472;
     </script>
     
     <script type="text/javascript" src="/apps/2.0rc3/sdk.js"></script>
@@ -223,6 +223,10 @@ Ext.define('Rally.technicalservices.ValidationRules',{
                     return 'Feature Risk has no Description';
                 case 'ruleFn_taskMissingFields':
                     return 'Task fields Missing';
+                case 'ruleFn_projectMissingWIP':
+                    return 'Project Missing WIP';
+                case 'ruleFn_iterationMissingFields':
+                    return 'Iteration fields Missing';
             }
             return ruleName;
         }
@@ -342,6 +346,7 @@ Ext.define("work-item-field-issues", {
                 value: Rally.util.DateTime.toIsoString(release.get('ReleaseDate'))
             }];
         },
+        
         getIterationFilters: function(iteration){
             if (!iteration){
                 return [];
@@ -357,7 +362,33 @@ Ext.define("work-item-field-issues", {
                 value: Rally.util.DateTime.toIsoString(iteration.get('EndDate'))
             }];
         },
+        
+        getIterationFiltersForIterations:function(release){
+            if (!release){
+                return [];
+            }
 
+            return [{
+                property: 'StartDate',
+                operator: '>=',
+                value: Rally.util.DateTime.toIsoString(release.get('ReleaseStartDate'))
+            },{
+                property: 'EndDate',
+                operator: '<=',
+                value: Rally.util.DateTime.toIsoString(release.get('ReleaseDate'))
+            }];
+            
+        },
+        
+        getProjectFilters: function() {
+            var project_name = this.getContext().getProject().Name;
+            
+            return Rally.data.wsapi.Filter.or([
+                {property:'Name', value: project_name },
+                {property:'Parent.Name', value: project_name }
+            ]);
+        },
+        
         onTimeboxUpdated: function(release, iteration){
             this.logger.log('onTimeboxUpdated',release, iteration);
 
@@ -369,7 +400,10 @@ Ext.define("work-item-field-issues", {
                     this._fetchData(this.portfolioItemFeature, this.featureFetchFields, this.getReleaseFilters(release)),
                     this._fetchData('HierarchicalRequirement', this.storyFetchFields, this.getReleaseFilters(release).concat(this.getIterationFilters(iteration))),
                     this._fetchScheduleStates(),
-                    this._fetchData('Task', this.taskFetchFields, this.getReleaseFilters(release).concat(this.getIterationFilters(iteration)))
+                    this._fetchData('Task', this.taskFetchFields, this.getReleaseFilters(release).concat(this.getIterationFilters(iteration))),
+                    this._fetchData('Project', ['Name'], this.getProjectFilters()),
+                    this._fetchData('Preference',['Name','Value'], [{property:'Name',operator:'contains',value:'project-wip:'}]),
+                    this._fetchData('Iteration',['Name','PlannedVelocity','Project'], this.getIterationFiltersForIterations(release))
                 ];
 
                 Deft.Promise.all(promises).then({
@@ -382,6 +416,9 @@ Ext.define("work-item-field-issues", {
                         var stories         = records[1];
                         var schedule_states = records[2];
                         var tasks           = records[3];
+                        var projects        = records[4];
+                        var project_preferences = records[5];
+                        var iterations      = records[6];
                         
                         var featureRules = Ext.create('Rally.technicalservices.FeatureValidationRules',{
                                 stories: stories
@@ -407,8 +444,26 @@ Ext.define("work-item-field-issues", {
                                 records: tasks
                             });
                        
-                        this.validatorData = featureValidator.ruleViolationData.concat(storyValidator.ruleViolationData).concat(taskValidator.ruleViolationData);
-                        this.logger.log("validationData:", this.validatorData);
+                       var projectRules = Ext.create('Rally.technicalservices.ProjectValidationRules',{
+                                projectPrefs: project_preferences
+                            }),
+                            projectValidator = Ext.create('Rally.technicalservices.Validator',{
+                                validationRuleObj: projectRules,
+                                records: projects
+                            });
+                            
+                       var iterationRules = Ext.create('Rally.technicalservices.IterationValidationRules',{ }),
+                            iterationValidator = Ext.create('Rally.technicalservices.Validator',{
+                                validationRuleObj: iterationRules,
+                                records: iterations
+                            });
+                            
+                        this.validatorData = featureValidator.ruleViolationData
+                            .concat(    storyValidator.ruleViolationData)
+                            .concat(     taskValidator.ruleViolationData)
+                            .concat(  projectValidator.ruleViolationData)
+                            .concat(iterationValidator.ruleViolationData);
+                            
                         this._createSummaryHeader(this.validatorData);
 
                     },
@@ -497,6 +552,8 @@ Ext.define("work-item-field-issues", {
             var series = [];
 
             var stack_by_type = {
+                'project': 'project',
+                'iteration': 'project',
                 'portfolioitem/feature': 'feature',
                 'hierarchicalrequirement': 'story',
                 'task': 'story' // want to stack stories and tasks together
@@ -614,6 +671,9 @@ Ext.define("work-item-field-issues", {
             }];
         },
         _artifactRenderer: function(v,m,r){
+            if ( r.get('_type') == 'iteration' ) {
+                return r.get('Name');
+            }
             return Rally.nav.DetailLink.getLink({
                 record: r,
                 text: v
@@ -811,6 +871,90 @@ Ext.define('Rally.technicalservices.FeatureValidationRules',{
     }
 });
 
+Ext.define('Rally.technicalservices.IterationValidationRules',{
+    extend: 'Rally.technicalservices.ValidationRules',
+    //ruleFnPrefix: 'ruleFn_',
+    requiredFields: ['PlannedVelocity'], //
+    /**
+     * 
+     * @config {Ext.data.Model}  
+     * 
+     * An array of the preferences where the names contain 'project-wip'
+     */
+    projectPrefs: [],
+    
+    constructor: function(config){
+        Ext.apply(this, config);
+    },
+    ruleFn_iterationMissingFields: function(r) {
+        var missingFields = [];
+
+        _.each(this.requiredFields, function (f) {
+            if (!r.get(f) && r.getField(f)) {
+                var name = r.getField(f).displayName;
+                missingFields.push(name);
+            }
+        });
+        if (missingFields.length === 0) {
+            return null;
+        }
+        return Ext.String.format('<li>Iteration fields Missing: {0}', missingFields.join(','));
+    }
+});
+
+
+Ext.define('Rally.technicalservices.ProjectValidationRules',{
+    extend: 'Rally.technicalservices.ValidationRules',
+    //ruleFnPrefix: 'ruleFn_',
+    requiredFields: ['Owner'], //
+    /**
+     * 
+     * @config {Ext.data.Model}  
+     * 
+     * An array of the preferences where the names contain 'project-wip'
+     */
+    projectPrefs: [],
+    
+    constructor: function(config){
+        Ext.apply(this, config);
+    },
+    ruleFn_projectMissingWIP: function(r) {
+        // set the project to itself so that we can use it in the chart
+        r.set('Project',r.getData());
+        
+        var missingWIPTypes = [];
+        var checkWIPTypes = ["Complete","Defined","In-Progress"];
+        
+        var prefs = this._getPrefForProject(r.get('Name'));
+        
+        Ext.Array.each(checkWIPTypes, function(checkType){
+            if ( !prefs[checkType] || prefs[checkType] === "" || prefs[checkType] == "0" ) {
+                missingWIPTypes.push(checkType);
+            }
+        });
+        
+        if (missingWIPTypes.length === 0) {
+            return null;
+        }
+        return Ext.String.format('<li>Project Missing WIP: {0}', missingWIPTypes.join(','));
+    },
+    
+    _getPrefForProject: function(project_name) {
+        var prefs = {};
+        var projectRegex = new RegExp(project_name);
+        Ext.Array.each(this.projectPrefs, function(pref){
+            var key = pref.get('Name');
+            // project-wip:IA-Program > OR Solution Architecture Team:CompletedWIP
+            if ( projectRegex.test(key) ) {
+                var type = _.last(key.split(':')).replace(/WIP.*$/,'');
+                prefs[type] = Ext.JSON.decode(pref.get('Value'));
+            }
+        });
+        return prefs;
+    }
+});
+
+
 Ext.define('Rally.technicalservices.UserStoryValidationRules',{
     extend: 'Rally.technicalservices.ValidationRules',
     //ruleFnPrefix: 'ruleFn_',
@@ -922,6 +1066,8 @@ Ext.define('Rally.technicalservices.TaskValidationRules',{
         Ext.apply(this, config);
     },
     ruleFn_taskMissingFields: function(r) {
+        // force FormattedID so it shows in the left column
+        r.set('FormattedID', r.get('Name'));
         var missingFields = [];
 
         _.each(this.requiredFields, function (f) {

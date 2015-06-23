@@ -74,6 +74,10 @@ Ext.define('Rally.technicalservices.ValidationRules',{
                     return 'Feature Risk has no Description';
                 case 'ruleFn_taskMissingFields':
                     return 'Task fields Missing';
+                case 'ruleFn_projectMissingWIP':
+                    return 'Project Missing WIP';
+                case 'ruleFn_iterationMissingFields':
+                    return 'Iteration fields Missing';
             }
             return ruleName;
         }

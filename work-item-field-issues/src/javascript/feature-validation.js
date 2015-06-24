@@ -38,7 +38,7 @@ Ext.define('Rally.technicalservices.FeatureValidationRules',{
 
         _.each(this.requiredFields, function (f) {
             if (!r.get(f)) {
-                var name = r.getField(f).displayName;
+                var name = r.getField(f) ? r.getField(f).displayName : f;
                 missingFields.push(name);
             }
         });

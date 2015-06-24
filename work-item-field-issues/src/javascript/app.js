@@ -122,7 +122,7 @@ Ext.define("work-item-field-issues", {
                     this._fetchData(this.portfolioItemFeature, this.featureFetchFields, this.getReleaseFilters(release)),
                     this._fetchData('HierarchicalRequirement', this.storyFetchFields, this.getReleaseFilters(release).concat(this.getIterationFilters(iteration))),
                     this._fetchScheduleStates(),
-                    this._fetchData('Task', this.taskFetchFields, this.getReleaseFilters(release).concat(this.getIterationFilters(iteration))),
+                //    this._fetchData('Task', this.taskFetchFields, this.getReleaseFilters(release).concat(this.getIterationFilters(iteration))),
                     this._fetchData('Project', ['Name'], this.getProjectFilters()),
                     this._fetchData('Preference',['Name','Value'], [{property:'Name',operator:'contains',value:'project-wip:'}]),
                     this._fetchData('Iteration',['Name','PlannedVelocity','Project'], this.getIterationFiltersForIterations(release))
@@ -137,10 +137,10 @@ Ext.define("work-item-field-issues", {
                         var features        = records[0];
                         var stories         = records[1];
                         var schedule_states = records[2];
-                        var tasks           = records[3];
-                        var projects        = records[4];
-                        var project_preferences = records[5];
-                        var iterations      = records[6];
+                       // var tasks           = records[3];
+                        var projects        = records[3];
+                        var project_preferences = records[4];
+                        var iterations      = records[5];
                         
                         var featureRules = Ext.create('Rally.technicalservices.FeatureValidationRules',{
                                 stories: stories
@@ -160,11 +160,11 @@ Ext.define("work-item-field-issues", {
                                 records: stories
                             });
 
-                        var taskRules = Ext.create('Rally.technicalservices.TaskValidationRules',{ }),
-                            taskValidator = Ext.create('Rally.technicalservices.Validator',{
-                                validationRuleObj: taskRules,
-                                records: tasks
-                            });
+                        //var taskRules = Ext.create('Rally.technicalservices.TaskValidationRules',{ }),
+                        //    taskValidator = Ext.create('Rally.technicalservices.Validator',{
+                        //        validationRuleObj: taskRules,
+                        //        records: tasks
+                        //    });
                        
                        var projectRules = Ext.create('Rally.technicalservices.ProjectValidationRules',{
                                 projectPrefs: project_preferences
@@ -182,7 +182,7 @@ Ext.define("work-item-field-issues", {
                             
                         this.validatorData = featureValidator.ruleViolationData
                             .concat(    storyValidator.ruleViolationData)
-                            .concat(     taskValidator.ruleViolationData)
+                        //    .concat(     taskValidator.ruleViolationData)
                             .concat(  projectValidator.ruleViolationData)
                             .concat(iterationValidator.ruleViolationData);
                             

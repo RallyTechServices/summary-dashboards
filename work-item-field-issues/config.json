@@ -1,7 +1,7 @@
 {
     "name": "Work Item Field Issues",
     "className": "work-item-field-issues",
-    "server": "https://10.32.16.145",
+    "server": "https://demo-services1.rallydev.com/",
     "sdk": "2.0rc3",
     "apiKey": "_PUT_APIKEY_HERE_"
 }

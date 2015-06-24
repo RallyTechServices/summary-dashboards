@@ -89,7 +89,7 @@ Ext.define("ProjectStories", function() {
         },    
 
         readStories : function(projects) {
-
+            console.log('readStories', projects, self.filter);
             var me = this;
 
             var promises = _.map(projects,function(project) {
@@ -104,6 +104,7 @@ Ext.define("ProjectStories", function() {
                     }).then({
                     scope: me,
                     success: function(stories) {
+                        console.log('stories',stories);
                         deferred.resolve(stories);
                     }
                 });

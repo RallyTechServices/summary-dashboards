@@ -15,7 +15,7 @@ Ext.define("TSCountdown", {
     ],
     config: {
         defaultSettings: {
-            showScopeSelector:  false
+            showScopeSelector:  true
         }
     },
     launch: function() {

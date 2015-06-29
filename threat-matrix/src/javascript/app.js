@@ -21,7 +21,8 @@ Ext.define("threat-matrix", {
             riskMultiplier: 2,
             showDataLabels: true,
             showDependencyColors: false,
-            showScopeSelector: true
+            showScopeSelector: true,
+            programRiskSize: 10
         }
     },
     storyFetchFields: ['FormattedID','c_Risk','PlanEstimate','Project','ScheduleState','InProgressDate','Blocked','Blocker','CreationDate','Feature','Name','Predecessors'],
@@ -140,7 +141,8 @@ Ext.define("threat-matrix", {
                         storySizeMultiplier: this.getSetting('storySizeMultiplier'),
                         riskMultiplier: this.getSetting('riskMultiplier'),
                         showDataLabels: this.getSetting('showDataLabels'),
-                        showDependencyColors: this.getSetting('showDependencyColors')
+                        showDependencyColors: this.getSetting('showDependencyColors'),
+                        programRiskSize: this.getSetting('programRiskSize')
                     });
 
                     calc.runCalculation(records[0],records[1]).then({
@@ -216,6 +218,7 @@ Ext.define("threat-matrix", {
             xtype: 'container',
             padding: 10,
             html: '<div class="tslegendtext">Types:  </div><div class="tslegend-square">&nbsp;&nbsp;</div><div class="tslegendtext">&nbsp;&nbsp;Feature (Solid)</div><span class="tslegendspacer">&nbsp;</span>' +
+                '<div class="tslegend-donut">&nbsp;&nbsp;</div><div class="tslegendtext">&nbsp;&nbsp;Program Level Risk Feature (Solid Donut)</div><span class="tslegendspacer">&nbsp;</span>' +
                 '<div class="tslegend-circle">&nbsp;&nbsp;</div><div class="tslegendtext">&nbsp;&nbsp;Story (Translucent)</div><span class="tslegendspacer">&nbsp;</span>' +
                  '<div class="tslegend-hollow-circle">&nbsp;&nbsp;</div><div class="tslegendtext">&nbsp;&nbsp;Predecessor Stories are outlined</div><span class="tslegendspacer">&nbsp;</span>'
         });

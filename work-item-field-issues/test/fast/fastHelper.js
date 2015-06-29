@@ -9,6 +9,19 @@ var shiftDayBeginningToEnd = function(day) {
     return Rally.util.DateTime.add(Rally.util.DateTime.add(Rally.util.DateTime.add(day,'hour',23), 'minute',59),'second',59);
 };
 
+var setWIPLimits = function(){
+    //save app preferences
+    Rally.data.PreferenceManager.update({
+        appID: this.getAppId(),
+        settings: {
+            foo: 'bar'
+        },
+        success: function(updatedRecords, notUpdatedRecords) {
+            //yay!
+        }
+    });
+};
+
 Ext.define('mockStory',{
     extend: 'Ext.data.Model',
     fields: [

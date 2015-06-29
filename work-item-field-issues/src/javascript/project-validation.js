@@ -18,10 +18,10 @@ Ext.define('Rally.technicalservices.ProjectValidationRules',{
         r.set('Project',r.getData());
         
         var missingWIPTypes = [];
-        var checkWIPTypes = ["Complete","Defined","In-Progress"];
+        var checkWIPTypes = ["Completed","Defined","In-Progress"];
         
         var prefs = this._getPrefForProject(r.get('Name'));
-        
+        console.log('prefs', prefs, r.get('Name'));
         Ext.Array.each(checkWIPTypes, function(checkType){
             if ( !prefs[checkType] || prefs[checkType] === "" || prefs[checkType] == "0" ) {
                 missingWIPTypes.push(checkType);
@@ -42,7 +42,9 @@ Ext.define('Rally.technicalservices.ProjectValidationRules',{
         var projectRegex = new RegExp(project_name);
         Ext.Array.each(this.projectPrefs, function(pref){
             var key = pref.get('Name');
+            console.log('key',key);
             // project-wip:IA-Program > OR Solution Architecture Team:CompletedWIP
+            //"project-wip:" + projectname + ":" + state + "WIP";
             if ( projectRegex.test(key) ) {
                 var type = _.last(key.split(':')).replace(/WIP.*$/,'');
                 prefs[type] = Ext.JSON.decode(pref.get('Value'));

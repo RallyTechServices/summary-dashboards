@@ -242,14 +242,17 @@ Ext.define('Rally.technicalservices.ThreatCalculator', {
             isDependencyColor = this.noDependencyColor,
             isDependencyWidth = 0,
             dependencies = [],
-            isProgramLevelRisk = this._isProgramLevelRisk(artifact);  //TODO what to do for this...
+            isProgramLevelRisk = this._isProgramLevelRisk(artifact);
 
 
         var pointName = Ext.String.format("Project: {1}<br/>Size: {2}<br/>Age (days): {3}", artifact.get('FormattedID'),
                 artifact.get('Project').Name,
                 artifact.get('size'), artifact.get('age').toFixed(1));
 
-
+        if (isProgramLevelRisk){
+            color = '#FFFFFF';
+            isDependencyWidth = 2;
+        }
 
         if (hasDependency){
             dependencies = artifact.get('predecessorFids').slice();

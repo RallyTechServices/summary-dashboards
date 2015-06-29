@@ -226,6 +226,13 @@ Ext.define('Rally.technicalservices.ThreatCalculator', {
         this.projectLabelColorMap = projectLabelColorMap;
         return colorMap;
     },
+    _isProgramLevelRisk: function(artifact){
+        return  (this._isArtifactUserStory(artifact) == false &&
+            artifact.get(this.riskField) == true &&
+            artifact.get('LeafStoryCount') == 0 &&
+            !artifact.get('Parent'));
+        }
+    },
     _getSeries: function(artifact){
         this.logger.log('id, size, age, density',artifact.get('FormattedID'),artifact.get('size'),artifact.get('age'), artifact.get('density'),artifact.get('predecessorFids'))
 
@@ -234,13 +241,18 @@ Ext.define('Rally.technicalservices.ThreatCalculator', {
             hasDependency = artifact.get('predecessorFids') ? (artifact.get('predecessorFids').length > 0) : false,
             isDependencyColor = this.noDependencyColor,
             isDependencyWidth = 0,
-            dependencies = [];
+            dependencies = [],
+            isProgramLevelRisk = this._isProgramLevelRisk(artifact);
 
 
         var pointName = Ext.String.format("Project: {1}<br/>Size: {2}<br/>Age (days): {3}", artifact.get('FormattedID'),
                 artifact.get('Project').Name,
                 artifact.get('size'), artifact.get('age').toFixed(1));
 
+        if (isProgramLevelRisk){
+            color = '#FFFFFF';
+            isDependencyWidth = 2;
+        }
 
         if (hasDependency){
             dependencies = artifact.get('predecessorFids').slice();

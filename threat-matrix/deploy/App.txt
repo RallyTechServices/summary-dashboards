@@ -3,11 +3,11 @@
 <head>
     <title>Threat Matrix</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Sun Jun 07 2015 16:58:06 GMT-0600 (MDT) -->
+    <!--  Build Date: Mon Jun 29 2015 17:12:03 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Sun Jun 07 2015 16:58:06 GMT-0600 (MDT)";
-        var CHECKSUM = 44371549997;
+        var APP_BUILD_DATE = "Mon Jun 29 2015 17:12:03 GMT-0600 (MDT)";
+        var CHECKSUM = 47815815233;
     </script>
 
    <script type="text/javascript" src="/apps/2.0rc3/sdk.js"></script>
@@ -128,6 +128,7 @@ Ext.define('Rally.technicalservices.Logger',{
         Ext.apply(this,config);
     },
     log: function(){
+        var timestamp = "[ " + Ext.util.Format.date(new Date(), "Y-m-d H:i:s.u") + " ]";
         var i = -1, l = arguments.length, args = [], fn = 'console.log(args)';
         while(++i<l){
             args.push('args['+i+']');
@@ -181,7 +182,8 @@ Ext.define('Rally.technicalservices.ThreatCalculator', {
         iterationDays: undefined,
         releaseDays: undefined,
         showDataLabels: false,
-        showDependencyColors: false
+        showDependencyColors: false,
+        programRiskSize: undefined
     },
     /**
      * projectTree is used to show the hierarchy of the projects so that we can
@@ -341,6 +343,10 @@ Ext.define('Rally.technicalservices.ThreatCalculator', {
             return false;
         }
 
+        if (this._isProgramLevelRisk(artifact)){
+            return true;
+        }
+
         var size = artifact.get('size'),
             age = artifact.get('age');
 
@@ -366,6 +372,12 @@ Ext.define('Rally.technicalservices.ThreatCalculator', {
         this.projectLabelColorMap = projectLabelColorMap;
         return colorMap;
     },
+    _isProgramLevelRisk: function(artifact){
+        return  (this._isArtifactUserStory(artifact) == false &&
+            artifact.get(this.riskField) == true &&
+            artifact.get('LeafStoryCount') == 0 &&
+            !artifact.get('Parent'));
+    },
     _getSeries: function(artifact){
         this.logger.log('id, size, age, density',artifact.get('FormattedID'),artifact.get('size'),artifact.get('age'), artifact.get('density'),artifact.get('predecessorFids'))
 
@@ -374,13 +386,21 @@ Ext.define('Rally.technicalservices.ThreatCalculator', {
             hasDependency = artifact.get('predecessorFids') ? (artifact.get('predecessorFids').length > 0) : false,
             isDependencyColor = this.noDependencyColor,
             isDependencyWidth = 0,
-            dependencies = [];
+            dependencies = [],
+            isProgramLevelRisk = this._isProgramLevelRisk(artifact);
 
 
         var pointName = Ext.String.format("Project: {1}<br/>Size: {2}<br/>Age (days): {3}", artifact.get('FormattedID'),
                 artifact.get('Project').Name,
                 artifact.get('size'), artifact.get('age').toFixed(1));
 
+        if (isProgramLevelRisk){
+            isDependencyWidth = Math.max(this.programRiskSize-2, 1);
+            isDependencyColor = color;
+            color = '#FFFFFF';
+            pointName = Ext.String.format("<b>Program Level Risk</b><br/>Project: {0}",
+                artifact.get('Project').Name);
+        }
 
         if (hasDependency){
             dependencies = artifact.get('predecessorFids').slice();
@@ -491,6 +511,10 @@ Ext.define('Rally.technicalservices.ThreatCalculator', {
             }
     },
     _getRadius: function(artifact){
+        if (this._isProgramLevelRisk(artifact)){
+            return this.programRiskSize;
+        }
+
         var multiplier = this._isArtifactUserStory(artifact) ? this.storySizeMultiplier || 1 : this.featureSizeMultiplier || 1;
         return Math.max(artifact.get('size') * multiplier || 0, this.minSize);
     },
@@ -667,6 +691,7 @@ Ext.define("threat-matrix", {
     logger: new Rally.technicalservices.Logger(),
     defaults: { margin: 10 },
     items: [
+        {xtype:'tsinfolink',minHeight: 14},
         {xtype:'container',itemId:'settings_box'},
         {xtype:'container', itemId:'selector_box' }
     ],
@@ -683,11 +708,12 @@ Ext.define("threat-matrix", {
             riskMultiplier: 2,
             showDataLabels: true,
             showDependencyColors: false,
-            showScopeSelector: true
+            showScopeSelector: true,
+            programRiskSize: 10
         }
     },
     storyFetchFields: ['FormattedID','c_Risk','PlanEstimate','Project','ScheduleState','InProgressDate','Blocked','Blocker','CreationDate','Feature','Name','Predecessors'],
-    featureFetchFields: ['FormattedID','Project','ActualStartDate','ActualEndDate','LeafStoryPlanEstimateTotal', 'LeafStoryCount','Name', 'c_Risk'], //,'Predecessors'],
+    featureFetchFields: ['FormattedID','Project','ActualStartDate','ActualEndDate','LeafStoryPlanEstimateTotal', 'LeafStoryCount','Name', 'c_Risk', 'Parent'], //,'Predecessors'],
     portfolioItemFeature: 'PortfolioItem/Feature',
     projectFetchFields: ['Name','Parent','ObjectID'],
     riskField: 'c_Risk',
@@ -802,7 +828,8 @@ Ext.define("threat-matrix", {
                         storySizeMultiplier: this.getSetting('storySizeMultiplier'),
                         riskMultiplier: this.getSetting('riskMultiplier'),
                         showDataLabels: this.getSetting('showDataLabels'),
-                        showDependencyColors: this.getSetting('showDependencyColors')
+                        showDependencyColors: this.getSetting('showDependencyColors'),
+                        programRiskSize: this.getSetting('programRiskSize')
                     });
 
                     calc.runCalculation(records[0],records[1]).then({
@@ -878,6 +905,7 @@ Ext.define("threat-matrix", {
             xtype: 'container',
             padding: 10,
             html: '<div class="tslegendtext">Types:  </div><div class="tslegend-square">&nbsp;&nbsp;</div><div class="tslegendtext">&nbsp;&nbsp;Feature (Solid)</div><span class="tslegendspacer">&nbsp;</span>' +
+                '<div class="tslegend-donut">&nbsp;&nbsp;</div><div class="tslegendtext">&nbsp;&nbsp;Program Level Risk Feature (Solid Donut)</div><span class="tslegendspacer">&nbsp;</span>' +
                 '<div class="tslegend-circle">&nbsp;&nbsp;</div><div class="tslegendtext">&nbsp;&nbsp;Story (Translucent)</div><span class="tslegendspacer">&nbsp;</span>' +
                  '<div class="tslegend-hollow-circle">&nbsp;&nbsp;</div><div class="tslegendtext">&nbsp;&nbsp;Predecessor Stories are outlined</div><span class="tslegendspacer">&nbsp;</span>'
         });
@@ -1198,6 +1226,7 @@ Ext.define('timebox-selector', {
                 {
                     var release = t.getRecord();
                     this.fireEvent('releasechange',release);
+                    console.log("Publishing Release:", release);
                     this.publish('timeboxReleaseChanged', release);
                     this._updateIterationCombo(release);
                 },
@@ -1343,6 +1372,18 @@ Ext.define('timebox-selector', {
     background-color: rgba(103,103,103,1);
     border-style: solid;
     border-width: 1px;
+    display: inline-block;
+}
+
+.tslegend-donut {
+    width: 14px;
+    height: 14px;
+    text-align: center;
+    border-radius: 7px;
+    border-width: 4px;
+    color: rgba(103,103,103,1);
+    background-color: #FFFFFF;
+    border-style: solid;
     display: inline-block;
 }
 

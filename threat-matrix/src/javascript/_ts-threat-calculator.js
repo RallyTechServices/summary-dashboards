@@ -41,7 +41,8 @@ Ext.define('Rally.technicalservices.ThreatCalculator', {
         iterationDays: undefined,
         releaseDays: undefined,
         showDataLabels: false,
-        showDependencyColors: false
+        showDependencyColors: false,
+        programRiskSize: undefined
     },
     /**
      * projectTree is used to show the hierarchy of the projects so that we can
@@ -201,6 +202,10 @@ Ext.define('Rally.technicalservices.ThreatCalculator', {
             return false;
         }
 
+        if (this._isProgramLevelRisk(artifact)){
+            return true;
+        }
+
         var size = artifact.get('size'),
             age = artifact.get('age');
 
@@ -231,7 +236,6 @@ Ext.define('Rally.technicalservices.ThreatCalculator', {
             artifact.get(this.riskField) == true &&
             artifact.get('LeafStoryCount') == 0 &&
             !artifact.get('Parent'));
-        }
     },
     _getSeries: function(artifact){
         this.logger.log('id, size, age, density',artifact.get('FormattedID'),artifact.get('size'),artifact.get('age'), artifact.get('density'),artifact.get('predecessorFids'))
@@ -250,8 +254,11 @@ Ext.define('Rally.technicalservices.ThreatCalculator', {
                 artifact.get('size'), artifact.get('age').toFixed(1));
 
         if (isProgramLevelRisk){
+            isDependencyWidth = Math.max(this.programRiskSize-2, 1);
+            isDependencyColor = color;
             color = '#FFFFFF';
-            isDependencyWidth = 2;
+            pointName = Ext.String.format("<b>Program Level Risk</b><br/>Project: {0}",
+                artifact.get('Project').Name);
         }
 
         if (hasDependency){
@@ -363,6 +370,10 @@ Ext.define('Rally.technicalservices.ThreatCalculator', {
             }
     },
     _getRadius: function(artifact){
+        if (this._isProgramLevelRisk(artifact)){
+            return this.programRiskSize;
+        }
+
         var multiplier = this._isArtifactUserStory(artifact) ? this.storySizeMultiplier || 1 : this.featureSizeMultiplier || 1;
         return Math.max(artifact.get('size') * multiplier || 0, this.minSize);
     },

@@ -431,8 +431,15 @@ Ext.define("threat-matrix", {
                 fieldLabel: 'Risk Multiplier for User Stories',
                 labelWidth: 200,
                 labelAlign: 'right',
-                 minValue: 0,
-                 margin: '0 0 20 0'
+                 minValue: 0
+            },{
+                name: 'programRiskSize',
+                xtype: 'rallynumberfield',
+                fieldLabel: 'Size for Program Level Risk Features',
+                labelWidth: 200,
+                labelAlign: 'right',
+                minValue: 3,
+                margin: '0 0 20 0'
             },{
                 name: 'showDataLabels',
                 xtype: 'rallycheckboxfield',

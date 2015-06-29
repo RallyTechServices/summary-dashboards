@@ -20,10 +20,14 @@ Ext.define('Rally.technicalservices.Validator',{
             _.each(this.records, function(r){
                 totalRecords ++;
                 var violations = [];
-                _.each(rules, function(rule){
+                Ext.Array.each(rules, function(rule){
                     var v = validationRuleObj[rule](r);
-                    if (v){
-                        violations.push({rule: rule, text: v});
+                    if (v && !_.isEmpty(v)){
+                        violations.push(v);
+                        if (v.stopProcessing == true){
+                            return false;
+                        }
+                        //violations.push({rule: rule, text: v});
                     }
                 });
 

@@ -78,6 +78,10 @@ Ext.define('Rally.technicalservices.ValidationRules',{
                     return 'Project Missing WIP';
                 case 'ruleFn_iterationMissingFields':
                     return 'Iteration fields Missing';
+                case 'ruleFn_FeatureDateIssue':
+                    return 'Feature Date Issue';
+                case 'ruleFn_isProgramRisk':
+                    return 'Feature is program level risk';
             }
             return ruleName;
         }

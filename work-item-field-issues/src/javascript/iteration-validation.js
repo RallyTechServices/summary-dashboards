@@ -25,7 +25,10 @@ Ext.define('Rally.technicalservices.IterationValidationRules',{
         if (missingFields.length === 0) {
             return null;
         }
-        return Ext.String.format('<li>Iteration fields Missing: {0}', missingFields.join(','));
+        return {
+            rule: 'ruleFn_iterationMissingFields',
+            text: Ext.String.format('<li>Iteration fields Missing: {0}', missingFields.join(','))
+        };
     }
 });
 

@@ -31,7 +31,10 @@ Ext.define('Rally.technicalservices.ProjectValidationRules',{
         if (missingWIPTypes.length === 0) {
             return null;
         }
-        return Ext.String.format('<li>Project Missing WIP: {0}', missingWIPTypes.join(','));
+        return {
+            rule: 'ruleFn_projectMissingWIP',
+            text: Ext.String.format('<li>Project Missing WIP: {0}', missingWIPTypes.join(','))
+        };
     },
     
     _getPrefForProject: function(project_name) {

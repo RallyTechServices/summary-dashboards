@@ -25,7 +25,7 @@ Ext.define("threat-matrix", {
         }
     },
     storyFetchFields: ['FormattedID','c_Risk','PlanEstimate','Project','ScheduleState','InProgressDate','Blocked','Blocker','CreationDate','Feature','Name','Predecessors'],
-    featureFetchFields: ['FormattedID','Project','ActualStartDate','ActualEndDate','LeafStoryPlanEstimateTotal', 'LeafStoryCount','Name', 'c_Risk'], //,'Predecessors'],
+    featureFetchFields: ['FormattedID','Project','ActualStartDate','ActualEndDate','LeafStoryPlanEstimateTotal', 'LeafStoryCount','Name', 'c_Risk', 'Parent'], //,'Predecessors'],
     portfolioItemFeature: 'PortfolioItem/Feature',
     projectFetchFields: ['Name','Parent','ObjectID'],
     riskField: 'c_Risk',

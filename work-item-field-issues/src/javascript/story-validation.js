@@ -18,7 +18,10 @@ Ext.define('Rally.technicalservices.UserStoryValidationRules',{
         var scheduleStateIdx = _.indexOf(this.orderedScheduleStates, r.get('ScheduleState'));
 
         if (!r.get('Iteration') && scheduleStateIdx > this.definedScheduleStateIndex){
-            return Ext.String.format('<li>Story is In-Progress with unscheduled Iteration', r.get('ScheduleState'));
+            return {
+                rule: 'ruleFn_unscheduledIterationScheduleState',
+                text: Ext.String.format('<li>Story is In-Progress with unscheduled Iteration', r.get('ScheduleState'))
+            };
         }
         return null;
     },
@@ -45,34 +48,49 @@ Ext.define('Rally.technicalservices.UserStoryValidationRules',{
         if (missingFields.length === 0) {
             return null;
         }
-        return Ext.String.format('<li>Story fields Missing: {0}', missingFields.join(','));
+        return {
+            rule: 'ruleFn_storyMissingFields',
+            text: Ext.String.format('<li>Story fields Missing: {0}', missingFields.join(','))
+        };
     },
     ruleFn_storyHasNoFeature: function(r){
         if (!r.get('Feature')){
-            return '<li>Story has no parent Feature.';
+            return {
+                rule: 'ruleFn_storyHasNoFeature',
+                text: '<li>Story has no parent Feature.'
+            };
         }
         return null;
     },
     ruleFn_storyPlanEstimate: function(r){
         if (r.get('PlanEstimate')==0){
-            return '<li>Story has no points';
+            return {
+                rule: 'ruleFn_storyPlanEstimate',
+                text: '<li>Story has no points'
+            };
         }
         return null;
     },
     ruleFn_storyHasIterationWithoutRelease: function(r){
         if (!r.get('Release') && r.get('Iteration')){
-            return Ext.String.format('<li>Story has Iteration [{0}] without a Release.', r.get('Iteration').Name);
+            return {
+                rule: 'ruleFn_storyHasIterationWithoutRelease',
+                text: Ext.String.format('<li>Story has Iteration [{0}] without a Release.', r.get('Iteration').Name)
+            };
         }
         return null;
     },
     ruleFn_storyBlockedWithoutReason: function(r){
         if (r.get('Blocked') && !r.get('BlockedReason')){
-            if (r.get('Blocker')){
-                console.log('blocker', r.get('Blocker'));
-                return '<li>Story is blocked without reason.';
-            } else {
-                return '<li>Story is blocked without a reason.';
-            }
+            return {
+                rule: 'ruleFn_storyBlockedWithoutReason',
+                text: '<li>Story is blocked without reason.'
+            };
+            //if (r.get('Blocker')){
+            //    return '<li>Story is blocked without reason.';
+            //} else {
+            //    return '<li>Story is blocked without a reason.';
+            //}
         }
         return null;
     },
@@ -85,15 +103,20 @@ Ext.define('Rally.technicalservices.UserStoryValidationRules',{
             if (!r.get('Feature').Release || r.get('Feature').Release.Name != release.Name ||
                 r.get('Feature').Release.ReleaseStartDate != release.ReleaseStartDate ||
                 r.get('Feature').Release.ReleaseDate != release.ReleaseDate){
-                msg = '<li>Story Release is not Feature Release';
+                return {
+                    rule: 'ruleFn_storyRelaseDoesNotMatchFeatureRelease',
+                    text: '<li>Story Release is not Feature Release'
+                };
             }
-
         }
         return msg;
     },
     ruleFn_storyRiskDescription: function(r){
         if (r.get('c_Risk') && !r.get('c_RiskStatement')){
-            return '<li>Story Risk has no Description'
+            return {
+                rule: 'ruleFn_storyRiskDescription',
+                text: '<li>Story Risk has no Description'
+            };
         }
         return null;
     }

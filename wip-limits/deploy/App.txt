@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WIP Limits Setter</title>
+    <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
+    <!--  Build Date: Mon Jun 29 2015 18:18:06 GMT-0600 (MDT) -->
+    
+    <script type="text/javascript">
+        var APP_BUILD_DATE = "Mon Jun 29 2015 18:18:06 GMT-0600 (MDT)";
+        var CHECKSUM = 4196200291;
+    </script>
+    
+    <script type="text/javascript" src="/apps/2.0rc3/sdk.js"></script>
+
+    <script type="text/javascript">
+        Rally.onReady(function() {
+             
+/**
+ * A link that pops up a version dialog box
+ */
+
+Ext.define('Rally.technicalservices.InfoLink',{
+    extend: 'Ext.Component',
+    alias: 'widget.tsinfolink',
+    
+    /**
+     * @cfg {String} informationHtml
+     * Additional text to be displayed on the popup dialog (for exmaple,
+     * to add a description of the app's use or functionality)
+     */
+    informationHtml: null,
+    
+    /**
+     * 
+     * cfg {String} title
+     * The title for the dialog box
+     */
+     title: "Build Information",
+    
+    renderTpl: "<div id='{id}-infolinkWrap' class='tsinfolink'>i</div>",
+
+    initComponent: function() {
+        this.callParent(arguments);
+       
+    },
+    
+    onRender: function() {
+        this.callParent(arguments);
+        this.mon(this.el,'click',this.onClick,this);
+    },
+    _generateChecksum: function(string){
+        var chk = 0x12345678,
+            i;
+        string = string.replace(/var CHECKSUM = .*;/,"");
+        string = string.replace(/\s/g,"");  //Remove all whitespace from the string.
+        
+        for (i = 0; i < string.length; i++) {
+            chk += (string.charCodeAt(i) * i);
+        }
+    
+        return chk;
+    },
+    _checkChecksum: function(container) {
+        var me = this;
+        Ext.Ajax.request({
+            url: document.URL,
+            params: {
+                id: 1
+            },
+            success: function (response) {
+                text = response.responseText;
+                if ( CHECKSUM ) {
+                    if ( CHECKSUM !== me._generateChecksum(text) ) {
+                        console.log("Checksums don't match!");
+                        if ( me.dialog ) {
+                            me.dialog.add({xtype:'container',html:'Checksums do not match'});
+                        }
+                    }
+                }
+            }
+        });
+    },
+    onClick: function(e) {
+        var me = this;
+        this._checkChecksum(this);
+        
+        var dialog_items = [];
+        
+        if ( this.informationHtml ) {
+            dialog_items.push({
+                xtype:'container',
+                html: this.informationHtml
+            });
+        }
+                
+        dialog_items.push({
+            xtype:'container',
+            html:"This app was created by the Rally Technical Services Team."
+        });
+        
+        if ( APP_BUILD_DATE ) {
+            dialog_items.push({
+                xtype:'container',
+                html:'Build date/time: ' + APP_BUILD_DATE
+            });
+        }
+        
+        if (this.dialog){this.dialog.destroy();}
+        this.dialog = Ext.create('Rally.ui.dialog.Dialog',{
+            defaults: { padding: 5, margin: 5 },
+            closable: true,
+            draggable: true,
+            title: me.title,
+            items: dialog_items
+        });
+        this.dialog.show();
+    }
+});
+
+/*
+ */
+Ext.define('Rally.technicalservices.Logger',{
+    constructor: function(config){
+        Ext.apply(this,config);
+    },
+    log: function(args){
+        var timestamp = "[ " + Ext.util.Format.date(new Date(), "Y-m-d H:i:s.u") + " ]";
+        //var output_args = arguments;
+        //output_args.unshift( [ "[ " + timestamp + " ]" ] );
+        //output_args = Ext.Array.push(output_args,arguments);
+        
+        var output_args = [];
+        output_args = Ext.Array.push(output_args,[timestamp]);
+        output_args = Ext.Array.push(output_args, Ext.Array.slice(arguments,0));
+
+        window.console && console.log.apply(console,output_args);
+    }
+
+});
+
+Ext.define("GridExporter", {
+    dateFormat : 'Y-m-d g:i',
+
+    exportGrid: function(grid) {
+        if (Ext.isIE) {
+            this._ieToExcel(grid);
+        } else {
+            var data = this._getCSV(grid);
+            window.location = 'data:text/csv;charset=utf8,' + encodeURIComponent(data);
+        }
+    },
+
+    _escapeForCSV: function(string) {
+        if (string.match(/,/)) {
+            if (!string.match(/"/)) {
+                string = '"' + string + '"';
+            } else {
+                string = string.replace(/,/g, ''); // comma's and quotes-- sorry, just lose the commas
+            }
+        }
+        return string;
+    },
+
+    _getFieldText: function(fieldData) {
+        var text;
+
+        if (fieldData === null || fieldData === undefined) {
+            text = '';
+
+        } else if (fieldData._refObjectName && !fieldData.getMonth) {
+            text = fieldData._refObjectName;
+
+        } else if (fieldData instanceof Date) {
+            text = Ext.Date.format(fieldData, this.dateFormat);
+
+        } else if (!fieldData.match) { // not a string or object we recognize...bank it out
+            text = '';
+
+        } else {
+            text = fieldData;
+        }
+
+        return text;
+    },
+
+    _getFieldTextAndEscape: function(fieldData) {
+        var string  = this._getFieldText(fieldData);
+        return this._escapeForCSV(string);
+    },
+
+    _getCSV: function (grid) {
+        var cols    = grid.columns;
+        var store   = grid.store;
+        var data    = '';
+
+        var that = this;
+        Ext.Array.each(cols, function(col, index) {
+            if (col.hidden !== true) {
+                data += that._getFieldTextAndEscape(col.text) + ',';
+            }
+        });
+        data += "\n";
+
+        store.each(function(record) {
+            var entry       = record.getData();
+            Ext.Array.each(cols, function(col, index) {
+                if (col.hidden !== true) {
+                    var fieldName   = col.dataIndex;
+                    var text        = entry[fieldName];
+
+                    data += that._getFieldTextAndEscape(text) + ',';
+                }
+            });
+            data += "\n";
+        });
+
+        return data;
+    },
+
+    _ieGetGridData : function(grid, sheet) {
+        var that            = this;
+        var resourceItems   = grid.store.data.items;
+        var cols            = grid.columns;
+
+        Ext.Array.each(cols, function(col, colIndex) {
+            if (col.hidden !== true) {
+                console.log('header: ', col.text);
+                sheet.cells(1,colIndex + 1).value = col.text;
+            }
+        });
+
+        var rowIndex = 2;
+        grid.store.each(function(record) {
+            var entry   = record.getData();
+
+            Ext.Array.each(cols, function(col, colIndex) {
+                if (col.hidden !== true) {
+                    var fieldName   = col.dataIndex;
+                    var text        = entry[fieldName];
+                    var value       = that._getFieldText(text);
+
+                    sheet.cells(rowIndex, colIndex+1).value = value;
+                }
+            });
+            rowIndex++;
+        });
+    },
+
+    _ieToExcel: function (grid) {
+        if (window.ActiveXObject){
+            var  xlApp, xlBook;
+            try {
+                xlApp = new ActiveXObject("Excel.Application");
+                xlBook = xlApp.Workbooks.Add();
+            } catch (e) {
+                Ext.Msg.alert('Error', 'For the export to work in IE, you have to enable a security setting called "Initialize and script ActiveX control not marked as safe" from Internet Options -> Security -> Custom level..."');
+                return;
+            }
+
+            xlBook.worksheets("Sheet1").activate();
+            var XlSheet = xlBook.activeSheet;
+            xlApp.visible = true;
+
+            this._ieGetGridData(grid, XlSheet);
+            XlSheet.columns.autofit();
+        }
+    }
+});
+
+Ext.define("wip-limits", {
+    extend: 'Rally.app.App',
+    layout : {
+        type : "fit"
+    },
+    mixins : [
+        'Rally.Messageable'
+    ],
+    launch : function()
+    {
+        this._updateBoard();
+    },
+    _updateBoard : function(portfolioTimeboxFilter, storyTimeboxFilter)
+    {
+        var store = Ext.create('Rally.data.wsapi.Store', {
+            model : 'hierarchicalrequirement',
+            fetch : [
+                'Name',
+                'FormattedID',
+                'Project',
+                'ScheduleState'
+            ],
+            limit : Infinity
+        });
+        store.on('load', this._onStoriesLoaded, this);
+        store.load();
+    },
+    _onStoriesLoaded : function(store, stories)
+    {
+        var me = this;
+        var states = [
+            'Backlog',
+            'Defined',
+            'In-Progress',
+            'Completed',
+            'Accepted'
+        ];
+        var projectGroup = _.groupBy(stories, function(t)
+        {
+            return t.get("Project") ? t.get("Project")._refObjectName : "none";
+        });
+        me.summaries = _.map(_.keys(projectGroup), function(project)
+        {
+            var stories = projectGroup[project];
+            this.currentProject = project;
+            var counts = _.countBy(stories, function(story)
+            {
+                return story.get('ScheduleState');
+            });
+            var values = {};
+            _.each(states, function(state)
+            {
+                values[state] = _.isUndefined(counts[state]) ? 0 : counts[state];
+                var wipKey = state + 'WIP';
+                values[wipKey] = 0;
+            });
+            values.project = this.currentProject;
+            return values;
+        }, this);
+        me.newStore = Ext.create('Rally.data.custom.Store', {
+            data : me.summaries,
+            sorters : {
+                property : 'project',
+                direction : 'ASC'
+            }
+        });
+        _.each(me.summaries, function(row)
+        {
+            _.each(states, function(state)
+            {
+                var wipKey = state + 'WIP';
+                me._getWipLimit(row.project, wipKey);
+            });
+        });
+        me.newStore.addListener('update', function(store, record, op, fieldNames, eOpts)
+        {
+            if (op == 'edit')
+            {
+                var project = record.get('project');
+                var fieldName = _.first(fieldNames);
+                var value = record.get(fieldName);
+                me._setWipLimit(project, fieldName, value);
+            }
+        }, store, {
+            // single: true
+        });
+        this._displayGrid(me.newStore);
+    },
+    _displayGrid : function(store)
+    {
+        var that = this;
+        this.remove('workqueue');
+        this.add({
+            xtype : 'rallygrid',
+            itemId : 'workqueue',
+            enablebulkeditable : true,
+            enableEditing : true,
+            store : store,
+            columnCfgs : [
+                {
+                    text : 'Project',
+                    dataIndex : 'project',
+                    flex : 6,
+                    align : 'center'
+                },
+                {
+                    text : 'Defined',
+                    dataIndex : 'Defined',
+                    flex : 0.8,
+                    align : 'center'
+                },
+                {
+                    text : 'Defined Limit',
+                    dataIndex : 'DefinedWIP',
+                    flex : 0.8,
+                    editor : {
+                        xtype : 'textfield'
+                    },
+                    renderer : that.renderLimit,
+                    align : 'center'
+                },
+                {
+                    text : 'In-Progress',
+                    dataIndex : 'In-Progress',
+                    flex : 0.8,
+                    align : 'center'
+                },
+                {
+                    text : 'In-Progress Limit',
+                    dataIndex : 'In-ProgressWIP',
+                    flex : 0.8,
+                    editor : {
+                        xtype : 'textfield'
+                    },
+                    renderer : that.renderLimit,
+                    align : 'center'
+                },
+                {
+                    text : 'Completed',
+                    dataIndex : 'Completed',
+                    flex : 0.8,
+                    align : 'center'
+                },
+                {
+                    text : 'Completed Limit',
+                    dataIndex : 'CompletedWIP',
+                    flex : 0.8,
+                    editor : {
+                        xtype : 'textfield'
+                    },
+                    renderer : that.renderLimit,
+                    align : 'center'
+                }
+            ]
+        });
+    },
+    renderLimit : function(value, meta, record, row, col, store, gridView)
+    {
+        // var field = null;
+        // switch (col) {
+        // case 2:
+        // field = "DefinedWIP";
+        // break;
+        // case 4:
+        // field = "In-ProgressWIP";
+        // break;
+        // case 6:
+        // field = "CompletedWIP";
+        // break;
+        // }
+        // if (value > record.get(field)) {
+        meta.tdCls = 'limit';
+        // }
+        return value;
+    },
+    _setWipLimit : function(project, state, limit)
+    {
+        var key = this._getWipKey(project, state);
+        var settings = {};
+        settings[key] = Ext.JSON.encode(limit);
+        var workspace = this.getContext().getWorkspace();
+        Rally.data.PreferenceManager.update({
+            workspace : workspace,
+            settings : settings
+        }).then({
+            success : function(updatedRecords, notUpdatedRecord, options)
+            {
+            },
+            failure : function()
+            {
+                console.log("Failed to write preference: ", key, settings);
+            }
+        });
+    },
+    _getWipKey : function(project, state)
+    {
+        return 'project-wip:' + project + ':' + state;
+    },
+    _getWipLimit : function(project, state)
+    {
+        var me = this;
+        var key = this._getWipKey(project, state);
+        var workspace = this.getContext().getWorkspace();
+        console.log('workspace: ', workspace);
+        Rally.data.PreferenceManager.load({
+            workspace : workspace,
+            filterByName : key,
+            success : function(prefs)
+            {
+                if (prefs && prefs[key])
+                {
+                    var value = prefs[key];
+                    var row = _.find(me.summaries, function(r)
+                    {
+                        return r.project === project;
+                    });
+                    row[state] = Ext.JSON.decode(value);
+                    me.newStore.load();
+                }
+            },
+            failure : function()
+            {
+                console.log("Failed to get WIP limit: ", key);
+            }
+        });
+    }
+});
+
+            
+               Rally.launchApp('wip-limits', {
+                   name: 'WIP Limits Setter'
+               });
+        });
+    </script>
+    
+    <style type="text/css">
+
+.app {
+}
+.tsinfolink {
+    position:absolute;
+    right:0px;
+    width: 14px;
+    height: 14px;
+    border-radius: 7px;
+    text-align: center;
+    color: white;
+    background: #C0C0C0;
+    border-style: solid;
+    border-width: 1px;
+    margin-top: 25px;
+    margin-right: 5px;
+    cursor: pointer;
+}
+.limit {
+    background-color: #d9d9d9 !important;
+    color: black;
+    font-weight: bold;
+}
+    </style>
+
+</head>
+<body></body>
+</html>

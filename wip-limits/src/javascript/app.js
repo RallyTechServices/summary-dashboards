@@ -114,7 +114,9 @@ Ext.define("wip-limits", {
                     dataIndex : 'DefinedWIP',
                     flex : 0.8,
                     editor : {
-                        xtype : 'textfield'
+                        xtype : 'numberfield',
+                        minValue: 0,
+
                     },
                     renderer : that.renderLimit,
                     align : 'center'

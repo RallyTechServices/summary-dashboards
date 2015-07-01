@@ -142,7 +142,7 @@ Ext.define("ProjectStories", function() {
                         type, 
                         ["FormattedID","Name","ObjectID","LeafStoryCount","LeafStoryPlanEstimateTotal",
                         "PreliminaryEstimate", "AcceptedLeafStoryCount", "AcceptedLeafStoryPlanEstimateTotal",
-                        "PercentDoneByStoryCount","c_ValueMetricKPI","Rank"], 
+                        "PercentDoneByStoryCount","c_ValueMetricKPI","Rank","State"],
                         [self.featureFilter],
                         {   project: project.get("_ref"),
                             projectScopeUp: false,

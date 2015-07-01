@@ -1,7 +1,7 @@
 {
    "name": "pyramid-success-chart",
    "className": "CustomApp",
-   "server": "https://demo-services1.rallydev.com/",
+   "server": "https://10.32.16.145/",
    "sdk": "2.0rc3",
    "javascript": [
       "../common/src/javascript/rally-functions.js",

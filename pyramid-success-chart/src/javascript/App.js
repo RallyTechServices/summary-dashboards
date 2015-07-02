@@ -12,7 +12,6 @@ Ext.define('CustomApp', {
             featureReleaseState: "Done"
         }
     },
-
     chartColors: [ '#3498db','#f1c40f','#c0392b','#9b59b6','#2ecc71',
         '#2f7ed8', '#8bbc21', '#910000',
         '#492970', '#f28f43', '#145499','#77a1e5', '#c42525', '#a6c96a',
@@ -514,7 +513,7 @@ Ext.define('CustomApp', {
     },
 
     renderFeatureWords : function() {
-        console.log('renderfeatureworkds',this);
+        console.log('renderfeaturestories',this);
 
 
 
@@ -528,10 +527,9 @@ Ext.define('CustomApp', {
             if (series.options.featureWords){
                 featureWordsExist = true;
                 console.log('featureworkds',series.options.featureWords[index]);
-                var featureWords = _.compact(series.options.featureWords[index]).slice(0,numWords) || [];  // || _.compact(series.options.featureWords[index]).slice(0,numWords);
+                var featureWords = [] || _.compact(series.options.featureWords[index]).slice(0,numWords) || [];  // || _.compact(series.options.featureWords[index]).slice(0,numWords);
                 var y = point.plotY - (( featureWords.length * wordHeight)/2);
                 _.each(featureWords,function(fw,x) {
-                    // var word = fw.split(' ').slice(0,2).join(' ');
                     var word = fw;
                     ren.label(word, 5, y + (x*wordHeight))
                         .css({

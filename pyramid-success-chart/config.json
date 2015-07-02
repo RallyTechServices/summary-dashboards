@@ -10,6 +10,7 @@
       "src/javascript/App.js",
       "../common/src/javascript/jquery-2.1.4.min.js",
       "../common/src/javascript/highcharts.js",
+      "../common/src/javascript/highcharts-more.js",
       "../common/src/javascript/funnel.js"
    ],
    "css": [

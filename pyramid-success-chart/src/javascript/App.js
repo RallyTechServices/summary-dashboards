@@ -96,7 +96,7 @@ Ext.define('CustomApp', {
             pr.readProjectWorkItems(function(error, workItems, projects, states){
                 that.prepareFeatureChartData( workItems, projects, function(error,series,categories) {
                     //that.createChart(series,categories);
-                    that.createDonutChart(series, categories);
+                    that.createPolarChart(series, categories);
                 });              
             });          
         } else {
@@ -109,7 +109,7 @@ Ext.define('CustomApp', {
             pr.readProjectWorkItems(function(error, workItems, projects, states){
                 that.prepareChartData( workItems, projects, states, function(error,series,categories) {
                     //that.createChart(series,categories);
-                    that.createDonutChart(series, categories);
+                    that.createPolarChart(series, categories);
                 });
             });
         }
@@ -148,6 +148,8 @@ Ext.define('CustomApp', {
 
     prepareChartData : function(stories, projects, states, callback) {
 
+
+
         var that = this;
         var categories = _.map( projects, function(p) { return p.get("Name"); });
         var completedStates = ["Accepted",_.last(states)],
@@ -167,145 +169,80 @@ Ext.define('CustomApp', {
         };
 
         var data = _.map(categories,function(project,index){
-            return [ project, 
-                summarize(stories[index],states),
-                summarize(stories[index],completedStates),
-                summarize(stories[index],releasedStates)
-            ];
-        });
-        var sortedData = data.sort(function(a,b) { return b[1] - a[1]; });
-        var status_data = [];
-        _.each(sortedData, function(d, i){
-            var released = d[3],
-                completed = d[2] - released,
-                not_completed = d[1] - d[2];
+            var total = summarize(stories[index],states),
+                completed = summarize(stories[index],completedStates),
+                released = summarize(stories[index],releasedStates),
+                label = this._getProjectLabel(project,total,completed,released,'Accepted','Released');
 
-            status_data.push({
-                name: 'Released',
-                y: released,
-                color: this._getReleasedColor(i)
-            },{
-                name: 'Accepted',
-                y: completed,
-                color: this._getCompletedColor(i)
-            });
-            status_data.push({
-                name: 'Not Accepted',
-                y: not_completed,
-                color: this._getTotalColor(i)
-            });
+            return [ label, total, completed, released];
+
         }, this);
 
+        var sortedData = data.sort(function(a,b) { return b[1] - a[1]; }) ;
         var seriesData = [{
-            name : 'Project Scope',
-            size: '50%',
-            data : _.map(sortedData, function(d, i){return {name: d[0], y: d[1], color: this._getReleasedColor(i)}; }, this),
-            completedData : _.map(sortedData,function(d) { return d[2];}),
+            name : 'Accepted',
+            data : _.map(sortedData, function(d){return d[2] }),
             dataLabels: {
-                enabled: true,
-                formatter : function() {
-                    var scope = this.point.y;
-                    var completed = this.point.series.options.completedData[this.point.index];
-                    var pct = Math.round( scope > 0 ? (completed/scope)*100 : 0);
-                    return " [" + completed + "/" + scope + "] ("+pct+"%) <br/>" +
-                        _.last(this.point.name.split(">"));
-                },
-                connectorWidth: 0,
-                distance : 55,
-                overflow: 'none',
-                crop: false/*,
-                 style: { width: '100%' }*/
+                enabled: false
             }
         },{
-            name: '# Stories',
-            size: '100%',
-            innerSize: '54%',
-            data: status_data,
+            name: 'Released',
+            data: _.map(sortedData, function(d){return d[3]-d[3]; }),
             dataLabels: {enabled: false}
         }];
 
-
-
-        //var seriesData = [{
-        //    name : 'Project Scope',
-        //    data : sortedData,
-        //    completedData : _.map(sortedData,function(d) { return d[2];})
-        //}];
-
-        callback(null,categories,seriesData);
+        callback(null,_.map(sortedData, function(d){return d[0] }),seriesData);
 
     },
+    _getProjectLabel: function(project, total, completed, released,completedText, releasedText){
+       var pct = Math.round( total > 0 ? (completed/total)*100 : 0),
+            pct_released = Math.round(total > 0 ? released/total * 100 : 0);
 
+        if (completed == 0){
+            return Ext.String.format("<b>{0}</b><br/>No {1} items.",_.last(project.split(">")),completedText);
+        }
+
+        return Ext.String.format("<b>{7}</b><br/>[{0}/{1}] ({2}%) {3} <br/>[{4}/{1}] ({5}%) {6}",
+            completed,
+            total,
+            pct,
+            completedText,
+            released,
+            pct_released,
+            releasedText,
+            _.last(project.split(">")));
+    },
     prepareFeatureChartData : function(features, projects, callback) {
 
-        var that = this;
         var categories = _.map( projects, function(p) { return p.get("Name"); });
     
-        var pointsValue = function(value) {
-            return !_.isUndefined(value) && !_.isNull(value) ? value : 0;
-        };
         var data = _.map(categories,function(project,index){
-            return [ project,
-                features[index].length,
-                this._summarizeCompletedFeatures(features[index]),
-                this._getFeatureWords(features[index]),
-                this._summarizeReleasedFeatures(features[index], this.getSetting('featureReleaseState'))
-            ];
+            var total = features[index].length,
+                completed = this._summarizeCompletedFeatures(features[index]),
+                released = this._summarizeReleasedFeatures(features[index], this.getSetting('featureReleaseState')),
+                words = this._getFeatureWords(features[index]),
+                label = this._getProjectLabel(project,total,completed,released,'Completed','Released');
+
+            console.log('words',words);
+            return [ label, total, completed, words, released];
+
         }, this);
 
          var sortedData = data.sort(function(a,b) { return b[1] - a[1]; }) ;
 
-        var status_data = [];
-        _.each(sortedData, function(d, i){
-            var released = d[4],
-                completed = d[2] - released,
-                not_completed = d[1] - d[2];
-
-            status_data.push({
-                name: 'Released',
-                y: released,
-                color: this._getReleasedColor(i)
-            },{
-                name: 'Completed',
-                y: completed,
-                color: this._getCompletedColor(i)
-            });
-            status_data.push({
-                name: 'Not Completed',
-                y: not_completed,
-                color: this._getTotalColor(i)
-            });
-        }, this);
-
         var seriesData = [{
-            name : 'Project Scope',
-            size: '50%',
-            data : _.map(sortedData, function(d, i){return {name: d[0], y: d[1], color: this._getReleasedColor(i)}; }, this),
-            completedData : _.map(sortedData, function(d){return d[2];}),
+            name : 'Completed',
+            data : _.map(sortedData, function(d){return d[2]-d[4];}),
             featureWords : _.map(sortedData,function(d) { return d[3];}),
             dataLabels: {
-                enabled: true,
-                formatter : function() {
-                    var scope = this.point.y;
-                    var completed = this.point.series.options.completedData[this.point.index];
-                    var pct = Math.round( scope > 0 ? (completed/scope)*100 : 0);
-                    return " [" + completed + "/" + scope + "] ("+pct+"%) <br/>" +
-                        _.last(this.point.name.split(">"));
-                },
-                connectorWidth: 0,
-                distance : 55,
-                overflow: 'none',
-                crop: false/*,
-                 style: { width: '100%' }*/
+                enabled: false
             }
         },{
-            name: '#Features',
-            size: '100%',
-            innerSize: '54%',
-            data: status_data,
+            name: 'Released',
+            data: _.map(sortedData, function(d, i){return d[4];}, this),
             dataLabels: {enabled: false}
         }];
-        callback(null,categories,seriesData);
+        callback(null, _.map(sortedData, function(d){return d[0];}),seriesData);
     },
     _getFeatureWords: function(workItems){
         return _.map(workItems,function(feature){
@@ -348,6 +285,91 @@ Ext.define('CustomApp', {
             );
         }
         return hex;
+    },
+    createPolarChart: function(categories, seriesData,callback){
+        this.setLoading(false);
+        console.log('createPolarChart', categories ,seriesData);
+        var isEmpty = function(series) {
+            var total = _.reduce(_.first(series).data,function(memo,d) {
+                return memo + d[1];
+            },0);
+            return total === 0;
+        };
+
+        var that = this;
+        var chart_width = this.container.getWidth() * .90;
+        var chartConfig = {
+            credits: { enabled: false },
+            colors : this.chartColors,
+            chart: {
+                polar: true,
+                type: 'column',
+                spacingTop: 25,
+                spacingBottom: 25,
+                spacingRight: 25,
+                spacingLeft: 25,
+              //  width: chart_width,
+                events : {
+                    load : that.renderFeatureWords
+                }
+            },
+            title: {
+                text: ''
+            },
+            plotOptions: {
+                column: {
+                    tooltip: {
+                        headerFormat: '',
+                        pointFormat: '{series.name}: <b>{point.y}</b><br/>'
+                    }
+                },
+                series: {
+                    stacking: 'normal',
+                    shadow: false,
+                    groupPadding: 0,
+                    pointPlacement: 'on'
+                }
+            },
+            xAxis: {
+                categories: categories,
+                labels: {
+                    style: {
+                        width: '300px',
+                        whiteSpace: 'nowrap'
+                    },
+                    useHTML: true
+                }
+            },
+            legend : {
+                enabled : false
+            },
+            series: seriesData
+        };
+
+        if (!_.isUndefined(that.x)) {
+            that.remove(that.x);
+        }
+
+        that.x = Ext.widget('container',{
+            autoShow: true ,shadow: false,title: "",resizable: false,margin: 10,
+            html: '<div id="chart-container" class="chart-container"></div>',
+            listeners: {
+                resize: function(panel) {
+                },
+                afterrender : function(panel) {
+                    console.log('afterrender');
+                    var chart = $('#chart-container').highcharts(chartConfig);
+                    console.log('chart',chart,panel);
+                }
+            }
+        });
+
+        if (!isEmpty(seriesData))
+            that.add(that.x);
+        else {
+            console.log("no data",seriesData);
+        }
+
     },
     createDonutChart: function(categories, seriesData, statusData, callback){
         this.setLoading(false);
@@ -492,38 +514,47 @@ Ext.define('CustomApp', {
     },
 
     renderFeatureWords : function() {
+        console.log('renderfeatureworkds',this);
+
+
 
         var ren = this.renderer;
         var wordHeight = 11;
-        var series = _.first(this.series);
+        var series = _.first(this.series),
+            featureWordsExist = false;
 
         _.each(series.points,function(point,index) {
             var numWords = series.length <= 6 ? 3 : 1;
-            var featureWords = [] || _.compact(series.options.featureWords[index]).slice(0,numWords);
-            var y = point.plotY - (( featureWords.length * wordHeight)/2);
-            _.each(featureWords,function(fw,x) {
-                // var word = fw.split(' ').slice(0,2).join(' ');
-                var word = fw;
-                ren.label(word, 5, y + (x*wordHeight))
-                .css({
-                    fontWeight: 'normal',
-                    fontSize: '75%'
-                })
-                .attr({
-                    zIndex : 9
-                })
-                .add();
-            });
+            if (series.options.featureWords){
+                featureWordsExist = true;
+                console.log('featureworkds',series.options.featureWords[index]);
+                var featureWords = _.compact(series.options.featureWords[index]).slice(0,numWords) || [];  // || _.compact(series.options.featureWords[index]).slice(0,numWords);
+                var y = point.plotY - (( featureWords.length * wordHeight)/2);
+                _.each(featureWords,function(fw,x) {
+                    // var word = fw.split(' ').slice(0,2).join(' ');
+                    var word = fw;
+                    ren.label(word, 5, y + (x*wordHeight))
+                        .css({
+                            fontWeight: 'normal',
+                            fontSize: '75%'
+                        })
+                        .attr({
+                            zIndex : 9
+                        })
+                        .add();
+                });
+            }
         });
 
-        ren.label("Only up to the first 3 top ranked kpi's are shown", 5, 285)
-        .css({
-            'textAlign': 'center',
-            fontWeight: 'normal',
-            fontSize: '85%'
-        })
-        .add();
-
+        if (featureWordsExist){
+            ren.label("Only up to the first 3 top ranked kpi's are shown", 5, 285)
+                .css({
+                    'textAlign': 'left',
+                    fontWeight: 'normal',
+                    fontSize: '85%'
+                })
+                .add();
+        }
     },
 
 

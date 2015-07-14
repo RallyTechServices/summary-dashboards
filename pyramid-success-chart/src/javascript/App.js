@@ -69,6 +69,7 @@ Ext.define('CustomApp', {
 
 
     run : function(releaseName,iterationName) {
+        console.log('run',releaseName,iterationName);
         
         this.setLoading('loading data...');
         
@@ -78,13 +79,13 @@ Ext.define('CustomApp', {
 
         var chartFeatures = that.getSetting('features')===true;
 
+        console.log('chartFeatures', chartFeatures);
         if (chartFeatures===true) {
             if (releaseName == null) { //Iteration changed
                 Rally.ui.notify.Notifier.showWarning({message: 'Features are not explicitly associated with Iterations.  The iteration will be ignored and all features for the selected Release will be included in the Success Donut'});
                 this.setLoading(false);
                 return;
             }
-
 
             var pr = Ext.create( "ProjectStories", {
                 ctx : that.getContext(),
@@ -146,9 +147,8 @@ Ext.define('CustomApp', {
     },
 
     prepareChartData : function(stories, projects, states, callback) {
-
-
-
+        console.log('prepareChartData',stories,projects);
+        
         var that = this;
         var categories = _.map( projects, function(p) { return p.get("Name"); });
         var completedStates = ["Accepted",_.last(states)],

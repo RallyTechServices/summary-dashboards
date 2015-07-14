@@ -21,6 +21,8 @@ Ext.define("ProjectStories", function() {
 
         readProjectWorkItems : function(callback) {
 
+            console.log('readProjectWorkItems', self.featureFilter);
+            
             var fns = [
                 self.readStates,
                 self.readProjects,
@@ -76,13 +78,18 @@ Ext.define("ProjectStories", function() {
                 ]).then({
                     scope: me,
                     success: function(projects) {
-                        _.first(projects).getCollection('Children').load({
-                            fetch : ["ObjectID","Name","_ref","Parent","State"],
-                            callback: function(records, operation, success) {
-                                self.projects = _.filter(records,function(r) { return r.get("State")!=="Closed"; });
-                                deferred.resolve(self.projects);
-                            }
-                        });
+                        if ( _.first(projects).get('Children').Count === 0 ) {
+                            self.projects = projects;
+                            deferred.resolve(self.projects);
+                        } else {
+                            _.first(projects).getCollection('Children').load({
+                                fetch : ["ObjectID","Name","_ref","Parent","State"],
+                                callback: function(records, operation, success) {
+                                    self.projects = _.filter(records,function(r) { return r.get("State")!=="Closed"; });
+                                    deferred.resolve(self.projects);
+                                }
+                            });
+                        }
                     }
             });
             return deferred.promise;

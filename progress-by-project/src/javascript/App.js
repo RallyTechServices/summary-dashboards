@@ -68,7 +68,9 @@ Ext.define('CustomApp', {
     },
 
     _changeIteration: function(iteration) {
-        this.run(null,iteration.get("Name"),null);
+        if ( !Ext.isEmpty(iteration) ) {
+            this.run(null,iteration.get("Name"),null);
+        }
     },
 
     run : function(releaseName,iterationName) {
@@ -124,7 +126,7 @@ Ext.define('CustomApp', {
     },
 
     prepareChartData : function(stories, projects, states, callback) {
-
+        console.log('states', states);
         var that = this;
 
         var projectKeys = _.map(projects,function(project) { return _.last(project.get("Name").split('>')); });
@@ -212,7 +214,8 @@ Ext.define('CustomApp', {
             "Backlog" : ["Defined"],
             "In-Progress" : ["In-Progress"],
             "Complete":  ["Completed"],
-            "Accepted" : ["Accepted"]
+            "Accepted" : ["Accepted"],
+            "Released" : ["Released"]
         };
 
         // add initial and last states if necessary

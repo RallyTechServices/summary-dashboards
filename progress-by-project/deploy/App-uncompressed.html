@@ -116,6 +116,8 @@ Ext.define("ProjectStories", function() {
 
         readProjectWorkItems : function(callback) {
 
+            console.log('readProjectWorkItems', self.featureFilter);
+            
             var fns = [
                 self.readStates,
                 self.readProjects,
@@ -171,20 +173,25 @@ Ext.define("ProjectStories", function() {
                 ]).then({
                     scope: me,
                     success: function(projects) {
-                        _.first(projects).getCollection('Children').load({
-                            fetch : ["ObjectID","Name","_ref","Parent","State"],
-                            callback: function(records, operation, success) {
-                                self.projects = _.filter(records,function(r) { return r.get("State")!=="Closed"; });
-                                deferred.resolve(self.projects);
-                            }
-                        });
+                        if ( _.first(projects).get('Children').Count === 0 ) {
+                            self.projects = projects;
+                            deferred.resolve(self.projects);
+                        } else {
+                            _.first(projects).getCollection('Children').load({
+                                fetch : ["ObjectID","Name","_ref","Parent","State"],
+                                callback: function(records, operation, success) {
+                                    self.projects = _.filter(records,function(r) { return r.get("State")!=="Closed"; });
+                                    deferred.resolve(self.projects);
+                                }
+                            });
+                        }
                     }
             });
             return deferred.promise;
         },    
 
         readStories : function(projects) {
-
+            console.log('readStories', projects, self.filter);
             var me = this;
 
             var promises = _.map(projects,function(project) {
@@ -199,6 +206,7 @@ Ext.define("ProjectStories", function() {
                     }).then({
                     scope: me,
                     success: function(stories) {
+                        console.log('stories',stories);
                         deferred.resolve(stories);
                     }
                 });
@@ -236,7 +244,7 @@ Ext.define("ProjectStories", function() {
                         type, 
                         ["FormattedID","Name","ObjectID","LeafStoryCount","LeafStoryPlanEstimateTotal",
                         "PreliminaryEstimate", "AcceptedLeafStoryCount", "AcceptedLeafStoryPlanEstimateTotal",
-                        "PercentDoneByStoryCount","c_ValueMetricKPI","Rank"], 
+                        "PercentDoneByStoryCount","c_ValueMetricKPI","Rank","State"],
                         [self.featureFilter],
                         {   project: project.get("_ref"),
                             projectScopeUp: false,
@@ -378,6 +386,9 @@ Ext.define("ProjectStories", function() {
     _updateIterationCombo : function(release)
     {
         this.remove('globaliterationpicker');
+        this.fireEvent('iterationchange',null);
+        this.publish('timeboxIterationChanged', null);
+                    
         var endFilter = Ext.create('Rally.data.wsapi.Filter', {
             property : "EndDate",
             operator : "<=",
@@ -525,7 +536,9 @@ Ext.define('CustomApp', {
     },
 
     _changeIteration: function(iteration) {
-        this.run(null,iteration.get("Name"),null);
+        if ( !Ext.isEmpty(iteration) ) {
+            this.run(null,iteration.get("Name"),null);
+        }
     },
 
     run : function(releaseName,iterationName) {
@@ -581,7 +594,7 @@ Ext.define('CustomApp', {
     },
 
     prepareChartData : function(stories, projects, states, callback) {
-
+        console.log('states', states);
         var that = this;
 
         var projectKeys = _.map(projects,function(project) { return _.last(project.get("Name").split('>')); });
@@ -669,7 +682,8 @@ Ext.define('CustomApp', {
             "Backlog" : ["Defined"],
             "In-Progress" : ["In-Progress"],
             "Complete":  ["Completed"],
-            "Accepted" : ["Accepted"]
+            "Accepted" : ["Accepted"],
+            "Released" : ["Released"]
         };
 
         // add initial and last states if necessary
@@ -748,7 +762,7 @@ Ext.define('CustomApp', {
     loadMask: false,
     chartColors : [],
     chartConfig: {
-        colors : ["#E0E0E0","#00a9e0","#fad200","#8dc63f"],
+        colors : ["#ee6c19","#FAD200","#3F86C9","#8DC63F", "#888"],
         chart: {
             type: 'bar'
         },
@@ -770,6 +784,9 @@ Ext.define('CustomApp', {
                 }
             }
         ],
+        legend: {
+            reversed: true
+        },
         plotOptions: {
             series: {
                 dataLabels: {
@@ -799,7 +816,6 @@ Ext.define('CustomApp', {
 
         });
     </script>
-
 
 
     <style type="text/css">

@@ -64,7 +64,9 @@ Ext.define('CustomApp', {
     },
 
     _changeIteration: function(iteration) {
-        this.run(null,iteration.get("Name"),null);
+        if ( ! Ext.isEmpty(iteration) ) {
+            this.run(null,iteration.get("Name"),null);
+        }
     },
 
 
@@ -96,20 +98,20 @@ Ext.define('CustomApp', {
             pr.readProjectWorkItems(function(error, workItems, projects, states){
                 that.prepareFeatureChartData( workItems, projects, function(error,series,categories) {
                     //that.createChart(series,categories);
-                    that.createPolarChart(series, categories);
+                    that.createAreaChart(series, categories);
                 });              
             });          
         } else {
             var pr = Ext.create( "ProjectStories", {
                 ctx : that.getContext(),
-                filter : that.rallyFunctions.createFilter(releaseName, iterationName),
+                filter : that.rallyFunctions.createFilter(releaseName, iterationName)
                 // featureFilter : that.rallyFunctions.createFeatureFilter(releaseName)
             });
 
             pr.readProjectWorkItems(function(error, workItems, projects, states){
                 that.prepareChartData( workItems, projects, states, function(error,series,categories) {
                     //that.createChart(series,categories);
-                    that.createPolarChart(series, categories);
+                    that.createAreaChart(series, categories);
                 });
             });
         }
@@ -285,6 +287,7 @@ Ext.define('CustomApp', {
         }
         return hex;
     },
+    
     createPolarChart: function(categories, seriesData,callback){
         this.setLoading(false);
         console.log('createPolarChart', categories ,seriesData);
@@ -370,6 +373,94 @@ Ext.define('CustomApp', {
         }
 
     },
+    
+    createAreaChart: function(categories, seriesData,callback){
+        this.setLoading(false);
+        console.log('createAreaChart', categories ,seriesData);
+        var isEmpty = function(series) {
+            var total = _.reduce(_.first(series).data,function(memo,d) {
+                return memo + d[1];
+            },0);
+            return total === 0;
+        };
+
+        var that = this;
+        var chart_width = this.container.getWidth() * .90;
+        var chartConfig = {
+            credits: { enabled: false },
+            colors : this.chartColors,
+            chart: {
+                type: 'area',
+                spacingTop: 25,
+                spacingBottom: 25,
+                spacingRight: 25,
+                spacingLeft: 25,
+                width: chart_width,
+                events : {
+                    load : that.renderFeatureWords
+                }
+            },
+            title: {
+                text: ''
+            },
+            plotOptions: {
+                column: {
+                    tooltip: {
+                        headerFormat: '',
+                        pointFormat: '{series.name}: <b>{point.y}</b><br/>'
+                    }
+                },
+                series: {
+                    stacking: 'normal',
+                    shadow: false,
+                    groupPadding: 0,
+                    pointPlacement: 'on'
+                }
+            },
+            yAxis: [{
+                title: { text: '' }
+            }],
+            xAxis: {
+                categories: categories,
+                labels: {
+                    style: {
+                        width: '300px',
+                        whiteSpace: 'nowrap'
+                    },
+                    useHTML: true
+                }
+            },
+            legend : {
+                enabled : true
+            },
+            series: seriesData
+        };
+
+        if (!_.isUndefined(that.x)) {
+            that.remove(that.x);
+        }
+
+        that.x = Ext.widget('container',{
+            autoShow: true ,shadow: false,title: "",resizable: false,margin: 10,
+            html: '<div id="chart-container" class="chart-container"></div>',
+            listeners: {
+                resize: function(panel) {
+                },
+                afterrender : function(panel) {
+                    console.log('afterrender');
+                    var chart = $('#chart-container').highcharts(chartConfig);
+                    console.log('chart',chart,panel);
+                }
+            }
+        });
+
+        if (!isEmpty(seriesData))
+            that.add(that.x);
+        else {
+            console.log("no data",seriesData);
+        }
+
+    },
     createDonutChart: function(categories, seriesData, statusData, callback){
         this.setLoading(false);
         console.log('createDonutChart', categories ,seriesData);
@@ -398,7 +489,7 @@ Ext.define('CustomApp', {
             },
             plotOptions: {
                 pie : {
-                    allowPointSelect : true,
+                    allowPointSelect : true
                    // width: '45%'
                 },
                 series: {
@@ -515,8 +606,6 @@ Ext.define('CustomApp', {
     renderFeatureWords : function() {
         console.log('renderfeaturestories',this);
 
-
-
         var ren = this.renderer;
         var wordHeight = 11;
         var series = _.first(this.series),
@@ -545,7 +634,7 @@ Ext.define('CustomApp', {
         });
 
         if (featureWordsExist){
-            ren.label("Only up to the first 3 top ranked kpi's are shown", 5, 285)
+            ren.label("Only up to the first 3 top ranked KPIs are shown")
                 .css({
                     'textAlign': 'left',
                     fontWeight: 'normal',

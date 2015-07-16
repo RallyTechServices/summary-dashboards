@@ -150,7 +150,7 @@ Ext.define('CustomApp', {
             },0);
 
             var p = ( total > 0 ? ((stateTotal/total)*100) : 0);
-            return Math.round(p);
+            return p;
         };
 
         var summary = that.createSummaryRecord();

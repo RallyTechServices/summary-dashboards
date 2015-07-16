@@ -58,6 +58,9 @@ Ext.define('timebox-selector', {
     _updateIterationCombo : function(release)
     {
         this.remove('globaliterationpicker');
+        this.fireEvent('iterationchange',null);
+        this.publish('timeboxIterationChanged', null);
+                    
         var endFilter = Ext.create('Rally.data.wsapi.Filter', {
             property : "EndDate",
             operator : "<=",

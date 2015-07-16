@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <title><%= name %></title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
     <!--  Build Date: <%= new Date() %> -->
@@ -13,9 +14,6 @@
     <script type="text/javascript" src="/apps/<%= sdk %>/sdk.js"></script>
 
     <script type="text/javascript">
-        if (!window.location.origin) {
-            window.location.origin = window.location.protocol + "//" + window.location.hostname + (window.location.port ? ':' + window.location.port: '');
-        }
 
         Rally.onReady(function() {
             <%= js_contents %>

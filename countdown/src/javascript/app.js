@@ -77,9 +77,13 @@ Ext.define("TSCountdown", {
     _changeIteration: function(timebox) {
         this.logger.log("_changeIteration", timebox);
         
-        this.down('#iteration_counter').setEndDate( timebox.get('EndDate') );
-        this.down('#iteration_counter').text = timebox.get('Name') + ": " + timebox.get('EndDate');
-        
+        if ( Ext.isEmpty(timebox) ) {
+            this.down('#iteration_counter').setEndDate( new Date() );
+            this.down('#iteration_counter').text = "None selected";
+        } else {
+            this.down('#iteration_counter').setEndDate( timebox.get('EndDate') );
+            this.down('#iteration_counter').text = timebox.get('Name') + ": " + timebox.get('EndDate');
+        }
     },
     _loadAStoreWithAPromise: function(model_name, model_fields, filters){
         var deferred = Ext.create('Deft.Deferred');

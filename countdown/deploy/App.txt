@@ -1,21 +1,19 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <title>Countdown</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Wed Jun 24 2015 08:27:01 GMT-0600 (MDT) -->
+    <!--  Build Date: Wed Jul 15 2015 17:01:57 GMT-0700 (PDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Wed Jun 24 2015 08:27:01 GMT-0600 (MDT)";
-        var CHECKSUM = 8966876940;
+        var APP_BUILD_DATE = "Wed Jul 15 2015 17:01:57 GMT-0700 (PDT)";
+        var CHECKSUM = 9113347681;
     </script>
     
     <script type="text/javascript" src="/apps/2.0rc3/sdk.js"></script>
 
     <script type="text/javascript">
-        if (!window.location.origin) {
-            window.location.origin = window.location.protocol + "//" + window.location.hostname + (window.location.port ? ':' + window.location.port: '');
-        }
 
         Rally.onReady(function() {
              
@@ -79,6 +77,9 @@ Ext.define('timebox-selector', {
     _updateIterationCombo : function(release)
     {
         this.remove('globaliterationpicker');
+        this.fireEvent('iterationchange',null);
+        this.publish('timeboxIterationChanged', null);
+                    
         var endFilter = Ext.create('Rally.data.wsapi.Filter', {
             property : "EndDate",
             operator : "<=",
@@ -532,9 +533,13 @@ Ext.define("TSCountdown", {
     _changeIteration: function(timebox) {
         this.logger.log("_changeIteration", timebox);
         
-        this.down('#iteration_counter').setEndDate( timebox.get('EndDate') );
-        this.down('#iteration_counter').text = timebox.get('Name') + ": " + timebox.get('EndDate');
-        
+        if ( Ext.isEmpty(timebox) ) {
+            this.down('#iteration_counter').setEndDate( new Date() );
+            this.down('#iteration_counter').text = "None selected";
+        } else {
+            this.down('#iteration_counter').setEndDate( timebox.get('EndDate') );
+            this.down('#iteration_counter').text = timebox.get('Name') + ": " + timebox.get('EndDate');
+        }
     },
     _loadAStoreWithAPromise: function(model_name, model_fields, filters){
         var deferred = Ext.create('Deft.Deferred');

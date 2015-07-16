@@ -7,7 +7,7 @@ Ext.define('Rally.technicalservices.progressChart',{
     loadMask: false,
     chartColors : [],
     chartConfig: {
-        colors : ["#E0E0E0","#00a9e0","#fad200","#8dc63f"],
+        colors : ["#ee6c19","#FAD200","#3F86C9","#8DC63F", "#888"],
         chart: {
             type: 'bar'
         },
@@ -29,19 +29,24 @@ Ext.define('Rally.technicalservices.progressChart',{
                 }
             }
         ],
+        legend: {
+            reversed: true
+        },
         plotOptions: {
             series: {
                 dataLabels: {
                     enabled: true,
                     align: 'center',
                     formatter : function() {
-                        return (this.percentage !== 0) ? (Math.round(this.percentage) + " %") : "";
+//                        return (this.percentage !== 0) ? (Math.round(this.percentage) + " %") : "";
+                        return (this.y !== 0) ? (Math.round(this.y) + " %") : "";
                     },
                     color: '#FFFFFF'
                 },
                 stacking: 'normal'
             }        
-        }
+        },
+        tooltip: { enabled: false }
     },
     constructor: function (config) {
         this.callParent(arguments);

@@ -3,10 +3,10 @@
 <head>
     <title>Utilization Chart</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Fri Jul 17 2015 18:53:51 GMT-0600 (MDT) -->
+    <!--  Build Date: Fri Jul 17 2015 20:17:40 GMT-0700 (PDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Fri Jul 17 2015 18:53:51 GMT-0600 (MDT)";
+        var APP_BUILD_DATE = "Fri Jul 17 2015 20:17:40 GMT-0700 (PDT)";
         var CHECKSUM = [%= checksum %];
     </script>
     

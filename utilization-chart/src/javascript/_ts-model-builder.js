@@ -3,28 +3,20 @@ Ext.define('Rally.technicalservices.ModelBuilder',{
 
     build: function(modelType, newModelName, field_cfgs) {
         var deferred = Ext.create('Deft.Deferred');
-
+        var me = this;
+        
         Rally.data.ModelFactory.getModel({
             type: modelType,
             success: function(model) {
 
                 var default_fields = [{
                     name: '__startScope',
-                    convert: function (value, record) {
-                        return 1;
-                    },
                     displayName: 'Start Stability'
                 },{
                     name: '__endScope',
-                    convert: function(value, record){
-                        return 2;
-                    },
                     displayName: 'End Stability'
                 },{
                     name: '__endAcceptance',
-                    convert: function(value, record){
-                        return 2;
-                    },
                     displayName: 'End Acceptance'
                 },{
                     name: '__days',
@@ -50,27 +42,87 @@ Ext.define('Rally.technicalservices.ModelBuilder',{
                     displayName: 'Days'
                 },{
                     name: '__dailyScope',
-                    convert: function(value, record){
-                        return [1,1,2]
-                    },
+                    defaultValue:  [],
                     displayName: 'Daily Stability'
                 },{
                     name: '__dailyAcceptance',
-                    convert: function(value, record){
-                        return [0,1,2];
-                    },
+                    defaultValue: [],
                     displayName: 'Daily Acceptance'
                 }];
                 
                 var fields = Ext.Array.merge(default_fields, field_cfgs);
                 var new_model = Ext.define(newModelName, {
                     extend: model,
-                    fields: fields
+                    fields: fields,
+                    setCFD: me._setCFD
+                        
                 });
                 deferred.resolve(new_model);
             }
         });
 
         return deferred;
+    },
+    
+    // sometimes, dates are provided as beginning of day, but we 
+    // want to go to the end of the day
+    shiftToEndOfDay: function(js_date) {
+        return Rally.util.DateTime.add(Rally.util.DateTime.add(js_date,'day',1),'second',-1);
+    },
+    
+    isAccepted: function(state) {
+        return ( state == 'Accepted' );
+    },
+    
+    _setCFD: function(cfd_array) {
+        var days = this.get('__days');
+        
+        var my_oid = this.get('ObjectID');
+        
+        // set scope to nulls every day
+        var daily_scope = Ext.Array.map( days, function(day){ return null; });
+        var daily_acceptance = Ext.Array.map( days, function(day){ return null; });
+        
+        var total_by_day = {};
+        var acceptance_by_day = {};
+        
+        Ext.Array.each(cfd_array, function(cfd){
+            var cfd_oid = cfd.get('IterationObjectID');
+            
+            if ( Ext.isEmpty(cfd_oid) || Ext.isEmpty(my_oid) || my_oid == cfd_oid ) {
+                
+                var card_total = cfd.get('CardEstimateTotal') || 0;
+                var day = Rally.technicalservices.ModelBuilder.shiftToEndOfDay(cfd.get('CreationDate'));
+                
+                if (!total_by_day[day]) { total_by_day[day] = 0; }
+                
+                total_by_day[day] += card_total;
+
+                if ( Rally.technicalservices.ModelBuilder.isAccepted(cfd.get('CardState')) ) {
+                    if (!acceptance_by_day[day]) { acceptance_by_day[day] = 0; }
+                    acceptance_by_day[day] += card_total;
+                }
+            }
+        });
+
+        Ext.Array.each(days, function(day,idx){
+            if ( total_by_day[day] ) {
+                daily_scope[idx] = total_by_day[day];
+            }
+            if ( acceptance_by_day[day] ) {
+                daily_acceptance[idx] = acceptance_by_day[day];
+            }
+        });
+        
+        this.set('__dailyScope',daily_scope);
+        if ( daily_scope.length > 0 ) {
+            this.set('__startScope',daily_scope[0]);
+            this.set('__endScope',daily_scope[daily_scope.length - 1]);
+        }
+        
+        this.set('__dailyAcceptance',daily_acceptance);
+        if ( daily_acceptance.length > 0 ) {
+            this.set('__endAcceptance',daily_acceptance[daily_acceptance.length - 1]);
+        }
     }
 });

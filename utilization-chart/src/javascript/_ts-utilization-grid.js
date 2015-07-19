@@ -40,44 +40,58 @@ Ext.define('Rally.technicalservices.grid.Legend', {
             dataIndex: 'Project',
             text: 'Project',
             flex: 3,
-            renderer: this._objectNameRenderer
+            renderer: this._projectNameRenderer
         },{
             dataIndex: 'Name',
-            flex: 3,
+            flex: 2,
             text: 'Iteration'
         },{
             dataIndex:'StartDate',
             text:'Start',
-            flex: 3,
+            flex: 2,
             renderer: this._dateRenderer
         },{
             dataIndex:'EndDate',
             text:'End',
-            flex: 3,
+            flex: 2,
             renderer: this._dateRenderer
         },{
             dataIndex:'PlannedVelocity',
-            text:'Potential (Planned)',
+            text:'&#9632; Potential (Planned)',
             flex: 1,
-            editor: 'rallynumberfield'
+            editor: 'rallynumberfield',
+            sortable: false
         },{
             dataIndex:'__startScope',
             flex: 1,
-            text:'Points at Start (Stability)'
+            text:'&#9679; Points at Start (Stability)',
+            sortable: false
         },{
             dataIndex:'__endScope',
             flex: 1,
-            text:'Points at End (Stability)'
+            text:'&#9679; Points at End (Stability)',
+            sortable: false
         },{
             dataIndex:'__endAcceptance',
             flex: 1,
-            text:'Accepted at End'
+            text:'&#9660; Accepted at End',
+            sortable: false
         }];
      },
     _dateRenderer: function(value){
         //todo make ordinals
         return Ext.util.Format.date(value,'Y-m-d');
     },
+    
+    _projectNameRenderer: function(value) {
+        if ( !Ext.isEmpty(value) ) {
+            var name_array = value.Name.split('>');
+            return name_array[name_array.length - 1];
+        }
+        
+        return value;
+    },
+    
     _objectNameRenderer: function(value){
         if (value && value.Name){
             return value.Name;

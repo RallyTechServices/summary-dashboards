@@ -86,6 +86,8 @@ Ext.define("utilization-chart", {
         
         if ( !Ext.isEmpty(iteration) && zoom_to_iteration) {
             
+            me.setLoading('Loading iteration ' + iteration.get('Name') );
+            
             Rally.technicalservices.ModelBuilder.build('Iteration','Utilization',[]).then({
                 scope: this,
                 success: function(model){
@@ -93,18 +95,27 @@ Ext.define("utilization-chart", {
                     var filter = [{property:'Name',value: name}];
                     var fields = ['Name','Project','EndDate','StartDate','PlannedVelocity'];
 
-                    me._loadAStoreWithAPromise(model, fields, filter ).then({
+                    Deft.Chain.pipeline([
+                        function() { return me._loadAStoreWithAPromise(model, fields, filter ); }, 
+                        function(iterations) { 
+                            me.setLoading('Loading Cumulative Flow Data...');
+                            return me._associateCFDsWithIterations(iterations);
+                        }
+                    ]).then({
                         scope: me,
-                        success: function(iterations) {
-                            me._buildChart(iterations, zoom_to_iteration);
-                            me._buildGrid(iterations, zoom_to_iteration);
+                        success: function(calculated_iterations) {
+                            me.logger.log('Iterations: ', calculated_iterations);
+                            me.setLoading(false);
+                            
+                            me._buildChart(calculated_iterations, zoom_to_iteration);
+                            me._buildGrid(calculated_iterations, zoom_to_iteration);
                         },
                         failure: function(msg) {
                             Ext.Msg.alert('!', msg);
                         }
                     });
                 }
-            });
+            }).always(function() { me.setLoading(false); });
         }
     },
     getChart: function(){
@@ -130,14 +141,43 @@ Ext.define("utilization-chart", {
                 scope: this,
                 colorclicked: function(record){
                     this.getChart().toggleColor(record.get('__color'))
+                },
+                headerclick: function( grid, column ) {
+                    //this.getChart().toggleSeriesType(column.dataIndex);
                 }
             }
         });
     },
+    
+    _associateCFDsWithIterations: function(iterations) {
+        var deferred = Ext.create('Deft.Deferred');
+        
+        var fetch_fields =  ['CardEstimateTotal','CardState','CreationDate','IterationObjectID'];
+        var start_date = Rally.util.DateTime.toIsoString(iterations[0].get('StartDate'));
+        var end_date   = Rally.util.DateTime.toIsoString(iterations[0].get('EndDate'));
+        
+        var filters = [
+            {property: 'CreationDate', operator: '>=', value:start_date},
+            {property: 'CreationDate', operator: '<=', value:  end_date}
+        ];
+        
+        this._loadAStoreWithAPromise('IterationCumulativeFlowData', fetch_fields, filters ).then({
+            success: function(cfds) {
+                Ext.Array.each(iterations, function(iteration){
+                    iteration.setCFD(cfds);
+                });
+                deferred.resolve(iterations);
+            },
+            failure: function(msg) {
+                deferred.reject(msg);
+            }
+        });
+        return deferred.promise;
+    },
+    
     _loadAStoreWithAPromise: function(model, model_fields, filters){
         var deferred = Ext.create('Deft.Deferred');
         var me = this;
-        this.setLoading("Loading...");
         
         this.logger.log("Starting load:",model,model_fields, filters);
           
@@ -147,9 +187,7 @@ Ext.define("utilization-chart", {
             filters: filters,
             limit: 'Infinity'
         }).load({
-            callback : function(records, operation, successful) {
-                me.setLoading(false);
-                
+            callback : function(records, operation, successful) {                
                 if (successful){
                     deferred.resolve(records);
                 } else {

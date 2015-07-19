@@ -37,8 +37,7 @@ Ext.define('Rally.technicalservices.chart.Utilization',{
             '#DB843D', '#92A8CD', '#A47D7C', '#B5CA92'],
 
             chart: {
-                height: 300,
-
+                height: 300
             },
             title: {
                 text: '',
@@ -55,13 +54,12 @@ Ext.define('Rally.technicalservices.chart.Utilization',{
                 title: { text: 'Points' },
                 min: 0
             }],
-            plotOptions: {},
+            plotOptions: {}
         },
 
         records: undefined,
 
         zoomToIteration: true
-
 
     },
     constructor: function(config) {

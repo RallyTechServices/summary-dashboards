@@ -15,3 +15,44 @@
     margin-right: 5px;
     cursor: pointer;
 }
+
+.grid-legend-show-action {
+    width: 18px;
+    height: 18px;
+    border-radius: 3px;
+    text-align: center;
+    color: white;
+    border-style: solid;
+    border-width: 1px;
+    display: inline-block;
+}
+.grid-legend-hide-action {
+    width: 18px;
+    height: 18px;
+    border-radius: 3px;
+    text-align: center;
+    background-color: white;
+    border-style: solid;
+    border-width: 2px;
+    display: inline-block;
+}
+.button-circle {
+    width: 14px;
+    height: 14px;
+    border-radius: 7px;
+    text-align: center;
+    background-color: dimgray;
+    border-style: solid;
+    border-width: 1px;
+    display: inline-block;
+}
+.button-square {
+    width: 14px;
+    height: 14px;
+    border-radius: 0px;
+    text-align: center;
+    background-color: dimgray;
+    border-style: solid;
+    border-width: 1px;
+    display: inline-block;
+}

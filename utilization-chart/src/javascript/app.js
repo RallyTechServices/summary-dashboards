@@ -6,8 +6,8 @@ Ext.define("utilization-chart", {
     items: [
         {xtype:'container',itemId:'settings_box'},
         {xtype:'container',itemId:'selector_box'},
-        {xtype:'container',itemId:'chart_box', margin: 5},
-        {xtype:'container',itemId:'grid_box',  margin: 5},
+        {xtype:'container',itemId:'chart_box', margin: 5, padding: 10, flex: 1},
+        {xtype:'container',itemId:'grid_box',  margin: 5, padding: 10, flex: 1},
         {xtype:'tsinfolink'}
     ],
 
@@ -80,10 +80,11 @@ Ext.define("utilization-chart", {
     
     _changeIteration: function(iteration) {
         var me = this;
-        var settings = this.getSettings();
+        var settings = this.getSettings(),
+            zoom_to_iteration = settings.zoomToIteration == true || settings.zoomToIteration == "true" ;
         this.logger.log("Iteration changed:", iteration);
         
-        if ( !Ext.isEmpty(iteration) && settings.zoomToIteration == true || settings.zoomToIteration == "true" ) {
+        if ( !Ext.isEmpty(iteration) && zoom_to_iteration) {
             
             Rally.technicalservices.ModelBuilder.build('Iteration','Utilization',[]).then({
                 scope: this,
@@ -91,11 +92,12 @@ Ext.define("utilization-chart", {
                     var name = iteration.get('Name');
                     var filter = [{property:'Name',value: name}];
                     var fields = ['Name','Project','EndDate','StartDate','PlannedVelocity'];
-                    
+
                     me._loadAStoreWithAPromise(model, fields, filter ).then({
                         scope: me,
                         success: function(iterations) {
-                            console.log(iterations);
+                            me._buildChart(iterations, zoom_to_iteration);
+                            me._buildGrid(iterations, zoom_to_iteration);
                         },
                         failure: function(msg) {
                             Ext.Msg.alert('!', msg);
@@ -105,7 +107,33 @@ Ext.define("utilization-chart", {
             });
         }
     },
-    
+    getChart: function(){
+        return this.down('tsutilizationchart');
+    },
+    _buildChart: function(iterations, zoom_to_iteration){
+        var me = this;
+
+        this.down('#chart_box').removeAll();
+        this.down('#grid_box').removeAll();
+
+        this.down('#chart_box').add({
+            xtype: 'tsutilizationchart',
+            records: iterations,
+            zoomToIteration: zoom_to_iteration
+        });
+    },
+    _buildGrid: function(iterations, zoom_to_iterations){
+        this.down('#grid_box').add({
+            xtype: 'tslegendgrid',
+            records: iterations,
+            listeners: {
+                scope: this,
+                colorclicked: function(record){
+                    this.getChart().toggleColor(record.get('__color'))
+                }
+            }
+        });
+    },
     _loadAStoreWithAPromise: function(model, model_fields, filters){
         var deferred = Ext.create('Deft.Deferred');
         var me = this;
@@ -113,7 +141,7 @@ Ext.define("utilization-chart", {
         
         this.logger.log("Starting load:",model,model_fields, filters);
           
-        Ext.create('Rally.data.wsapi.Store', {
+        var store = Ext.create('Rally.data.wsapi.Store', {
             model: model,
             fetch: model_fields,
             filters: filters,
@@ -132,7 +160,7 @@ Ext.define("utilization-chart", {
         });
         return deferred.promise;
     },
-    
+
      /********************************************
      /* Overrides for App class
      /*

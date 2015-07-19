@@ -50,6 +50,7 @@
                             }
     
                             Rally.environment.externalContext = rawContext;
+                            
                             //this._loadResources();
                             onready();
                         },
@@ -130,6 +131,9 @@
                             extend: 'Rally.app.App',
                             componentCls: 'app',
                             launch: function() {
+                                var context = this.getContext();
+                                
+                                
                                 // when app is loaded, we can run our jasmine tests!
                                 var jasmineEnv = jasmine.getEnv();
     
@@ -154,7 +158,7 @@
         // });
         }
         
-        setTimeout(afterWait(), 1000);
+        setTimeout(afterWait, 5000);
     </script>
     <link rel="stylesheet" type="text/css" href="src/style/app.css">
     

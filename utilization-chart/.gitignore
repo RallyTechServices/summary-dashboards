@@ -7,5 +7,6 @@ _SpecRunner.html
 deploy/app.min.js
 .project
 .settings
+.grunt
 deploy/ConfluenceApp.txt
 deploy/ExternalApp.txt

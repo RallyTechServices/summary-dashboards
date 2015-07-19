@@ -27,18 +27,6 @@ Ext.define('Rally.technicalservices.ModelBuilder',{
                     },
                     displayName: 'End Acceptance'
                 },{
-                    name: '__dailyScope',
-                    convert: function(value, record){
-                        return [1,1,2]
-                    },
-                    displayName: 'Daily Stability'
-                },{
-                    name: '__dailyAcceptance',
-                    convert: function(value, record){
-                        return [0,1,2];
-                    },
-                    displayName: 'Daily Acceptance'
-                },{
                     name: '__days',
                     convert: function(value, record){
                         // this is an array of dates (end of the day) that the daily fields correspond to
@@ -60,6 +48,18 @@ Ext.define('Rally.technicalservices.ModelBuilder',{
                         return array_of_days;
                     },
                     displayName: 'Days'
+                },{
+                    name: '__dailyScope',
+                    convert: function(value, record){
+                        return [1,1,2]
+                    },
+                    displayName: 'Daily Stability'
+                },{
+                    name: '__dailyAcceptance',
+                    convert: function(value, record){
+                        return [0,1,2];
+                    },
+                    displayName: 'Daily Acceptance'
                 }];
                 
                 var fields = Ext.Array.merge(default_fields, field_cfgs);

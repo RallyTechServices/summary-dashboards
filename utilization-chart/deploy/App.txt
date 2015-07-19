@@ -4,11 +4,11 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <title>Utilization Chart</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Sun Jul 19 2015 15:32:14 GMT-0600 (MDT) -->
+    <!--  Build Date: Sun Jul 19 2015 16:05:04 GMT-0700 (PDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Sun Jul 19 2015 15:32:14 GMT-0600 (MDT)";
-        var CHECKSUM = 15161531697;
+        var APP_BUILD_DATE = "Sun Jul 19 2015 16:05:04 GMT-0700 (PDT)";
+        var CHECKSUM = 19835722960;
     </script>
     
         <script type="text/javascript" src="/apps/2.0rc3/sdk.js"></script>
@@ -286,28 +286,20 @@ Ext.define('Rally.technicalservices.ModelBuilder',{
 
     build: function(modelType, newModelName, field_cfgs) {
         var deferred = Ext.create('Deft.Deferred');
-
+        var me = this;
+        
         Rally.data.ModelFactory.getModel({
             type: modelType,
             success: function(model) {
 
                 var default_fields = [{
                     name: '__startScope',
-                    convert: function (value, record) {
-                        return 1;
-                    },
                     displayName: 'Start Stability'
                 },{
                     name: '__endScope',
-                    convert: function(value, record){
-                        return 2;
-                    },
                     displayName: 'End Stability'
                 },{
                     name: '__endAcceptance',
-                    convert: function(value, record){
-                        return 2;
-                    },
                     displayName: 'End Acceptance'
                 },{
                     name: '__days',
@@ -333,28 +325,88 @@ Ext.define('Rally.technicalservices.ModelBuilder',{
                     displayName: 'Days'
                 },{
                     name: '__dailyScope',
-                    convert: function(value, record){
-                        return [1,1,2]
-                    },
+                    defaultValue:  [],
                     displayName: 'Daily Stability'
                 },{
                     name: '__dailyAcceptance',
-                    convert: function(value, record){
-                        return [0,1,2];
-                    },
+                    defaultValue: [],
                     displayName: 'Daily Acceptance'
                 }];
                 
                 var fields = Ext.Array.merge(default_fields, field_cfgs);
                 var new_model = Ext.define(newModelName, {
                     extend: model,
-                    fields: fields
+                    fields: fields,
+                    setCFD: me._setCFD
+                        
                 });
                 deferred.resolve(new_model);
             }
         });
 
         return deferred;
+    },
+    
+    // sometimes, dates are provided as beginning of day, but we 
+    // want to go to the end of the day
+    shiftToEndOfDay: function(js_date) {
+        return Rally.util.DateTime.add(Rally.util.DateTime.add(js_date,'day',1),'second',-1);
+    },
+    
+    isAccepted: function(state) {
+        return ( state == 'Accepted' );
+    },
+    
+    _setCFD: function(cfd_array) {
+        var days = this.get('__days');
+        
+        var my_oid = this.get('ObjectID');
+        
+        // set scope to nulls every day
+        var daily_scope = Ext.Array.map( days, function(day){ return null; });
+        var daily_acceptance = Ext.Array.map( days, function(day){ return null; });
+        
+        var total_by_day = {};
+        var acceptance_by_day = {};
+        
+        Ext.Array.each(cfd_array, function(cfd){
+            var cfd_oid = cfd.get('IterationObjectID');
+            
+            if ( Ext.isEmpty(cfd_oid) || Ext.isEmpty(my_oid) || my_oid == cfd_oid ) {
+                
+                var card_total = cfd.get('CardEstimateTotal') || 0;
+                var day = Rally.technicalservices.ModelBuilder.shiftToEndOfDay(cfd.get('CreationDate'));
+                
+                if (!total_by_day[day]) { total_by_day[day] = 0; }
+                
+                total_by_day[day] += card_total;
+
+                if ( Rally.technicalservices.ModelBuilder.isAccepted(cfd.get('CardState')) ) {
+                    if (!acceptance_by_day[day]) { acceptance_by_day[day] = 0; }
+                    acceptance_by_day[day] += card_total;
+                }
+            }
+        });
+
+        Ext.Array.each(days, function(day,idx){
+            if ( total_by_day[day] ) {
+                daily_scope[idx] = total_by_day[day];
+            }
+            if ( acceptance_by_day[day] ) {
+                daily_acceptance[idx] = acceptance_by_day[day];
+            }
+        });
+        
+        this.set('__dailyScope',daily_scope);
+        if ( daily_scope.length > 0 ) {
+            this.set('__startScope',daily_scope[0]);
+            this.set('__endScope',daily_scope[daily_scope.length - 1]);
+        }
+        
+        this.set('__dailyAcceptance',daily_acceptance);
+        if ( daily_acceptance.length > 0 ) {
+            this.set('__endAcceptance',daily_acceptance[daily_acceptance.length - 1]);
+        }
     }
 });
 Ext.define('Rally.technicalservices.chart.Utilization',{
@@ -562,20 +614,20 @@ Ext.define('Rally.technicalservices.grid.Legend', {
             dataIndex: 'Project',
             text: 'Project',
             flex: 3,
-            renderer: this._objectNameRenderer
+            renderer: this._projectNameRenderer
         },{
             dataIndex: 'Name',
-            flex: 3,
+            flex: 2,
             text: 'Iteration'
         },{
             dataIndex:'StartDate',
             text:'Start',
-            flex: 3,
+            flex: 2,
             renderer: this._dateRenderer
         },{
             dataIndex:'EndDate',
             text:'End',
-            flex: 3,
+            flex: 2,
             renderer: this._dateRenderer
         },{
             dataIndex:'PlannedVelocity',
@@ -600,6 +652,16 @@ Ext.define('Rally.technicalservices.grid.Legend', {
         //todo make ordinals
         return Ext.util.Format.date(value,'Y-m-d');
     },
+    
+    _projectNameRenderer: function(value) {
+        if ( !Ext.isEmpty(value) ) {
+            var name_array = value.Name.split('>');
+            return name_array[name_array.length - 1];
+        }
+        
+        return value;
+    },
+    
     _objectNameRenderer: function(value){
         if (value && value.Name){
             return value.Name;
@@ -695,6 +757,8 @@ Ext.define("utilization-chart", {
         
         if ( !Ext.isEmpty(iteration) && zoom_to_iteration) {
             
+            me.setLoading('Loading iteration ' + iteration.get('Name') );
+            
             Rally.technicalservices.ModelBuilder.build('Iteration','Utilization',[]).then({
                 scope: this,
                 success: function(model){
@@ -702,18 +766,27 @@ Ext.define("utilization-chart", {
                     var filter = [{property:'Name',value: name}];
                     var fields = ['Name','Project','EndDate','StartDate','PlannedVelocity'];
 
-                    me._loadAStoreWithAPromise(model, fields, filter ).then({
+                    Deft.Chain.pipeline([
+                        function() { return me._loadAStoreWithAPromise(model, fields, filter ); }, 
+                        function(iterations) { 
+                            me.setLoading('Loading Cumulative Flow Data...');
+                            return me._associateCFDsWithIterations(iterations);
+                        }
+                    ]).then({
                         scope: me,
-                        success: function(iterations) {
-                            me._buildChart(iterations, zoom_to_iteration);
-                            me._buildGrid(iterations, zoom_to_iteration);
+                        success: function(calculated_iterations) {
+                            me.logger.log('Iterations: ', calculated_iterations);
+                            me.setLoading(false);
+                            
+                            me._buildChart(calculated_iterations, zoom_to_iteration);
+                            me._buildGrid(calculated_iterations, zoom_to_iteration);
                         },
                         failure: function(msg) {
                             Ext.Msg.alert('!', msg);
                         }
                     });
                 }
-            });
+            }).always(function() { me.setLoading(false); });
         }
     },
     getChart: function(){
@@ -743,10 +816,36 @@ Ext.define("utilization-chart", {
             }
         });
     },
+    
+    _associateCFDsWithIterations: function(iterations) {
+        var deferred = Ext.create('Deft.Deferred');
+        
+        var fetch_fields =  ['CardEstimateTotal','CardState','CreationDate','IterationObjectID'];
+        var start_date = Rally.util.DateTime.toIsoString(iterations[0].get('StartDate'));
+        var end_date   = Rally.util.DateTime.toIsoString(iterations[0].get('EndDate'));
+        
+        var filters = [
+            {property: 'CreationDate', operator: '>=', value:start_date},
+            {property: 'CreationDate', operator: '<=', value:  end_date}
+        ];
+        
+        this._loadAStoreWithAPromise('IterationCumulativeFlowData', fetch_fields, filters ).then({
+            success: function(cfds) {
+                Ext.Array.each(iterations, function(iteration){
+                    iteration.setCFD(cfds);
+                });
+                deferred.resolve(iterations);
+            },
+            failure: function(msg) {
+                deferred.reject(msg);
+            }
+        });
+        return deferred.promise;
+    },
+    
     _loadAStoreWithAPromise: function(model, model_fields, filters){
         var deferred = Ext.create('Deft.Deferred');
         var me = this;
-        this.setLoading("Loading...");
         
         this.logger.log("Starting load:",model,model_fields, filters);
           
@@ -756,9 +855,7 @@ Ext.define("utilization-chart", {
             filters: filters,
             limit: 'Infinity'
         }).load({
-            callback : function(records, operation, successful) {
-                me.setLoading(false);
-                
+            callback : function(records, operation, successful) {                
                 if (successful){
                     deferred.resolve(records);
                 } else {

@@ -4,11 +4,11 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <title>Utilization Chart</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Sun Jul 19 2015 16:16:04 GMT-0700 (PDT) -->
+    <!--  Build Date: Sun Jul 19 2015 16:25:04 GMT-0700 (PDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Sun Jul 19 2015 16:16:04 GMT-0700 (PDT)";
-        var CHECKSUM = 19870953587;
+        var APP_BUILD_DATE = "Sun Jul 19 2015 16:25:04 GMT-0700 (PDT)";
+        var CHECKSUM = 20163498115;
     </script>
     
         <script type="text/javascript" src="/apps/2.0rc3/sdk.js"></script>
@@ -472,7 +472,6 @@ Ext.define('Rally.technicalservices.chart.Utilization',{
 
         zoomToIteration: true
 
-
     },
     constructor: function(config) {
         this.mergeConfig(config);
@@ -632,19 +631,23 @@ Ext.define('Rally.technicalservices.grid.Legend', {
             dataIndex:'PlannedVelocity',
             text:'&#9632; Potential (Planned)',
             flex: 1,
-            editor: 'rallynumberfield'
+            editor: 'rallynumberfield',
+            sortable: false
         },{
             dataIndex:'__startScope',
             flex: 1,
-            text:'&#9679; Points at Start (Stability)'
+            text:'&#9679; Points at Start (Stability)',
+            sortable: false
         },{
             dataIndex:'__endScope',
             flex: 1,
-            text:'&#9679; Points at End (Stability)'
+            text:'&#9679; Points at End (Stability)',
+            sortable: false
         },{
             dataIndex:'__endAcceptance',
             flex: 1,
-            text:'&#9660; Accepted at End'
+            text:'&#9660; Accepted at End',
+            sortable: false
         }];
      },
     _dateRenderer: function(value){
@@ -811,6 +814,9 @@ Ext.define("utilization-chart", {
                 scope: this,
                 colorclicked: function(record){
                     this.getChart().toggleColor(record.get('__color'))
+                },
+                headerclick: function( grid, column ) {
+                    //this.getChart().toggleSeriesType(column.dataIndex);
                 }
             }
         });

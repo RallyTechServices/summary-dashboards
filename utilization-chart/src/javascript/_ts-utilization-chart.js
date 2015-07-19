@@ -61,7 +61,6 @@ Ext.define('Rally.technicalservices.chart.Utilization',{
 
         zoomToIteration: true
 
-
     },
     constructor: function(config) {
         this.mergeConfig(config);

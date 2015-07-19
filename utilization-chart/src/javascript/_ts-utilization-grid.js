@@ -59,19 +59,23 @@ Ext.define('Rally.technicalservices.grid.Legend', {
             dataIndex:'PlannedVelocity',
             text:'&#9632; Potential (Planned)',
             flex: 1,
-            editor: 'rallynumberfield'
+            editor: 'rallynumberfield',
+            sortable: false
         },{
             dataIndex:'__startScope',
             flex: 1,
-            text:'&#9679; Points at Start (Stability)'
+            text:'&#9679; Points at Start (Stability)',
+            sortable: false
         },{
             dataIndex:'__endScope',
             flex: 1,
-            text:'&#9679; Points at End (Stability)'
+            text:'&#9679; Points at End (Stability)',
+            sortable: false
         },{
             dataIndex:'__endAcceptance',
             flex: 1,
-            text:'&#9660; Accepted at End'
+            text:'&#9660; Accepted at End',
+            sortable: false
         }];
      },
     _dateRenderer: function(value){

@@ -141,6 +141,9 @@ Ext.define("utilization-chart", {
                 scope: this,
                 colorclicked: function(record){
                     this.getChart().toggleColor(record.get('__color'))
+                },
+                headerclick: function( grid, column ) {
+                    //this.getChart().toggleSeriesType(column.dataIndex);
                 }
             }
         });

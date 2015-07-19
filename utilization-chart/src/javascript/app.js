@@ -83,7 +83,6 @@ Ext.define("utilization-chart", {
         var settings = this.getSettings();
         this.logger.log("Iteration changed:", iteration);
         
-        
         if ( !Ext.isEmpty(iteration) && settings.zoomToIteration == true || settings.zoomToIteration == "true" ) {
             
             Rally.technicalservices.ModelBuilder.build('Iteration','Utilization',[]).then({

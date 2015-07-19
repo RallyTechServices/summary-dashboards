@@ -1,4 +1,17 @@
-// nothing to do
+
+Ext.define('mockCFD',{
+    extend: 'Ext.data.Model',
+    fields: [
+        {name:'CardCount',type:'int'},
+        {name:'CardEstimateTotal',type:'int'},
+        {name:'CardState',type:'string'},
+        {name:'CardToDoTotal',type:'int'},
+        {name:'CreationDate',type:'date', defaultValue:new Date()},
+        {name:'ObjectID',type:'int'},
+        {name:'TaskEstimateTotal',type:'int'},
+        {name:'IterationObjectID', type:'int'}
+    ]
+});
 
 /**
 *

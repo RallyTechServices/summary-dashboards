@@ -199,11 +199,16 @@ Ext.define('CustomApp', {
        var pct = Math.round( total > 0 ? (accepted/total)*100 : 0),
             pct_released = Math.round(total > 0 ? released/total * 100 : 0);
 
+        var project_name = _.last(project.split(">"));
+
         if (accepted == 0){
-            return Ext.String.format("<b>{0}</b><br/>No {1} items.",_.last(project.split(">")),acceptedText);
+            if ( Ext.isEmpty(project_name) ) {
+                return Ext.String.format("No {1} items.",project_name,acceptedText);
+            }
+            return Ext.String.format("<b>{0}</b><br/>No {1} items.",project_name,acceptedText);
         }
 
-        return Ext.String.format("<b>{7}</b><br/>[{0}/{1}] ({2}%) {3} <br/>[{4}/{1}] ({5}%) {6}",
+        var label = Ext.String.format("<b>{7}</b><br/>[{0}/{1}] ({2}%) {3} <br/>[{4}/{1}] ({5}%) {6}",
             accepted,
             total,
             pct,
@@ -211,12 +216,24 @@ Ext.define('CustomApp', {
             released,
             pct_released,
             releasedText,
-            _.last(project.split(">")));
+            project_name);
+        if ( Ext.isEmpty(project_name) ) {
+            label = Ext.String.format("[{0}/{1}] ({2}%) {3} <br/>[{4}/{1}] ({5}%) {6}",
+                accepted,
+                total,
+                pct,
+                acceptedText,
+                released,
+                pct_released,
+                releasedText);
+        }
+        return label 
     },
     prepareFeatureChartData : function(features, projects, callback) {
-
+        console.log('prepareFeatureChartData', features, projects);
+        
         var categories = _.map( projects, function(p) { return p.get("Name"); });
-    
+        
         var data = _.map(categories,function(project,index){
             var total = features[index].length,
                 accepted = this._summarizeCompletedFeatures(features[index]),
@@ -229,7 +246,7 @@ Ext.define('CustomApp', {
 
         }, this);
 
-         var sortedData = data.sort(function(a,b) { return b[1] - a[1]; }) ;
+        var sortedData = data.sort(function(a,b) { return b[1] - a[1]; }) ;
 
         var seriesData = [{
             name : 'Accepted',
@@ -377,6 +394,17 @@ Ext.define('CustomApp', {
     createAreaChart: function(categories, seriesData,callback){
         this.setLoading(false);
         console.log('createAreaChart', categories ,seriesData);
+        
+        if ( categories.length == 1 ) {
+            // we're at a leaf node!
+            // don't want it to look like two dots!
+            console.log('categories are 1');
+            categories = ["",categories[0],""];
+            Ext.Array.each(seriesData, function(series){
+                series.data = [ 0, series.data[0], 0 ];
+            });
+        }
+        
         var isEmpty = function(series) {
             var total = _.reduce(_.first(series).data,function(memo,d) {
                 return memo + d[1];
@@ -404,8 +432,10 @@ Ext.define('CustomApp', {
                 text: ''
             },
             plotOptions: {
+
                 column: {
                     tooltip: {
+                        enabled: false,
                         headerFormat: '',
                         pointFormat: '{series.name}: <b>{point.y}</b><br/>'
                     }
@@ -433,6 +463,7 @@ Ext.define('CustomApp', {
             legend : {
                 enabled : true
             },
+            tooltip: { enabled: false },
             series: seriesData
         };
 

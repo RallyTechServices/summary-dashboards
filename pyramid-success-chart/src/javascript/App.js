@@ -153,7 +153,7 @@ Ext.define('CustomApp', {
         
         var that = this;
         var categories = _.map( projects, function(p) { return p.get("Name"); });
-        var completedStates = ["Accepted",_.last(states)],
+        var acceptedStates = ["Accepted",_.last(states)],
             releasedStates = _.last(states) === "Accepted" ? [] : [_.last(states)];
 
         var pointsValue = function(value) {
@@ -171,11 +171,11 @@ Ext.define('CustomApp', {
 
         var data = _.map(categories,function(project,index){
             var total = summarize(stories[index],states),
-                completed = summarize(stories[index],completedStates),
+                accepted = summarize(stories[index],acceptedStates),
                 released = summarize(stories[index],releasedStates),
-                label = this._getProjectLabel(project,total,completed,released,'Accepted','Released');
+                label = this._getProjectLabel(project,total,accepted,released,'Accepted','Released');
 
-            return [ label, total, completed, released];
+            return [ label, total, accepted, released];
 
         }, this);
 
@@ -195,19 +195,19 @@ Ext.define('CustomApp', {
         callback(null,_.map(sortedData, function(d){return d[0] }),seriesData);
 
     },
-    _getProjectLabel: function(project, total, completed, released,completedText, releasedText){
-       var pct = Math.round( total > 0 ? (completed/total)*100 : 0),
+    _getProjectLabel: function(project, total, accepted, released,acceptedText, releasedText){
+       var pct = Math.round( total > 0 ? (accepted/total)*100 : 0),
             pct_released = Math.round(total > 0 ? released/total * 100 : 0);
 
-        if (completed == 0){
-            return Ext.String.format("<b>{0}</b><br/>No {1} items.",_.last(project.split(">")),completedText);
+        if (accepted == 0){
+            return Ext.String.format("<b>{0}</b><br/>No {1} items.",_.last(project.split(">")),acceptedText);
         }
 
         return Ext.String.format("<b>{7}</b><br/>[{0}/{1}] ({2}%) {3} <br/>[{4}/{1}] ({5}%) {6}",
-            completed,
+            accepted,
             total,
             pct,
-            completedText,
+            acceptedText,
             released,
             pct_released,
             releasedText,
@@ -219,20 +219,20 @@ Ext.define('CustomApp', {
     
         var data = _.map(categories,function(project,index){
             var total = features[index].length,
-                completed = this._summarizeCompletedFeatures(features[index]),
+                accepted = this._summarizeCompletedFeatures(features[index]),
                 released = this._summarizeReleasedFeatures(features[index], this.getSetting('featureReleaseState')),
                 words = this._getFeatureWords(features[index]),
-                label = this._getProjectLabel(project,total,completed,released,'Completed','Released');
+                label = this._getProjectLabel(project,total,accepted,released,'Accepted','Released');
 
             console.log('words',words);
-            return [ label, total, completed, words, released];
+            return [ label, total, accepted, words, released];
 
         }, this);
 
          var sortedData = data.sort(function(a,b) { return b[1] - a[1]; }) ;
 
         var seriesData = [{
-            name : 'Completed',
+            name : 'Accepted',
             data : _.map(sortedData, function(d){return d[2]-d[4];}),
             featureWords : _.map(sortedData,function(d) { return d[3];}),
             dataLabels: {
@@ -268,7 +268,7 @@ Ext.define('CustomApp', {
     _getTotalColor: function(index){
         return this._hexToRGBAColorString(this.chartColors[index], 0.33);
     },
-    _getCompletedColor: function(index){
+    _getAcceptedColor: function(index){
         return this._hexToRGBAColorString(this.chartColors[index], 0.66);
     },
     _getReleasedColor: function(index){
@@ -561,9 +561,9 @@ Ext.define('CustomApp', {
                         enabled: true,
                         formatter : function() {
                             var scope = this.point.y;
-                            var completed = this.point.series.options.completedData[this.point.index];
-                            var pct = Math.round( scope > 0 ? (completed/scope)*100 : 0);
-                            return " [" + completed + "/" + scope + "] ("+pct+"%) <br/>" + 
+                            var accepted = this.point.series.options.acceptedData[this.point.index];
+                            var pct = Math.round( scope > 0 ? (accepted/scope)*100 : 0);
+                            return " [" + accepted + "/" + scope + "] ("+pct+"%) <br/>" + 
                                 _.last(this.point.name.split(">"));
                         },
                         softConnector: true,

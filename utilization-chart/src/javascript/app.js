@@ -30,6 +30,7 @@ Ext.define("utilization-chart", {
         var me = this;
         
         this.logger.log("Settings:", settings);
+        
         if ( settings.showScopeSelector == true || settings.showScopeSelector == "true" ) {
             this.down('#selector_box').add({
                 xtype : 'timebox-selector',
@@ -93,10 +94,12 @@ Ext.define("utilization-chart", {
                 success: function(model){
                     var name = iteration.get('Name');
                     var filter = [{property:'Name',value: name}];
-                    var fields = ['Name','Project','EndDate','StartDate','PlannedVelocity'];
+                    var fields = ['Name','EndDate','StartDate','PlannedVelocity','Project','Parent','Children','ObjectID'];
 
                     Deft.Chain.pipeline([
-                        function() { return me._loadAStoreWithAPromise(model, fields, filter ); }, 
+                        function() { 
+                            return me._loadAStoreWithAPromise(model, fields, filter ); 
+                        }, 
                         function(iterations) { 
                             me.setLoading('Loading Cumulative Flow Data...');
                             return me._associateCFDsWithIterations(iterations);
@@ -105,10 +108,12 @@ Ext.define("utilization-chart", {
                         scope: me,
                         success: function(calculated_iterations) {
                             me.logger.log('Iterations: ', calculated_iterations);
+                            var rolled_up_iterations = me._rollUpData(calculated_iterations);
+                            
                             me.setLoading(false);
                             
-                            me._buildChart(calculated_iterations, zoom_to_iteration);
-                            me._buildGrid(calculated_iterations, zoom_to_iteration);
+                            me._buildChart(rolled_up_iterations, zoom_to_iteration);
+                            me._buildGrid(rolled_up_iterations, zoom_to_iteration);
                         },
                         failure: function(msg) {
                             Ext.Msg.alert('!', msg);
@@ -173,6 +178,61 @@ Ext.define("utilization-chart", {
             }
         });
         return deferred.promise;
+    },
+    
+    _rollUpData: function(iterations) {
+        var leaves = Ext.Array.filter(iterations, function(iteration){
+            var project = iteration.get('Project');
+            if ( project && project.Children && project.Children.Count == 0 && project.Parent ) {
+                return true;
+            }
+            return false;
+        });
+        
+        this.logger.log("Leaf project iterations: ", leaves);
+        
+        this.iterations_by_project_oid = {};
+        Ext.Array.each(iterations, function(iteration) {
+            var project = iteration.get('Project');
+            this.iterations_by_project_oid[project.ObjectID] = iteration;
+        },this);
+        
+        while ( leaves.length > 0 ) {
+            var parent_iterations = [];
+            Ext.Array.each(leaves, function(leaf) {
+                parent = this._setValuesForParent(leaf.get('Project'),'PlannedVelocity');
+                if ( parent ) {
+                    var parent_oid = parent.ObjectID;
+                    parent_iterations = Ext.Array.merge(parent_iterations, this.iterations_by_project_oid[parent_oid]);
+                }
+            },this);
+            
+            console.log('parents:', parent_iterations);
+            leaves = parent_iterations;
+        }
+        
+        return iterations;
+    },
+    
+    _setValuesForParent: function(leaf,field) {
+        if (! leaf.Parent ) {
+            return null;
+        }
+        
+        var leaf_oid = leaf.ObjectID;
+        var parent_oid = leaf.Parent.ObjectID;
+        var leaf_iteration = this.iterations_by_project_oid[leaf_oid];
+        var parent_iteration = this.iterations_by_project_oid[parent_oid];
+        
+        if ( parent_iteration ) {
+            var parent_planned = parent_iteration.get(field) || 0;
+            var leaf_planned = leaf_iteration.get(field) || 0;
+            
+            parent_iteration.set(field, parent_planned + leaf_planned);
+            return parent_iteration.get('Project');
+        }
+        
+        return null;
     },
     
     _loadAStoreWithAPromise: function(model, model_fields, filters){

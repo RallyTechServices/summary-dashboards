@@ -109,11 +109,12 @@ Ext.define("utilization-chart", {
                         success: function(calculated_iterations) {
                             me.logger.log('Iterations: ', calculated_iterations);
                             var rolled_up_iterations = me._rollUpData(calculated_iterations);
+                            var filtered_iterations = this._filterOutDistantProjects(rolled_up_iterations);
                             
                             me.setLoading(false);
                             
-                            me._buildChart(rolled_up_iterations, zoom_to_iteration);
-                            me._buildGrid(rolled_up_iterations, zoom_to_iteration);
+                            me._buildChart(filtered_iterations, zoom_to_iteration);
+                            me._buildGrid(filtered_iterations, zoom_to_iteration);
                         },
                         failure: function(msg) {
                             Ext.Msg.alert('!', msg);
@@ -178,6 +179,23 @@ Ext.define("utilization-chart", {
             }
         });
         return deferred.promise;
+    },
+    
+    _filterOutDistantProjects: function(iterations){
+        var current_project_oid = this.getContext().getProject().ObjectID;
+
+        var filtered_iterations = Ext.Array.filter(iterations, function(iteration){
+            var parent = iteration.get('Project').Parent;
+            
+            if ( !parent ) { return false; }
+            
+            return (parent.ObjectID == current_project_oid ) ;
+        });
+        
+        if ( filtered_iterations.length > 0 ) {
+            return filtered_iterations;
+        }
+        return iterations;
     },
     
     _rollUpData: function(iterations) {

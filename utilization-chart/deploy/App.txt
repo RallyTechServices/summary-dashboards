@@ -4,11 +4,11 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <title>Utilization Chart</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Sun Jul 19 2015 18:00:45 GMT-0700 (PDT) -->
+    <!--  Build Date: Sun Jul 19 2015 18:10:35 GMT-0700 (PDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Sun Jul 19 2015 18:00:45 GMT-0700 (PDT)";
-        var CHECKSUM = 25294666819;
+        var APP_BUILD_DATE = "Sun Jul 19 2015 18:10:35 GMT-0700 (PDT)";
+        var CHECKSUM = 26322077133;
     </script>
     
         <script type="text/javascript" src="/apps/2.0rc3/sdk.js"></script>
@@ -782,11 +782,12 @@ Ext.define("utilization-chart", {
                         success: function(calculated_iterations) {
                             me.logger.log('Iterations: ', calculated_iterations);
                             var rolled_up_iterations = me._rollUpData(calculated_iterations);
+                            var filtered_iterations = this._filterOutDistantProjects(rolled_up_iterations);
                             
                             me.setLoading(false);
                             
-                            me._buildChart(rolled_up_iterations, zoom_to_iteration);
-                            me._buildGrid(rolled_up_iterations, zoom_to_iteration);
+                            me._buildChart(filtered_iterations, zoom_to_iteration);
+                            me._buildGrid(filtered_iterations, zoom_to_iteration);
                         },
                         failure: function(msg) {
                             Ext.Msg.alert('!', msg);
@@ -851,6 +852,23 @@ Ext.define("utilization-chart", {
             }
         });
         return deferred.promise;
+    },
+    
+    _filterOutDistantProjects: function(iterations){
+        var current_project_oid = this.getContext().getProject().ObjectID;
+
+        var filtered_iterations = Ext.Array.filter(iterations, function(iteration){
+            var parent = iteration.get('Project').Parent;
+            
+            if ( !parent ) { return false; }
+            
+            return (parent.ObjectID == current_project_oid ) ;
+        });
+        
+        if ( filtered_iterations.length > 0 ) {
+            return filtered_iterations;
+        }
+        return iterations;
     },
     
     _rollUpData: function(iterations) {

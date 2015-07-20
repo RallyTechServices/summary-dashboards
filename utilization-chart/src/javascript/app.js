@@ -140,7 +140,7 @@ Ext.define("utilization-chart", {
         });
     },
     _buildGrid: function(iterations, zoom_to_iterations){
-        this.down('#grid_box').add({
+        var grid = this.down('#grid_box').add({
             xtype: 'tslegendgrid',
             records: iterations,
             listeners: {
@@ -148,8 +148,8 @@ Ext.define("utilization-chart", {
                 colorclicked: function(record){
                     this.getChart().toggleColor(record.get('__color'))
                 },
-                headerclick: function( grid, column ) {
-                    this.getChart().toggleShape(column.shape);
+                shapeclicked: function(shape ) {
+                    this.getChart().toggleShape(shape);
                 }
             }
         });

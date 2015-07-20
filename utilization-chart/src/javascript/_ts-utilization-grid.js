@@ -21,6 +21,17 @@ Ext.define('Rally.technicalservices.grid.Legend', {
         this.addEvents('colorclicked');
         this.callParent(arguments);
     },
+    toggleRowState: function(rowIndex, hidden) {
+        var row = this.getView().getNode(rowIndex),
+            color = hidden ? "#c6c6c6" : "#000000";
+
+        if (row) {
+            Ext.fly(row).setStyle("color",color);
+        }
+    },
+    toggleColumnState: function(record, colIndex, hidden){
+        //TODO : toggle shape column state
+    },
     _getColumnCfgs: function(){
         var me = this;
 
@@ -30,7 +41,13 @@ Ext.define('Rally.technicalservices.grid.Legend', {
             width: 24,
             handler: function(grid, rowIndex, colIndex, item) {
                 var rec = grid.getStore().getAt(rowIndex);
-                //Todo make background color gray when unclicked
+                if (rec.get('__colorHidden')){
+                    rec.set('__colorHidden',false);
+                } else {
+                    rec.set('__colorHidden',true);
+                }
+                me.toggleRowState(rowIndex, rec.get('__colorHidden') );
+                console.log('item',item);
                 me.fireEvent('colorclicked', rec);
             },
             renderer: function(v, m, r){

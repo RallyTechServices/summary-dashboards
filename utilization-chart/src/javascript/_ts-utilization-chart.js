@@ -62,6 +62,7 @@ Ext.define('Rally.technicalservices.chart.Utilization',{
         zoomToIteration: true
 
     },
+    stateHidden: {},
     constructor: function(config) {
         this.mergeConfig(config);
         this.callParent([this.config]);
@@ -77,27 +78,38 @@ Ext.define('Rally.technicalservices.chart.Utilization',{
         }
     },
     toggleColor: function(color){
+
+        var colorHidden = this.stateHidden[color] === true;
+
         _.each(this.getChart().series, function(s){
             if (s && s.color == color){
-                if (s.visible){
-                    s.hide();
+                var shapeHidden = this.stateHidden[s.symbol] == true;
+                if (colorHidden === true){
+                    if (shapeHidden != true){
+                        s.show();
+                    }
                 } else {
-                    s.show();
+                    s.hide();
                 }
+                this.stateHidden[color] = !colorHidden;
             }
-        });
+        }, this);
     },
     toggleShape: function(shape){
+        var shapeHidden = this.stateHidden[shape] === true;
         _.each(this.getChart().series, function(s){
-            console.log('s',s, s.marker, s.options);
             if (s && s.symbol == shape){
-                if (s.visible){
-                    s.hide();
+                var colorHidden = this.stateHidden[s.color] == true;
+                if (shapeHidden === true){
+                    if (colorHidden != true){
+                        s.show();
+                    }
                 } else {
-                    s.show();
+                    s.hide();
                 }
+                this.stateHidden[shape] = !shapeHidden;
             }
-        });
+        }, this);
     },
     _initIterationChart: function(){
 
@@ -131,8 +143,9 @@ Ext.define('Rally.technicalservices.chart.Utilization',{
                 marker: { symbol:'square'}
             });
 
-
+            r.set('__seriesColor', colors[color_index]);
             r.set('__color', colors[color_index]);
+           // r.set('__toggleColor', colors[color_index]);
             color_index++;
         }, this);
 

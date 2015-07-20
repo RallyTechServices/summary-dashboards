@@ -143,7 +143,8 @@ Ext.define("utilization-chart", {
                     this.getChart().toggleColor(record.get('__color'))
                 },
                 headerclick: function( grid, column ) {
-                    //this.getChart().toggleSeriesType(column.dataIndex);
+                    console.log('column',column);
+                    this.getChart().toggleShape(column.shape);
                 }
             }
         });

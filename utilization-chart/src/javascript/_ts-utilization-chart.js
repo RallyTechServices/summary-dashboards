@@ -89,7 +89,8 @@ Ext.define('Rally.technicalservices.chart.Utilization',{
     },
     toggleShape: function(shape){
         _.each(this.getChart().series, function(s){
-            if (s && s.marker.symbol == shape){
+            console.log('s',s, s.marker, s.options);
+            if (s && s.symbol == shape){
                 if (s.visible){
                     s.hide();
                 } else {

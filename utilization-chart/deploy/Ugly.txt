@@ -3,10 +3,10 @@
 <head>
     <title>Utilization Chart</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Sun Jul 19 2015 22:55:36 GMT-0600 (MDT) -->
+    <!--  Build Date: Mon Jul 20 2015 14:06:03 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Sun Jul 19 2015 22:55:36 GMT-0600 (MDT)";
+        var APP_BUILD_DATE = "Mon Jul 20 2015 14:06:03 GMT-0600 (MDT)";
         var CHECKSUM = [%= checksum %];
     </script>
     
@@ -53,11 +53,11 @@
     display: inline-block;
 }
 
-.row-hidden {
+.x-grid-row .row-hidden {
     color: '#c9c9c9';
 }
 
-.row-visible {
+.x-grid-row .row-visible {
     color: '#000000';
 }
     </style>

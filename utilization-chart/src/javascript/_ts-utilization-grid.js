@@ -8,7 +8,8 @@ Ext.define('Rally.technicalservices.grid.Legend', {
         enableBulkEdit: false,
         padding: 10
     },
-
+    columnHidden: {},
+    rowHidden: {},
     constructor: function (config) {
         this.mergeConfig(config);
         this.callParent([this.config]);
@@ -18,19 +19,61 @@ Ext.define('Rally.technicalservices.grid.Legend', {
             data: this.records
         });
         this.columnCfgs = this._getColumnCfgs();
-        this.addEvents('colorclicked');
+        this.addEvents('colorclicked','shapeclicked');
         this.callParent(arguments);
-    },
-    toggleRowState: function(rowIndex, hidden) {
-        var row = this.getView().getNode(rowIndex),
-            color = hidden ? "#c6c6c6" : "#000000";
 
-        if (row) {
-            Ext.fly(row).setStyle("color",color);
+        this.headerCt.on('headerclick', this._onHeaderClick, this);
+    },
+    _onHeaderClick: function(header, col, e, t){
+        if (col.shape){
+            this.fireEvent('shapeclicked', col.shape);
+
+            this.toggleColumnState(col.shape);
         }
     },
-    toggleColumnState: function(record, colIndex, hidden){
-        //TODO : toggle shape column state
+    toggleRowState: function(rowIndex) {
+
+        var is_hidden = (this.rowHidden[rowIndex] == true),
+            color = is_hidden ? "#000000" : "#c6c6c6";
+        for (var i=0; i< this.columns.length; i++){
+            if (this.columnHidden[this.columns[i].dataIndex] != true){
+                var cell = this.getView().getCell(rowIndex,this.columns[i]);
+                if (cell) {
+                    Ext.fly(cell).setStyle("color",color);
+                }
+            }
+        }
+        this.rowHidden[rowIndex] = !is_hidden;
+
+
+    },
+    toggleColumnState: function(shape){
+
+        var rows = this.getStore().getCount();
+
+
+        var cols = [];
+        _.each(this.columns, function(col){
+            if (col.shape == shape){
+                cols.push(col);
+            }
+        });
+
+        for (var j=0; j<cols.length; j++){
+            var is_hidden = (this.columnHidden[cols[j].dataIndex] == true),
+                color = is_hidden ? "#000000" : "#c6c6c6";
+
+            for (var i=0; i< rows; i++){
+                if (this.rowHidden[i] != true){
+                    var cell = this.getView().getCell(i,cols[j]);
+                    if (cell) {
+                        Ext.fly(cell).setStyle("color",color);
+                    }
+                }
+            }
+            this.columnHidden[cols[j].dataIndex] = !is_hidden;
+        }
+
     },
     _getColumnCfgs: function(){
         var me = this;
@@ -47,7 +90,6 @@ Ext.define('Rally.technicalservices.grid.Legend', {
                     rec.set('__colorHidden',true);
                 }
                 me.toggleRowState(rowIndex, rec.get('__colorHidden') );
-                console.log('item',item);
                 me.fireEvent('colorclicked', rec);
             },
             renderer: function(v, m, r){

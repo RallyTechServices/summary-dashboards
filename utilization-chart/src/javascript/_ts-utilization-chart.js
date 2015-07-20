@@ -154,8 +154,6 @@ Ext.define('Rally.technicalservices.chart.Utilization',{
         this.chartData.categories = categories;
 
         this.fireEvent('legendupdated', series);
-
-        console.log(this.chartConfig.xAxis.categories, this.chartData);
     },
 
     _padArray: function(array, desired_length,padding_value){

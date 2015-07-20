@@ -8,6 +8,7 @@ Ext.define('Rally.technicalservices.grid.Legend', {
         enableBulkEdit: false,
         padding: 10
     },
+
     constructor: function (config) {
         this.mergeConfig(config);
         this.callParent([this.config]);
@@ -60,22 +61,26 @@ Ext.define('Rally.technicalservices.grid.Legend', {
             text:'&#9632; Potential (Planned)',
             flex: 1,
             editor: 'rallynumberfield',
-            sortable: false
+            sortable: false,
+            shape: 'square'
         },{
             dataIndex:'__startScope',
             flex: 1,
             text:'&#9679; Points at Start (Stability)',
-            sortable: false
+            sortable: false,
+            shape: 'circle'
         },{
             dataIndex:'__endScope',
             flex: 1,
             text:'&#9679; Points at End (Stability)',
-            sortable: false
+            sortable: false,
+            shape: 'circle'
         },{
             dataIndex:'__endAcceptance',
             flex: 1,
             text:'&#9660; Accepted at End',
-            sortable: false
+            sortable: false,
+            shape: 'triangle-down'
         }];
      },
     _dateRenderer: function(value){

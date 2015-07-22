@@ -15,10 +15,15 @@ Ext.define('Rally.technicalservices.grid.Legend', {
         this.callParent([this.config]);
     },
     initComponent: function () {
+        var pageSize = Math.max(this.records.length, 200);
         this.store = Ext.create('Rally.data.custom.Store',{
-            data: this.records
+            data: this.records,
+            pageSize: pageSize
         });
         this.columnCfgs = this._getColumnCfgs();
+        this.pageSize = pageSize;
+        this.showPagingToolbar = pageSize > 200;
+
         this.addEvents('colorclicked','shapeclicked');
         this.callParent(arguments);
 
@@ -32,25 +37,30 @@ Ext.define('Rally.technicalservices.grid.Legend', {
         }
     },
     toggleRowState: function(rowIndex) {
-
         var is_hidden = (this.rowHidden[rowIndex] == true),
-            color = is_hidden ? "#000000" : "#c6c6c6";
-        for (var i=0; i< this.columns.length; i++){
-            if (this.columnHidden[this.columns[i].dataIndex] != true){
-                var cell = this.getView().getCell(rowIndex,this.columns[i]);
-                if (cell) {
-                    Ext.fly(cell).setStyle("color",color);
+            color = is_hidden ? "#000000" : "#c6c6c6",
+            row_color = this.getStore().getAt(rowIndex).get('__color'),
+            rows = this.getStore().getCount();
+
+        for (var j=0; j<rows; j++){
+            var r_color = this.getStore().getAt(j).get('__color');
+            if (r_color == row_color){
+                for (var i=0; i< this.columns.length; i++){
+                    if (this.columnHidden[this.columns[i].dataIndex] != true){
+                        var cell = this.getView().getCell(j,this.columns[i]);
+                        if (cell) {
+                            Ext.fly(cell).setStyle("color",color);
+                        }
+                    }
                 }
+                this.rowHidden[j] = !is_hidden;
             }
         }
-        this.rowHidden[rowIndex] = !is_hidden;
-
-
     },
+
     toggleColumnState: function(shape){
 
         var rows = this.getStore().getCount();
-
 
         var cols = [];
         _.each(this.columns, function(col){
@@ -73,7 +83,6 @@ Ext.define('Rally.technicalservices.grid.Legend', {
             }
             this.columnHidden[cols[j].dataIndex] = !is_hidden;
         }
-
     },
     _getColumnCfgs: function(){
         var me = this;

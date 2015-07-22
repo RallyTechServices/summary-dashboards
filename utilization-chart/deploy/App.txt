@@ -4,11 +4,11 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <title>Utilization Chart</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Mon Jul 20 2015 14:07:49 GMT-0600 (MDT) -->
+    <!--  Build Date: Wed Jul 22 2015 16:46:39 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Mon Jul 20 2015 14:07:49 GMT-0600 (MDT)";
-        var CHECKSUM = 28974477881;
+        var APP_BUILD_DATE = "Wed Jul 22 2015 16:46:39 GMT-0600 (MDT)";
+        var CHECKSUM = 37784498569;
     </script>
     
         <script type="text/javascript" src="/apps/2.0rc3/sdk.js"></script>
@@ -556,7 +556,7 @@ Ext.define('Rally.technicalservices.chart.Utilization',{
 
             r.set('__seriesColor', colors[color_index]);
             r.set('__color', colors[color_index]);
-           // r.set('__toggleColor', colors[color_index]);
+
             color_index++;
         }, this);
 
@@ -575,7 +575,81 @@ Ext.define('Rally.technicalservices.chart.Utilization',{
         }
         return new_array;
     },
-    _initReleaseChart: function(){},
+    _initReleaseChart: function(){
+
+        var series = [],
+            colors = this.chartConfig.colors,
+            color_index = 0,
+            project_hash = {},
+            sorted_records = _.sortBy(this.records, function(r){
+                return r.get('StartDate');
+            }),
+            iterations = [];
+
+        _.each(sorted_records, function(r) {
+            var project_oid = r.get('Project').ObjectID,
+                iteration_name = r.get('Name');
+
+            if (!Ext.Array.contains(iterations, iteration_name)){
+                iterations.push(iteration_name);
+            }
+
+            if (project_hash[project_oid] == undefined) {
+                project_hash[project_oid] = {};
+            }
+            project_hash[project_oid][iteration_name] = r;
+        });
+
+        _.each(project_hash, function(obj, project_oid){
+
+            var start_scope_data = _.map(iterations, function(i){return obj[i] ? obj[i].get('__startScope') || null : null;}),
+                end_scope_data = _.map(iterations, function(i){return obj[i] ? obj[i].get('__endScope') || null : null;}),
+                end_acceptance_data = _.map(iterations, function(i){return obj[i] ? obj[i].get('__endAcceptance') || null : null;}),
+                planned_velocity = _.map(iterations, function(i){return obj[i] ? obj[i].get('PlannedVelocity') || null : null;});
+
+            series.push({
+                name: "End Acceptance", //obj[0].getField('__endAcceptance').displayName,
+                data: end_acceptance_data,
+                color: colors[color_index],
+                marker: { symbol:'triangle-down'}
+            });
+
+            series.push({
+                name: "End Stability", //obj.getField('__endScope').displayName,
+                data: end_scope_data,
+                color: colors[color_index],
+                marker: { symbol:'circle'}
+            });
+
+            series.push({
+                name: "Start Stability", //obj.getField('__startScope').displayName,
+                data: start_scope_data,
+                color: colors[color_index],
+                marker: { symbol:'circle' , fillColor: '#FFFFFF', lineColor: colors[color_index], lineWidth: 2}
+            });
+
+            series.push({
+                name: "Potential", //obj.getField('PlannedVelocity').displayName,
+                data: planned_velocity,
+                color: colors[color_index],
+                marker: { symbol:'square'}
+            });
+
+            //Now set the colors in the records
+            _.each(obj, function(r, i){
+                r.set('__seriesColor', colors[color_index]);
+                r.set('__color', colors[color_index]);
+            });
+            color_index++;
+        });
+
+        this.chartConfig.xAxis.categories = iterations;
+        this.chartData.series = series;
+        this.chartData.categories = iterations;
+        this.chartConfig.xAxis.title.text = "Iteration";
+
+        this.fireEvent('legendupdated', series);
+    },
     //Overriding this function because we want to set colors ourselves.
     _setChartColorsOnSeries: function (series) {
         return null;
@@ -599,10 +673,15 @@ Ext.define('Rally.technicalservices.grid.Legend', {
         this.callParent([this.config]);
     },
     initComponent: function () {
+        var pageSize = Math.max(this.records.length, 200);
         this.store = Ext.create('Rally.data.custom.Store',{
-            data: this.records
+            data: this.records,
+            pageSize: pageSize
         });
         this.columnCfgs = this._getColumnCfgs();
+        this.pageSize = pageSize;
+        this.showPagingToolbar = pageSize > 200;
+
         this.addEvents('colorclicked','shapeclicked');
         this.callParent(arguments);
 
@@ -616,25 +695,30 @@ Ext.define('Rally.technicalservices.grid.Legend', {
         }
     },
     toggleRowState: function(rowIndex) {
-
         var is_hidden = (this.rowHidden[rowIndex] == true),
-            color = is_hidden ? "#000000" : "#c6c6c6";
-        for (var i=0; i< this.columns.length; i++){
-            if (this.columnHidden[this.columns[i].dataIndex] != true){
-                var cell = this.getView().getCell(rowIndex,this.columns[i]);
-                if (cell) {
-                    Ext.fly(cell).setStyle("color",color);
+            color = is_hidden ? "#000000" : "#c6c6c6",
+            row_color = this.getStore().getAt(rowIndex).get('__color'),
+            rows = this.getStore().getCount();
+
+        for (var j=0; j<rows; j++){
+            var r_color = this.getStore().getAt(j).get('__color');
+            if (r_color == row_color){
+                for (var i=0; i< this.columns.length; i++){
+                    if (this.columnHidden[this.columns[i].dataIndex] != true){
+                        var cell = this.getView().getCell(j,this.columns[i]);
+                        if (cell) {
+                            Ext.fly(cell).setStyle("color",color);
+                        }
+                    }
                 }
+                this.rowHidden[j] = !is_hidden;
             }
         }
-        this.rowHidden[rowIndex] = !is_hidden;
-
-
     },
+
     toggleColumnState: function(shape){
 
         var rows = this.getStore().getCount();
-
 
         var cols = [];
         _.each(this.columns, function(col){
@@ -657,7 +741,6 @@ Ext.define('Rally.technicalservices.grid.Legend', {
             }
             this.columnHidden[cols[j].dataIndex] = !is_hidden;
         }
-
     },
     _getColumnCfgs: function(){
         var me = this;
@@ -747,6 +830,93 @@ Ext.define('Rally.technicalservices.grid.Legend', {
         return value;
     }
 });
+Ext.define('Rally.technicalservices.RollupToolbox',{
+    singleton: true,
+    rollUpData: function(iterations) {
+
+        var logger = new Rally.technicalservices.Logger(),
+            leaves = Ext.Array.filter(iterations, function(iteration){
+            var project = iteration.get('Project');
+            if ( project && project.Children && project.Children.Count == 0 && project.Parent ) {
+                return true;
+            }
+            return false;
+        });
+        logger.log("Leaf project iterations: ", leaves);
+
+        var project_iteration_hash = {};
+        Ext.Array.each(iterations, function(iteration) {
+            var project = iteration.get('Project');
+            if (Ext.isEmpty(project_iteration_hash[project.ObjectID])){
+                project_iteration_hash[project.ObjectID] = {};
+            }
+            project_iteration_hash[project.ObjectID][iteration.get('Name')] = iteration;
+        },this);
+
+        logger.log('project_iteration_hash', project_iteration_hash);
+        while ( leaves.length > 0 ) {
+            var parent_iterations = [];
+
+            Ext.Array.each(leaves, function(leaf) {
+                var iteration_name = leaf.get('Name'),
+                    parent_project = leaf.get('Project').Parent;
+
+                    if (parent_project && project_iteration_hash[parent_project.ObjectID] && project_iteration_hash[parent_project.ObjectID][iteration_name]){
+
+                        var parent_iteration = project_iteration_hash[parent_project.ObjectID][iteration_name];
+                        parent_iterations = Ext.Array.merge(parent_iterations, [parent_iteration]);
+
+                        this._setValuesForParent(leaf,parent_iteration,'PlannedVelocity');
+                        this._setValuesForParent(leaf,parent_iteration,'__startScope');
+                        this._setValuesForParent(leaf,parent_iteration,'__endScope');
+                        this._setValuesForParent(leaf,parent_iteration,'__endAcceptance');
+
+                        this._setArrayValuesForParent(leaf,parent_iteration,'__dailyScope');
+                        this._setArrayValuesForParent(leaf,parent_iteration,'__dailyAcceptance');
+                }
+            },this);
+            logger.log('parents:', parent_iterations);
+            leaves = parent_iterations;
+        }
+        return iterations;
+    },
+
+    _setArrayValuesForParent: function(leaf, parent,rollup_field) {
+        if (! parent ) {
+            return null;
+        }
+
+        var parent_values = parent.get(rollup_field) || [],
+            leaf_values = leaf.get(rollup_field) || [],
+            new_values = [];
+
+        Ext.Array.each(leaf_values, function(leaf_value,idx){
+            var value = leaf_value || 0;
+            if ( idx < parent_values.length ) {
+                var parent_value = parent_values[idx] || 0;
+                new_values.push(value + parent_value);
+            } else {
+                new_values.push(leaf_value);
+            }
+        });
+        parent.set(rollup_field, new_values);
+
+        return parent;
+    },
+
+    _setValuesForParent: function(leaf,leaf_parent,field) {
+        if (! leaf_parent) {
+            return null;
+        }
+
+        var parent_value = leaf_parent.get(field) || 0;
+        var leaf_value = leaf.get(field) || 0;
+
+        leaf_parent.set(field, parent_value + leaf_value);
+        return leaf_parent;
+    }
+});
+
 Ext.define("utilization-chart", {
     extend: 'Rally.app.App',
     componentCls: 'app',
@@ -762,7 +932,8 @@ Ext.define("utilization-chart", {
 
     config: {
         defaultSettings: {
-            zoomToIteration:  true
+            zoomToIteration:  true,
+            includeItemsAcceptedAfterNDays: 0
         }
     },
     
@@ -805,27 +976,53 @@ Ext.define("utilization-chart", {
     },
     
     _changeRelease: function(release) {
-//        var me = this;
-//        var settings = this.getSettings();
-//        this.logger.log("Release Changed:", release);
-//        
-//        if ( settings.zoomToIteration == false || settings.zoomToIteration == "false" ) {            
-//            var name = release.get('Name');
-//
-//            var filter = [{property:'Name',value:name}];
-//                        
-//            me._loadAStoreWithAPromise('Release', ['ReleaseStartDate','ReleaseDate','Name'], filter ).then({
-//                scope: me,
-//                success: function(releases) {
-//                    if (releases.length == 0) {
-//                        me.down('#chart_box').add({ xtype:'container', html:'No releases in scope'});
-//                    } else {
-//                        me._gatherData(releases[0]);
-//                    }
-//                }
-//            });
-//                    
-//        }
+        var me = this;
+        var settings = this.getSettings(),
+            zoom_to_iteration = settings.zoomToIteration;
+        this.logger.log("Release Changed:", release);
+
+        if ( zoom_to_iteration == false || zoom_to_iteration == "false" ) {
+            var startDate = Rally.util.DateTime.toIsoString(release.get('ReleaseStartDate')),
+                endDate = Rally.util.DateTime.toIsoString(release.get('ReleaseDate'));
+
+            Rally.technicalservices.ModelBuilder.build('Iteration','Utilization',[]).then({
+                scope: this,
+                success: function(model){
+
+                    var filter = [{property:'StartDate', operator: "<", value: endDate},
+                                    {property: 'EndDate', operator: ">", value: startDate}];
+                    var fields = ['Name','EndDate','StartDate','PlannedVelocity','Project','Parent','Children','ObjectID'];
+
+                    Deft.Chain.pipeline([
+                        function() {
+                            return me._loadAStoreWithAPromise(model, fields, filter );
+                        },
+                        function(iterations) {
+                            me.setLoading('Loading Cumulative Flow Data...');
+                            return me._associateCFDsWithIterations(iterations);
+                        }
+                    ]).then({
+                        scope: me,
+                        success: function(calculated_iterations) {
+                            me.logger.log('Iterations: ', calculated_iterations);
+                            var rolled_up_iterations = Rally.technicalservices.RollupToolbox.rollUpData(calculated_iterations);
+                            var filtered_iterations = this._filterOutDistantProjects(rolled_up_iterations);
+
+                            me.setLoading(false);
+
+                            me._buildChart(filtered_iterations, zoom_to_iteration);
+                            me._buildGrid(filtered_iterations, zoom_to_iteration);
+                        },
+                        failure: function(msg) {
+                            Ext.Msg.alert('!', msg);
+                        }
+                    });
+                }
+            }).always(function() { me.setLoading(false); });
+
+            //me.down('#chart_box').add({ xtype:'container', html:'No releases in scope'});
+
+        }
     },
     
     _changeIteration: function(iteration) {
@@ -857,9 +1054,9 @@ Ext.define("utilization-chart", {
                         scope: me,
                         success: function(calculated_iterations) {
                             me.logger.log('Iterations: ', calculated_iterations);
-                            var rolled_up_iterations = me._rollUpData(calculated_iterations);
+                            var rolled_up_iterations = Rally.technicalservices.RollupToolbox.rollUpData(calculated_iterations);
                             var filtered_iterations = this._filterOutDistantProjects(rolled_up_iterations);
-                            
+
                             me.setLoading(false);
                             
                             me._buildChart(filtered_iterations, zoom_to_iteration);
@@ -888,7 +1085,7 @@ Ext.define("utilization-chart", {
             zoomToIteration: zoom_to_iteration
         });
     },
-    _buildGrid: function(iterations, zoom_to_iterations){
+    _buildGrid: function(iterations, zoom_to_iteration){
         var grid = this.down('#grid_box').add({
             xtype: 'tslegendgrid',
             records: iterations,
@@ -934,8 +1131,11 @@ Ext.define("utilization-chart", {
         var current_project_oid = this.getContext().getProject().ObjectID;
 
         var filtered_iterations = Ext.Array.filter(iterations, function(iteration){
-            var parent = iteration.get('Project').Parent;
-            
+            var parent = iteration.get('Project').Parent,
+                project_oid = iteration.get('Project').ObjectID;
+
+            if (current_project_oid == project_oid){ return true; }
+
             if ( !parent ) { return false; }
             
             return (parent.ObjectID == current_project_oid ) ;
@@ -946,100 +1146,7 @@ Ext.define("utilization-chart", {
         }
         return iterations;
     },
-    
-    _rollUpData: function(iterations) {
-        var leaves = Ext.Array.filter(iterations, function(iteration){
-            var project = iteration.get('Project');
-            if ( project && project.Children && project.Children.Count == 0 && project.Parent ) {
-                return true;
-            }
-            return false;
-        });
-        
-        this.logger.log("Leaf project iterations: ", leaves);
-        
-        this.iterations_by_project_oid = {};
-        Ext.Array.each(iterations, function(iteration) {
-            var project = iteration.get('Project');
-            this.iterations_by_project_oid[project.ObjectID] = iteration;
-        },this);
-        
-        while ( leaves.length > 0 ) {
-            var parent_iterations = [];
-            Ext.Array.each(leaves, function(leaf) {
-                parent = this._setValuesForParent(leaf.get('Project'),'PlannedVelocity');
-                if ( parent ) {
-                    var parent_oid = parent.ObjectID;
-                    parent_iterations = Ext.Array.merge(parent_iterations, this.iterations_by_project_oid[parent_oid]);
-                }
-                
-                this._setValuesForParent(leaf.get('Project'),'__startScope');
-                this._setValuesForParent(leaf.get('Project'),'__endScope');
-                this._setValuesForParent(leaf.get('Project'),'__endAcceptance');
 
-                this._setArrayValuesForParent(leaf.get('Project'),'__dailyScope');
-                this._setArrayValuesForParent(leaf.get('Project'),'__dailyAcceptance');
-            },this);
-            
-            console.log('parents:', parent_iterations);
-            leaves = parent_iterations;
-        }
-        
-        return iterations;
-    },
-    
-    _setArrayValuesForParent: function(leaf,field) {
-        if (! leaf.Parent ) {
-            return null;
-        }
-        
-        var leaf_oid = leaf.ObjectID;
-        var parent_oid = leaf.Parent.ObjectID;
-        var leaf_iteration = this.iterations_by_project_oid[leaf_oid];
-        var parent_iteration = this.iterations_by_project_oid[parent_oid];
-        
-        if ( parent_iteration ) {
-            var parent_values = parent_iteration.get(field) || [];
-            var leaf_values = leaf_iteration.get(field) || [];
-            
-            var new_values = [];
-            Ext.Array.each(leaf_values, function(leaf_value,idx){
-                var value = leaf_value || 0;
-                if ( idx < parent_values.length ) {
-                    var parent_value = parent_values[idx] || 0;
-                    new_values.push(value + parent_value);
-                } else {
-                    new_values.push(leaf_value);
-                }
-            });
-            parent_iteration.set(field, new_values);
-            return parent_iteration.get('Project');
-        }
-        
-        return null;
-    },
-    
-    _setValuesForParent: function(leaf,field) {
-        if (! leaf.Parent ) {
-            return null;
-        }
-        
-        var leaf_oid = leaf.ObjectID;
-        var parent_oid = leaf.Parent.ObjectID;
-        var leaf_iteration = this.iterations_by_project_oid[leaf_oid];
-        var parent_iteration = this.iterations_by_project_oid[parent_oid];
-        
-        if ( parent_iteration ) {
-            var parent_value = parent_iteration.get(field) || 0;
-            var leaf_value = leaf_iteration.get(field) || 0;
-            
-            parent_iteration.set(field, parent_value + leaf_value);
-            return parent_iteration.get('Project');
-        }
-        
-        return null;
-    },
-    
     _loadAStoreWithAPromise: function(model, model_fields, filters){
         var deferred = Ext.create('Deft.Deferred');
         var me = this;
@@ -1088,6 +1195,14 @@ Ext.define("utilization-chart", {
                 fieldLabel: '',
                 margin: '0 0 25 200',
                 boxLabel: 'Show by Iteration<br/><span style="color:#999999;"><i>If <strong>not</strong> ticked, show by iterations in the selected release.</i></span>'
+            },
+            {
+                name: 'includeItemsAcceptedAfterNDays',
+                xtype: 'rallynumberfield',
+                fieldLabel: 'Include Stories Accepted within N days after the timebox end',
+                labelAlign: 'top',
+                margin: '0 0 25 200',
+                labelWidth: 300
             }
         ];
     },

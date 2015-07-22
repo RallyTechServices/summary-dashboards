@@ -27,6 +27,14 @@ Ext.define('mockIteration',{
         {name:'Name',type:'string'},
         {name:'StartDate',type:'auto'},
         {name:'EndDate',type:'auto'},
+        {name:'Project', type: 'auto'},
+        {name:'RollupNumber', type: 'int'},
+        {name:'PlannedVelocity', type: 'int'},
+        {name:'__startScope', type: 'int'},
+        {name:'__endScope', type: 'int'},
+        {name:'__endAcceptance', type: 'int'},
+        {name:'__dailyScope', type: 'auto'},
+        {name:'__dailyAcceptance', type: 'auto'},
         {name:'id',type:'int',convert:useObjectID}
     ]
 });

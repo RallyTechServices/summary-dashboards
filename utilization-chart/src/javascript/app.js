@@ -59,7 +59,7 @@ Ext.define("utilization-chart", {
     _changeRelease: function(release) {
         var me = this;
         var settings = this.getSettings(),
-            zoom_to_iteration = settings.zoomToIteration;
+            zoom_to_iteration = settings.zoomToIteration == true || settings.zoomToIteration == "true" ;
         this.logger.log("Release Changed:", release);
 
         if ( zoom_to_iteration == false || zoom_to_iteration == "false" ) {

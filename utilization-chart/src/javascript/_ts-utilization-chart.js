@@ -117,28 +117,47 @@ Ext.define('Rally.technicalservices.chart.Utilization',{
             return Rally.util.DateTime.format(d, 'M-d')
         });
 
+        var stragglers = this.records[0].get('__NDaysAfter');
+
+
+        if (stragglers > 0){
+            var straggler_date = Rally.util.DateTime.add(this.records[0].get('__days')[categories.length-1], 'day', stragglers);
+            categories.push(Ext.String.format('{1}<br/>(+{0} days)', stragglers, Rally.util.DateTime.format(straggler_date, 'M-d')));
+        }
+
         var series = [],
             colors = this.chartConfig.colors,
             color_index = 0;
 
         _.each(this.records, function(r){
+
+            var daily_acceptance = this._padArray(r.get('__dailyAcceptance'), categories.length),
+                daily_scope = this._padArray(r.get('__dailyScope'), categories.length),
+                planned_velocity = this._padArray([], categories.length, r.get('PlannedVelocity'));
+
+            if (stragglers){
+                var last_index = categories.length - 1;
+                daily_acceptance[last_index] = r.get('__endAcceptance');
+                daily_scope[last_index] = daily_scope[last_index-1];
+            }
+
             series.push({
                 name: r.getField('__dailyAcceptance').displayName,
-                data: this._padArray(r.get('__dailyAcceptance'), categories.length),
+                data: daily_acceptance,
                 color: colors[color_index],
                 marker: { symbol:'triangle-down'}
             });
 
             series.push({
                 name: r.getField('__dailyScope').displayName,
-                data: this._padArray(r.get('__dailyScope'), categories.length),
+                data: daily_scope,
                 color: colors[color_index],
                 marker: { symbol:'circle'}
             });
 
             series.push({
                 name: r.getField('PlannedVelocity').displayName,
-                data: this._padArray([], categories.length, r.get('PlannedVelocity')),
+                data: planned_velocity,
                 color: colors[color_index],
                 marker: { symbol:'square'}
             });

@@ -4,11 +4,11 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <title>Utilization Chart</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Wed Jul 22 2015 16:46:39 GMT-0600 (MDT) -->
+    <!--  Build Date: Wed Jul 22 2015 18:50:31 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Wed Jul 22 2015 16:46:39 GMT-0600 (MDT)";
-        var CHECKSUM = 37784498569;
+        var APP_BUILD_DATE = "Wed Jul 22 2015 18:50:31 GMT-0600 (MDT)";
+        var CHECKSUM = 46383517181;
     </script>
     
         <script type="text/javascript" src="/apps/2.0rc3/sdk.js"></script>
@@ -337,8 +337,8 @@ Ext.define('Rally.technicalservices.ModelBuilder',{
                 var new_model = Ext.define(newModelName, {
                     extend: model,
                     fields: fields,
-                    setCFD: me._setCFD
-                        
+                    setCFD: me._setCFD,
+                    setStragglers: me._setStragglers
                 });
                 deferred.resolve(new_model);
             }
@@ -406,6 +406,26 @@ Ext.define('Rally.technicalservices.ModelBuilder',{
         this.set('__dailyAcceptance',daily_acceptance);
         if ( daily_acceptance.length > 0 ) {
             this.set('__endAcceptance',daily_acceptance[daily_acceptance.length - 1]);
+        }
+    },
+    _setStragglers: function(artifacts, num_extra_days){
+        var late_acceptance_points = 0,
+            my_oid = this.get('ObjectID'),
+            start_date = this.get('EndDate'),
+            end_date = Rally.util.DateTime.add(start_date, 'day', num_extra_days);
+
+        Ext.Array.each(artifacts, function(a){
+            if (a.get('Iteration').ObjectID ==  my_oid ){
+                if (a.get('AcceptedDate') > start_date && a.get('AcceptedDate') <= end_date){
+                    late_acceptance_points += (a.get('PlanEstimate') || 0);
+                }
+            }
+        });
+
+        if (late_acceptance_points > 0){
+            var end_acceptance = this.get('__endAcceptance');
+            this.set('__endAcceptance', end_acceptance + late_acceptance_points);
+            //If we want this to be included in the daily acceptance, then update that array as well.
         }
     }
 });
@@ -784,7 +804,7 @@ Ext.define('Rally.technicalservices.grid.Legend', {
             renderer: this._dateRenderer
         },{
             dataIndex:'PlannedVelocity',
-            text:'&#9632; Potential (Planned)',
+            text:'&#9724;&nbsp;&nbsp;Potential (Planned)',
             flex: 1,
             editor: 'rallynumberfield',
             sortable: false,
@@ -792,19 +812,19 @@ Ext.define('Rally.technicalservices.grid.Legend', {
         },{
             dataIndex:'__startScope',
             flex: 1,
-            text:'&#9679; Points at Start (Stability)',
+            text:'&#9675;&nbsp;&nbsp;Points at Start (Stability)',
             sortable: false,
             shape: 'circle'
         },{
             dataIndex:'__endScope',
             flex: 1,
-            text:'&#9679; Points at End (Stability)',
+            text:'&#9679;&nbsp;&nbsp;Points at End (Stability)',
             sortable: false,
             shape: 'circle'
         },{
             dataIndex:'__endAcceptance',
             flex: 1,
-            text:'&#9660; Accepted at End',
+            text:'&#9660;&nbsp;&nbsp;Accepted at End',
             sortable: false,
             shape: 'triangle-down'
         }];
@@ -992,14 +1012,21 @@ Ext.define("utilization-chart", {
                     var filter = [{property:'StartDate', operator: "<", value: endDate},
                                     {property: 'EndDate', operator: ">", value: startDate}];
                     var fields = ['Name','EndDate','StartDate','PlannedVelocity','Project','Parent','Children','ObjectID'];
+                    var sorters = [{property:'EndDate', direction:'ASC'}];
 
                     Deft.Chain.pipeline([
                         function() {
-                            return me._loadAStoreWithAPromise(model, fields, filter );
+                            return me._loadAStoreWithAPromise(model, fields, filter, sorters);
                         },
                         function(iterations) {
                             me.setLoading('Loading Cumulative Flow Data...');
-                            return me._associateCFDsWithIterations(iterations);
+                            return me._associateCFDsWithIterations(iterations, startDate, endDate);
+                        },
+                        function(iterations) {
+                            me.setLoading('Loading post iteration acceptances...');
+                            var start_date = Rally.util.DateTime.toIsoString(iterations[0].get('EndDate'));  //This is why we added sorters....
+                            var end_date = Rally.util.DateTime.toIsoString(iterations[iterations.length-1].get('EndDate'));
+                            return me._associateStragglersWithIterations(settings.includeItemsAcceptedAfterNDays, iterations, start_date, end_date);
                         }
                     ]).then({
                         scope: me,
@@ -1019,9 +1046,6 @@ Ext.define("utilization-chart", {
                     });
                 }
             }).always(function() { me.setLoading(false); });
-
-            //me.down('#chart_box').add({ xtype:'container', html:'No releases in scope'});
-
         }
     },
     
@@ -1048,7 +1072,15 @@ Ext.define("utilization-chart", {
                         }, 
                         function(iterations) { 
                             me.setLoading('Loading Cumulative Flow Data...');
-                            return me._associateCFDsWithIterations(iterations);
+                                var start_date = Rally.util.DateTime.toIsoString(iterations[0].get('StartDate'));
+                                var end_date   = Rally.util.DateTime.toIsoString(iterations[0].get('EndDate'));
+                            return me._associateCFDsWithIterations(iterations, start_date, end_date);
+                        },
+                        function(iterations) {
+                            me.setLoading('Loading post iteration acceptances...');
+                            var start_date = Rally.util.DateTime.toIsoString(iterations[0].get('EndDate'));
+                            var end_date   = Rally.util.DateTime.toIsoString(iterations[0].get('EndDate'));
+                            return me._associateStragglersWithIterations(settings.includeItemsAcceptedAfterNDays,iterations, start_date, end_date);
                         }
                     ]).then({
                         scope: me,
@@ -1101,12 +1133,12 @@ Ext.define("utilization-chart", {
         });
     },
     
-    _associateCFDsWithIterations: function(iterations) {
+    _associateCFDsWithIterations: function(iterations, start_date, end_date) {
         var deferred = Ext.create('Deft.Deferred');
         
         var fetch_fields =  ['CardEstimateTotal','CardState','CreationDate','IterationObjectID'];
-        var start_date = Rally.util.DateTime.toIsoString(iterations[0].get('StartDate'));
-        var end_date   = Rally.util.DateTime.toIsoString(iterations[0].get('EndDate'));
+    //    var start_date = Rally.util.DateTime.toIsoString(iterations[0].get('StartDate'));
+    //    var end_date   = Rally.util.DateTime.toIsoString(iterations[0].get('EndDate'));
         
         var filters = [
             {property: 'CreationDate', operator: '>=', value:start_date},
@@ -1126,7 +1158,44 @@ Ext.define("utilization-chart", {
         });
         return deferred.promise;
     },
-    
+    _associateStragglersWithIterations: function(includeItemsAcceptedAfterNDays, iterations, start_date, end_date){
+        var deferred = Ext.create('Deft.Deferred');
+        this.logger.log('_associateStragglersWithIterations', includeItemsAcceptedAfterNDays, start_date, end_date);
+        if (isNaN(includeItemsAcceptedAfterNDays) ||  includeItemsAcceptedAfterNDays <= 0){
+            deferred.resolve(iterations);
+        } else {
+            var fetch_fields =  ['Iteration','AcceptedDate','PlanEstimate','Project','ObjectID','Name'];
+
+            var adjusted_end_date = Rally.util.DateTime.add(Rally.util.DateTime.fromIsoString(end_date), 'day', includeItemsAcceptedAfterNDays);
+            var filters = [
+                {property: 'AcceptedDate', operator: '>=', value: start_date},
+                {property: 'AcceptedDate', operator: '<=', value: Rally.util.DateTime.toIsoString(adjusted_end_date)},
+                {property: 'Iteration', operator: '!=', value: null}
+            ];
+
+            var store = Ext.create('Rally.data.wsapi.artifact.Store', {
+                models: ['Defect', 'UserStory'],
+                fetch: fetch_fields,
+                filters: filters,
+                limit: 'Infinity'
+            });
+
+            store.load({
+                scope: this,
+                callback: function(records, operation, success){
+                    if (success){
+                        Ext.Array.each(iterations, function(iteration){
+                            iteration.setStragglers(records, includeItemsAcceptedAfterNDays);
+                        });
+                        deferred.resolve(iterations);
+                    } else {
+                        deferred.reject('Failed to load post iteration accepted artifacts:  ' + operation.error.errors.join(','));
+                    }
+                }
+            });
+        }
+        return deferred.promise;
+    },
     _filterOutDistantProjects: function(iterations){
         var current_project_oid = this.getContext().getProject().ObjectID;
 
@@ -1147,17 +1216,20 @@ Ext.define("utilization-chart", {
         return iterations;
     },
 
-    _loadAStoreWithAPromise: function(model, model_fields, filters){
+    _loadAStoreWithAPromise: function(model, model_fields, filters, sorters){
         var deferred = Ext.create('Deft.Deferred');
         var me = this;
-        
+
+        sorters = sorters || [];
+
         this.logger.log("Starting load:",model,model_fields, filters);
           
         var store = Ext.create('Rally.data.wsapi.Store', {
             model: model,
             fetch: model_fields,
             filters: filters,
-            limit: 'Infinity'
+            limit: 'Infinity',
+            sorters: sorters
         }).load({
             callback : function(records, operation, successful) {                
                 if (successful){
@@ -1293,6 +1365,10 @@ Ext.define("utilization-chart", {
 
 .x-grid-row .row-visible {
     color: '#000000';
+}
+.triangle-down {
+    font-family: 'Pictofont';
+    content: icon-chevron-down;
 }
     </style>
 

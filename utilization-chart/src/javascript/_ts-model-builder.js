@@ -54,8 +54,8 @@ Ext.define('Rally.technicalservices.ModelBuilder',{
                 var new_model = Ext.define(newModelName, {
                     extend: model,
                     fields: fields,
-                    setCFD: me._setCFD
-                        
+                    setCFD: me._setCFD,
+                    setStragglers: me._setStragglers
                 });
                 deferred.resolve(new_model);
             }
@@ -123,6 +123,26 @@ Ext.define('Rally.technicalservices.ModelBuilder',{
         this.set('__dailyAcceptance',daily_acceptance);
         if ( daily_acceptance.length > 0 ) {
             this.set('__endAcceptance',daily_acceptance[daily_acceptance.length - 1]);
+        }
+    },
+    _setStragglers: function(artifacts, num_extra_days){
+        var late_acceptance_points = 0,
+            my_oid = this.get('ObjectID'),
+            start_date = this.get('EndDate'),
+            end_date = Rally.util.DateTime.add(start_date, 'day', num_extra_days);
+
+        Ext.Array.each(artifacts, function(a){
+            if (a.get('Iteration').ObjectID ==  my_oid ){
+                if (a.get('AcceptedDate') > start_date && a.get('AcceptedDate') <= end_date){
+                    late_acceptance_points += (a.get('PlanEstimate') || 0);
+                }
+            }
+        });
+
+        if (late_acceptance_points > 0){
+            var end_acceptance = this.get('__endAcceptance');
+            this.set('__endAcceptance', end_acceptance + late_acceptance_points);
+            //If we want this to be included in the daily acceptance, then update that array as well.
         }
     }
 });

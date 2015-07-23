@@ -73,14 +73,21 @@ Ext.define("utilization-chart", {
                     var filter = [{property:'StartDate', operator: "<", value: endDate},
                                     {property: 'EndDate', operator: ">", value: startDate}];
                     var fields = ['Name','EndDate','StartDate','PlannedVelocity','Project','Parent','Children','ObjectID'];
+                    var sorters = [{property:'EndDate', direction:'ASC'}];
 
                     Deft.Chain.pipeline([
                         function() {
-                            return me._loadAStoreWithAPromise(model, fields, filter );
+                            return me._loadAStoreWithAPromise(model, fields, filter, sorters);
                         },
                         function(iterations) {
                             me.setLoading('Loading Cumulative Flow Data...');
-                            return me._associateCFDsWithIterations(iterations);
+                            return me._associateCFDsWithIterations(iterations, startDate, endDate);
+                        },
+                        function(iterations) {
+                            me.setLoading('Loading post iteration acceptances...');
+                            var start_date = Rally.util.DateTime.toIsoString(iterations[0].get('EndDate'));  //This is why we added sorters....
+                            var end_date = Rally.util.DateTime.toIsoString(iterations[iterations.length-1].get('EndDate'));
+                            return me._associateStragglersWithIterations(settings.includeItemsAcceptedAfterNDays, iterations, start_date, end_date);
                         }
                     ]).then({
                         scope: me,
@@ -100,9 +107,6 @@ Ext.define("utilization-chart", {
                     });
                 }
             }).always(function() { me.setLoading(false); });
-
-            //me.down('#chart_box').add({ xtype:'container', html:'No releases in scope'});
-
         }
     },
     
@@ -129,7 +133,15 @@ Ext.define("utilization-chart", {
                         }, 
                         function(iterations) { 
                             me.setLoading('Loading Cumulative Flow Data...');
-                            return me._associateCFDsWithIterations(iterations);
+                                var start_date = Rally.util.DateTime.toIsoString(iterations[0].get('StartDate'));
+                                var end_date   = Rally.util.DateTime.toIsoString(iterations[0].get('EndDate'));
+                            return me._associateCFDsWithIterations(iterations, start_date, end_date);
+                        },
+                        function(iterations) {
+                            me.setLoading('Loading post iteration acceptances...');
+                            var start_date = Rally.util.DateTime.toIsoString(iterations[0].get('EndDate'));
+                            var end_date   = Rally.util.DateTime.toIsoString(iterations[0].get('EndDate'));
+                            return me._associateStragglersWithIterations(settings.includeItemsAcceptedAfterNDays,iterations, start_date, end_date);
                         }
                     ]).then({
                         scope: me,
@@ -182,12 +194,12 @@ Ext.define("utilization-chart", {
         });
     },
     
-    _associateCFDsWithIterations: function(iterations) {
+    _associateCFDsWithIterations: function(iterations, start_date, end_date) {
         var deferred = Ext.create('Deft.Deferred');
         
         var fetch_fields =  ['CardEstimateTotal','CardState','CreationDate','IterationObjectID'];
-        var start_date = Rally.util.DateTime.toIsoString(iterations[0].get('StartDate'));
-        var end_date   = Rally.util.DateTime.toIsoString(iterations[0].get('EndDate'));
+    //    var start_date = Rally.util.DateTime.toIsoString(iterations[0].get('StartDate'));
+    //    var end_date   = Rally.util.DateTime.toIsoString(iterations[0].get('EndDate'));
         
         var filters = [
             {property: 'CreationDate', operator: '>=', value:start_date},
@@ -207,7 +219,44 @@ Ext.define("utilization-chart", {
         });
         return deferred.promise;
     },
-    
+    _associateStragglersWithIterations: function(includeItemsAcceptedAfterNDays, iterations, start_date, end_date){
+        var deferred = Ext.create('Deft.Deferred');
+        this.logger.log('_associateStragglersWithIterations', includeItemsAcceptedAfterNDays, start_date, end_date);
+        if (isNaN(includeItemsAcceptedAfterNDays) ||  includeItemsAcceptedAfterNDays <= 0){
+            deferred.resolve(iterations);
+        } else {
+            var fetch_fields =  ['Iteration','AcceptedDate','PlanEstimate','Project','ObjectID','Name'];
+
+            var adjusted_end_date = Rally.util.DateTime.add(Rally.util.DateTime.fromIsoString(end_date), 'day', includeItemsAcceptedAfterNDays);
+            var filters = [
+                {property: 'AcceptedDate', operator: '>=', value: start_date},
+                {property: 'AcceptedDate', operator: '<=', value: Rally.util.DateTime.toIsoString(adjusted_end_date)},
+                {property: 'Iteration', operator: '!=', value: null}
+            ];
+
+            var store = Ext.create('Rally.data.wsapi.artifact.Store', {
+                models: ['Defect', 'UserStory'],
+                fetch: fetch_fields,
+                filters: filters,
+                limit: 'Infinity'
+            });
+
+            store.load({
+                scope: this,
+                callback: function(records, operation, success){
+                    if (success){
+                        Ext.Array.each(iterations, function(iteration){
+                            iteration.setStragglers(records, includeItemsAcceptedAfterNDays);
+                        });
+                        deferred.resolve(iterations);
+                    } else {
+                        deferred.reject('Failed to load post iteration accepted artifacts:  ' + operation.error.errors.join(','));
+                    }
+                }
+            });
+        }
+        return deferred.promise;
+    },
     _filterOutDistantProjects: function(iterations){
         var current_project_oid = this.getContext().getProject().ObjectID;
 
@@ -228,17 +277,20 @@ Ext.define("utilization-chart", {
         return iterations;
     },
 
-    _loadAStoreWithAPromise: function(model, model_fields, filters){
+    _loadAStoreWithAPromise: function(model, model_fields, filters, sorters){
         var deferred = Ext.create('Deft.Deferred');
         var me = this;
-        
+
+        sorters = sorters || [];
+
         this.logger.log("Starting load:",model,model_fields, filters);
           
         var store = Ext.create('Rally.data.wsapi.Store', {
             model: model,
             fetch: model_fields,
             filters: filters,
-            limit: 'Infinity'
+            limit: 'Infinity',
+            sorters: sorters
         }).load({
             callback : function(records, operation, successful) {                
                 if (successful){

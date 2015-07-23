@@ -126,7 +126,7 @@ Ext.define('Rally.technicalservices.grid.Legend', {
             renderer: this._dateRenderer
         },{
             dataIndex:'PlannedVelocity',
-            text:'&#9632; Potential (Planned)',
+            text:'&#9724;&nbsp;&nbsp;Potential (Planned)',
             flex: 1,
             editor: 'rallynumberfield',
             sortable: false,
@@ -134,19 +134,19 @@ Ext.define('Rally.technicalservices.grid.Legend', {
         },{
             dataIndex:'__startScope',
             flex: 1,
-            text:'&#9679; Points at Start (Stability)',
+            text:'&#9675;&nbsp;&nbsp;Points at Start (Stability)',
             sortable: false,
             shape: 'circle'
         },{
             dataIndex:'__endScope',
             flex: 1,
-            text:'&#9679; Points at End (Stability)',
+            text:'&#9679;&nbsp;&nbsp;Points at End (Stability)',
             sortable: false,
             shape: 'circle'
         },{
             dataIndex:'__endAcceptance',
             flex: 1,
-            text:'&#9660; Accepted at End',
+            text:'&#9660;&nbsp;&nbsp;Accepted at End',
             sortable: false,
             shape: 'triangle-down'
         }];

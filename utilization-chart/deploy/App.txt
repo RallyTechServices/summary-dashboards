@@ -4,11 +4,11 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <title>Utilization Chart</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Wed Jul 22 2015 18:56:51 GMT-0600 (MDT) -->
+    <!--  Build Date: Wed Jul 22 2015 22:03:36 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Wed Jul 22 2015 18:56:51 GMT-0600 (MDT)";
-        var CHECKSUM = 46505517282;
+        var APP_BUILD_DATE = "Wed Jul 22 2015 22:03:36 GMT-0600 (MDT)";
+        var CHECKSUM = 46509828269;
     </script>
     
         <script type="text/javascript" src="/apps/2.0rc3/sdk.js"></script>
@@ -806,7 +806,7 @@ Ext.define('Rally.technicalservices.grid.Legend', {
             dataIndex:'PlannedVelocity',
             text:'&#9724;&nbsp;&nbsp;Potential (Planned)',
             flex: 1,
-            editor: 'rallynumberfield',
+            //editor: 'rallynumberfield',
             sortable: false,
             shape: 'square'
         },{

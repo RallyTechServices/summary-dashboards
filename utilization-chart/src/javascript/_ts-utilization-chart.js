@@ -145,7 +145,7 @@ Ext.define('Rally.technicalservices.chart.Utilization',{
 
             r.set('__seriesColor', colors[color_index]);
             r.set('__color', colors[color_index]);
-           // r.set('__toggleColor', colors[color_index]);
+
             color_index++;
         }, this);
 
@@ -164,7 +164,81 @@ Ext.define('Rally.technicalservices.chart.Utilization',{
         }
         return new_array;
     },
-    _initReleaseChart: function(){},
+    _initReleaseChart: function(){
+
+        var series = [],
+            colors = this.chartConfig.colors,
+            color_index = 0,
+            project_hash = {},
+            sorted_records = _.sortBy(this.records, function(r){
+                return r.get('StartDate');
+            }),
+            iterations = [];
+
+        _.each(sorted_records, function(r) {
+            var project_oid = r.get('Project').ObjectID,
+                iteration_name = r.get('Name');
+
+            if (!Ext.Array.contains(iterations, iteration_name)){
+                iterations.push(iteration_name);
+            }
+
+            if (project_hash[project_oid] == undefined) {
+                project_hash[project_oid] = {};
+            }
+            project_hash[project_oid][iteration_name] = r;
+        });
+
+        _.each(project_hash, function(obj, project_oid){
+
+            var start_scope_data = _.map(iterations, function(i){return obj[i] ? obj[i].get('__startScope') || null : null;}),
+                end_scope_data = _.map(iterations, function(i){return obj[i] ? obj[i].get('__endScope') || null : null;}),
+                end_acceptance_data = _.map(iterations, function(i){return obj[i] ? obj[i].get('__endAcceptance') || null : null;}),
+                planned_velocity = _.map(iterations, function(i){return obj[i] ? obj[i].get('PlannedVelocity') || null : null;});
+
+            series.push({
+                name: "End Acceptance", //obj[0].getField('__endAcceptance').displayName,
+                data: end_acceptance_data,
+                color: colors[color_index],
+                marker: { symbol:'triangle-down'}
+            });
+
+            series.push({
+                name: "End Stability", //obj.getField('__endScope').displayName,
+                data: end_scope_data,
+                color: colors[color_index],
+                marker: { symbol:'circle'}
+            });
+
+            series.push({
+                name: "Start Stability", //obj.getField('__startScope').displayName,
+                data: start_scope_data,
+                color: colors[color_index],
+                marker: { symbol:'circle' , fillColor: '#FFFFFF', lineColor: colors[color_index], lineWidth: 2}
+            });
+
+            series.push({
+                name: "Potential", //obj.getField('PlannedVelocity').displayName,
+                data: planned_velocity,
+                color: colors[color_index],
+                marker: { symbol:'square'}
+            });
+
+            //Now set the colors in the records
+            _.each(obj, function(r, i){
+                r.set('__seriesColor', colors[color_index]);
+                r.set('__color', colors[color_index]);
+            });
+            color_index++;
+        });
+
+        this.chartConfig.xAxis.categories = iterations;
+        this.chartData.series = series;
+        this.chartData.categories = iterations;
+        this.chartConfig.xAxis.title.text = "Iteration";
+
+        this.fireEvent('legendupdated', series);
+    },
     //Overriding this function because we want to set colors ourselves.
     _setChartColorsOnSeries: function (series) {
         return null;

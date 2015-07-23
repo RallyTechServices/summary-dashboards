@@ -34,3 +34,7 @@
 .x-grid-row .row-visible {
     color: '#000000';
 }
+.triangle-down {
+    font-family: 'Pictofont';
+    content: icon-chevron-down;
+}

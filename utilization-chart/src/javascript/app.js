@@ -13,7 +13,8 @@ Ext.define("utilization-chart", {
 
     config: {
         defaultSettings: {
-            zoomToIteration:  true
+            zoomToIteration:  true,
+            includeItemsAcceptedAfterNDays: 0
         }
     },
     
@@ -56,27 +57,57 @@ Ext.define("utilization-chart", {
     },
     
     _changeRelease: function(release) {
-//        var me = this;
-//        var settings = this.getSettings();
-//        this.logger.log("Release Changed:", release);
-//        
-//        if ( settings.zoomToIteration == false || settings.zoomToIteration == "false" ) {            
-//            var name = release.get('Name');
-//
-//            var filter = [{property:'Name',value:name}];
-//                        
-//            me._loadAStoreWithAPromise('Release', ['ReleaseStartDate','ReleaseDate','Name'], filter ).then({
-//                scope: me,
-//                success: function(releases) {
-//                    if (releases.length == 0) {
-//                        me.down('#chart_box').add({ xtype:'container', html:'No releases in scope'});
-//                    } else {
-//                        me._gatherData(releases[0]);
-//                    }
-//                }
-//            });
-//                    
-//        }
+        var me = this;
+        var settings = this.getSettings(),
+            zoom_to_iteration = settings.zoomToIteration == true || settings.zoomToIteration == "true" ;
+        this.logger.log("Release Changed:", release);
+
+        if ( zoom_to_iteration == false || zoom_to_iteration == "false" ) {
+            var startDate = Rally.util.DateTime.toIsoString(release.get('ReleaseStartDate')),
+                endDate = Rally.util.DateTime.toIsoString(release.get('ReleaseDate'));
+
+            Rally.technicalservices.ModelBuilder.build('Iteration','Utilization',[]).then({
+                scope: this,
+                success: function(model){
+
+                    var filter = [{property:'StartDate', operator: "<", value: endDate},
+                                    {property: 'EndDate', operator: ">", value: startDate}];
+                    var fields = ['Name','EndDate','StartDate','PlannedVelocity','Project','Parent','Children','ObjectID'];
+                    var sorters = [{property:'EndDate', direction:'ASC'}];
+
+                    Deft.Chain.pipeline([
+                        function() {
+                            return me._loadAStoreWithAPromise(model, fields, filter, sorters);
+                        },
+                        function(iterations) {
+                            me.setLoading('Loading Cumulative Flow Data...');
+                            return me._associateCFDsWithIterations(iterations, startDate, endDate);
+                        },
+                        function(iterations) {
+                            me.setLoading('Loading post iteration acceptances...');
+                            var start_date = Rally.util.DateTime.toIsoString(iterations[0].get('EndDate'));  //This is why we added sorters....
+                            var end_date = Rally.util.DateTime.toIsoString(iterations[iterations.length-1].get('EndDate'));
+                            return me._associateStragglersWithIterations(settings.includeItemsAcceptedAfterNDays, iterations, start_date, end_date);
+                        }
+                    ]).then({
+                        scope: me,
+                        success: function(calculated_iterations) {
+                            me.logger.log('Iterations: ', calculated_iterations);
+                            var rolled_up_iterations = Rally.technicalservices.RollupToolbox.rollUpData(calculated_iterations);
+                            var filtered_iterations = this._filterOutDistantProjects(rolled_up_iterations);
+
+                            me.setLoading(false);
+
+                            me._buildChart(filtered_iterations, zoom_to_iteration);
+                            me._buildGrid(filtered_iterations, zoom_to_iteration);
+                        },
+                        failure: function(msg) {
+                            Ext.Msg.alert('!', msg);
+                        }
+                    });
+                }
+            }).always(function() { me.setLoading(false); });
+        }
     },
     
     _changeIteration: function(iteration) {
@@ -102,15 +133,23 @@ Ext.define("utilization-chart", {
                         }, 
                         function(iterations) { 
                             me.setLoading('Loading Cumulative Flow Data...');
-                            return me._associateCFDsWithIterations(iterations);
+                                var start_date = Rally.util.DateTime.toIsoString(iterations[0].get('StartDate'));
+                                var end_date   = Rally.util.DateTime.toIsoString(iterations[0].get('EndDate'));
+                            return me._associateCFDsWithIterations(iterations, start_date, end_date);
+                        },
+                        function(iterations) {
+                            me.setLoading('Loading post iteration acceptances...');
+                            var start_date = Rally.util.DateTime.toIsoString(iterations[0].get('EndDate'));
+                            var end_date   = Rally.util.DateTime.toIsoString(iterations[0].get('EndDate'));
+                            return me._associateStragglersWithIterations(settings.includeItemsAcceptedAfterNDays,iterations, start_date, end_date);
                         }
                     ]).then({
                         scope: me,
                         success: function(calculated_iterations) {
                             me.logger.log('Iterations: ', calculated_iterations);
-                            var rolled_up_iterations = me._rollUpData(calculated_iterations);
+                            var rolled_up_iterations = Rally.technicalservices.RollupToolbox.rollUpData(calculated_iterations);
                             var filtered_iterations = this._filterOutDistantProjects(rolled_up_iterations);
-                            
+
                             me.setLoading(false);
                             
                             me._buildChart(filtered_iterations, zoom_to_iteration);
@@ -139,7 +178,7 @@ Ext.define("utilization-chart", {
             zoomToIteration: zoom_to_iteration
         });
     },
-    _buildGrid: function(iterations, zoom_to_iterations){
+    _buildGrid: function(iterations, zoom_to_iteration){
         var grid = this.down('#grid_box').add({
             xtype: 'tslegendgrid',
             records: iterations,
@@ -155,12 +194,12 @@ Ext.define("utilization-chart", {
         });
     },
     
-    _associateCFDsWithIterations: function(iterations) {
+    _associateCFDsWithIterations: function(iterations, start_date, end_date) {
         var deferred = Ext.create('Deft.Deferred');
         
         var fetch_fields =  ['CardEstimateTotal','CardState','CreationDate','IterationObjectID'];
-        var start_date = Rally.util.DateTime.toIsoString(iterations[0].get('StartDate'));
-        var end_date   = Rally.util.DateTime.toIsoString(iterations[0].get('EndDate'));
+    //    var start_date = Rally.util.DateTime.toIsoString(iterations[0].get('StartDate'));
+    //    var end_date   = Rally.util.DateTime.toIsoString(iterations[0].get('EndDate'));
         
         var filters = [
             {property: 'CreationDate', operator: '>=', value:start_date},
@@ -180,13 +219,53 @@ Ext.define("utilization-chart", {
         });
         return deferred.promise;
     },
-    
+    _associateStragglersWithIterations: function(includeItemsAcceptedAfterNDays, iterations, start_date, end_date){
+        var deferred = Ext.create('Deft.Deferred');
+        this.logger.log('_associateStragglersWithIterations', includeItemsAcceptedAfterNDays, start_date, end_date);
+        if (isNaN(includeItemsAcceptedAfterNDays) ||  includeItemsAcceptedAfterNDays <= 0){
+            deferred.resolve(iterations);
+        } else {
+            var fetch_fields =  ['Iteration','AcceptedDate','PlanEstimate','Project','ObjectID','Name'];
+
+            var adjusted_end_date = Rally.util.DateTime.add(Rally.util.DateTime.fromIsoString(end_date), 'day', includeItemsAcceptedAfterNDays);
+            var filters = [
+                {property: 'AcceptedDate', operator: '>=', value: start_date},
+                {property: 'AcceptedDate', operator: '<=', value: Rally.util.DateTime.toIsoString(adjusted_end_date)},
+                {property: 'Iteration', operator: '!=', value: null}
+            ];
+
+            var store = Ext.create('Rally.data.wsapi.artifact.Store', {
+                models: ['Defect', 'UserStory'],
+                fetch: fetch_fields,
+                filters: filters,
+                limit: 'Infinity'
+            });
+
+            store.load({
+                scope: this,
+                callback: function(records, operation, success){
+                    if (success){
+                        Ext.Array.each(iterations, function(iteration){
+                            iteration.setStragglers(records, includeItemsAcceptedAfterNDays);
+                        });
+                        deferred.resolve(iterations);
+                    } else {
+                        deferred.reject('Failed to load post iteration accepted artifacts:  ' + operation.error.errors.join(','));
+                    }
+                }
+            });
+        }
+        return deferred.promise;
+    },
     _filterOutDistantProjects: function(iterations){
         var current_project_oid = this.getContext().getProject().ObjectID;
 
         var filtered_iterations = Ext.Array.filter(iterations, function(iteration){
-            var parent = iteration.get('Project').Parent;
-            
+            var parent = iteration.get('Project').Parent,
+                project_oid = iteration.get('Project').ObjectID;
+
+            if (current_project_oid == project_oid){ return true; }
+
             if ( !parent ) { return false; }
             
             return (parent.ObjectID == current_project_oid ) ;
@@ -197,111 +276,21 @@ Ext.define("utilization-chart", {
         }
         return iterations;
     },
-    
-    _rollUpData: function(iterations) {
-        var leaves = Ext.Array.filter(iterations, function(iteration){
-            var project = iteration.get('Project');
-            if ( project && project.Children && project.Children.Count == 0 && project.Parent ) {
-                return true;
-            }
-            return false;
-        });
-        
-        this.logger.log("Leaf project iterations: ", leaves);
-        
-        this.iterations_by_project_oid = {};
-        Ext.Array.each(iterations, function(iteration) {
-            var project = iteration.get('Project');
-            this.iterations_by_project_oid[project.ObjectID] = iteration;
-        },this);
-        
-        while ( leaves.length > 0 ) {
-            var parent_iterations = [];
-            Ext.Array.each(leaves, function(leaf) {
-                parent = this._setValuesForParent(leaf.get('Project'),'PlannedVelocity');
-                if ( parent ) {
-                    var parent_oid = parent.ObjectID;
-                    parent_iterations = Ext.Array.merge(parent_iterations, this.iterations_by_project_oid[parent_oid]);
-                }
-                
-                this._setValuesForParent(leaf.get('Project'),'__startScope');
-                this._setValuesForParent(leaf.get('Project'),'__endScope');
-                this._setValuesForParent(leaf.get('Project'),'__endAcceptance');
 
-                this._setArrayValuesForParent(leaf.get('Project'),'__dailyScope');
-                this._setArrayValuesForParent(leaf.get('Project'),'__dailyAcceptance');
-            },this);
-            
-            console.log('parents:', parent_iterations);
-            leaves = parent_iterations;
-        }
-        
-        return iterations;
-    },
-    
-    _setArrayValuesForParent: function(leaf,field) {
-        if (! leaf.Parent ) {
-            return null;
-        }
-        
-        var leaf_oid = leaf.ObjectID;
-        var parent_oid = leaf.Parent.ObjectID;
-        var leaf_iteration = this.iterations_by_project_oid[leaf_oid];
-        var parent_iteration = this.iterations_by_project_oid[parent_oid];
-        
-        if ( parent_iteration ) {
-            var parent_values = parent_iteration.get(field) || [];
-            var leaf_values = leaf_iteration.get(field) || [];
-            
-            var new_values = [];
-            Ext.Array.each(leaf_values, function(leaf_value,idx){
-                var value = leaf_value || 0;
-                if ( idx < parent_values.length ) {
-                    var parent_value = parent_values[idx] || 0;
-                    new_values.push(value + parent_value);
-                } else {
-                    new_values.push(leaf_value);
-                }
-            });
-            parent_iteration.set(field, new_values);
-            return parent_iteration.get('Project');
-        }
-        
-        return null;
-    },
-    
-    _setValuesForParent: function(leaf,field) {
-        if (! leaf.Parent ) {
-            return null;
-        }
-        
-        var leaf_oid = leaf.ObjectID;
-        var parent_oid = leaf.Parent.ObjectID;
-        var leaf_iteration = this.iterations_by_project_oid[leaf_oid];
-        var parent_iteration = this.iterations_by_project_oid[parent_oid];
-        
-        if ( parent_iteration ) {
-            var parent_value = parent_iteration.get(field) || 0;
-            var leaf_value = leaf_iteration.get(field) || 0;
-            
-            parent_iteration.set(field, parent_value + leaf_value);
-            return parent_iteration.get('Project');
-        }
-        
-        return null;
-    },
-    
-    _loadAStoreWithAPromise: function(model, model_fields, filters){
+    _loadAStoreWithAPromise: function(model, model_fields, filters, sorters){
         var deferred = Ext.create('Deft.Deferred');
         var me = this;
-        
+
+        sorters = sorters || [];
+
         this.logger.log("Starting load:",model,model_fields, filters);
           
         var store = Ext.create('Rally.data.wsapi.Store', {
             model: model,
             fetch: model_fields,
             filters: filters,
-            limit: 'Infinity'
+            limit: 'Infinity',
+            sorters: sorters
         }).load({
             callback : function(records, operation, successful) {                
                 if (successful){
@@ -339,6 +328,14 @@ Ext.define("utilization-chart", {
                 fieldLabel: '',
                 margin: '0 0 25 200',
                 boxLabel: 'Show by Iteration<br/><span style="color:#999999;"><i>If <strong>not</strong> ticked, show by iterations in the selected release.</i></span>'
+            },
+            {
+                name: 'includeItemsAcceptedAfterNDays',
+                xtype: 'rallynumberfield',
+                fieldLabel: 'Include Stories Accepted within N days after the timebox end',
+                labelAlign: 'top',
+                margin: '0 0 25 200',
+                labelWidth: 300
             }
         ];
     },

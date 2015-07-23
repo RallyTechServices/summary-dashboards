@@ -128,7 +128,7 @@ Ext.define('Rally.technicalservices.grid.Legend', {
             dataIndex:'PlannedVelocity',
             text:'&#9724;&nbsp;&nbsp;Potential (Planned)',
             flex: 1,
-            editor: 'rallynumberfield',
+            //editor: 'rallynumberfield',
             sortable: false,
             shape: 'square'
         },{

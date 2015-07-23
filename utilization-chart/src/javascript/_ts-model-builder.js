@@ -19,6 +19,9 @@ Ext.define('Rally.technicalservices.ModelBuilder',{
                     name: '__endAcceptance',
                     displayName: 'End Acceptance'
                 },{
+                    name: '__NDaysAfter',
+                    defaultValue: 0
+                },{
                     name: '__days',
                     convert: function(value, record){
                         // this is an array of dates (end of the day) that the daily fields correspond to
@@ -131,6 +134,8 @@ Ext.define('Rally.technicalservices.ModelBuilder',{
             start_date = this.get('EndDate'),
             end_date = Rally.util.DateTime.add(start_date, 'day', num_extra_days);
 
+        this.set('__NDaysAfter', num_extra_days || 0);
+
         Ext.Array.each(artifacts, function(a){
             if (a.get('Iteration').ObjectID ==  my_oid ){
                 if (a.get('AcceptedDate') > start_date && a.get('AcceptedDate') <= end_date){
@@ -142,7 +147,6 @@ Ext.define('Rally.technicalservices.ModelBuilder',{
         if (late_acceptance_points > 0){
             var end_acceptance = this.get('__endAcceptance');
             this.set('__endAcceptance', end_acceptance + late_acceptance_points);
-            //If we want this to be included in the daily acceptance, then update that array as well.
         }
     }
 });

@@ -4,11 +4,11 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <title>Utilization Chart</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Wed Jul 22 2015 22:03:36 GMT-0600 (MDT) -->
+    <!--  Build Date: Thu Jul 23 2015 11:58:07 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Wed Jul 22 2015 22:03:36 GMT-0600 (MDT)";
-        var CHECKSUM = 46509828269;
+        var APP_BUILD_DATE = "Thu Jul 23 2015 11:58:07 GMT-0600 (MDT)";
+        var CHECKSUM = 47218167084;
     </script>
     
         <script type="text/javascript" src="/apps/2.0rc3/sdk.js"></script>
@@ -992,7 +992,6 @@ Ext.define("utilization-chart", {
 
             this.publish('requestTimebox', this);
         }
-        
     },
     
     _changeRelease: function(release) {
@@ -1177,7 +1176,11 @@ Ext.define("utilization-chart", {
                 models: ['Defect', 'UserStory'],
                 fetch: fetch_fields,
                 filters: filters,
-                limit: 'Infinity'
+                limit: 'Infinity',
+                context: {
+                    project: this.getContext().getProject()._ref,
+                    projectScopeDown: true
+                }
             });
 
             store.load({
@@ -1197,7 +1200,8 @@ Ext.define("utilization-chart", {
         return deferred.promise;
     },
     _filterOutDistantProjects: function(iterations){
-        var current_project_oid = this.getContext().getProject().ObjectID;
+        var current_project_oid = this.getContext().getProject().ObjectID,
+            project_scope_down = this.getContext().getProjectScopeDown();
 
         var filtered_iterations = Ext.Array.filter(iterations, function(iteration){
             var parent = iteration.get('Project').Parent,
@@ -1205,7 +1209,7 @@ Ext.define("utilization-chart", {
 
             if (current_project_oid == project_oid){ return true; }
 
-            if ( !parent ) { return false; }
+            if ( !parent || !project_scope_down ) { return false; }
             
             return (parent.ObjectID == current_project_oid ) ;
         });
@@ -1229,7 +1233,11 @@ Ext.define("utilization-chart", {
             fetch: model_fields,
             filters: filters,
             limit: 'Infinity',
-            sorters: sorters
+            sorters: sorters,
+            context: {
+                project: this.getContext().getProject()._ref,
+                projectScopeDown: true
+            }
         }).load({
             callback : function(records, operation, successful) {                
                 if (successful){

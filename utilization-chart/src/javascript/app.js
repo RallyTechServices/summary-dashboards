@@ -53,7 +53,6 @@ Ext.define("utilization-chart", {
 
             this.publish('requestTimebox', this);
         }
-        
     },
     
     _changeRelease: function(release) {
@@ -238,7 +237,11 @@ Ext.define("utilization-chart", {
                 models: ['Defect', 'UserStory'],
                 fetch: fetch_fields,
                 filters: filters,
-                limit: 'Infinity'
+                limit: 'Infinity',
+                context: {
+                    project: this.getContext().getProject()._ref,
+                    projectScopeDown: true
+                }
             });
 
             store.load({
@@ -258,7 +261,8 @@ Ext.define("utilization-chart", {
         return deferred.promise;
     },
     _filterOutDistantProjects: function(iterations){
-        var current_project_oid = this.getContext().getProject().ObjectID;
+        var current_project_oid = this.getContext().getProject().ObjectID,
+            project_scope_down = this.getContext().getProjectScopeDown();
 
         var filtered_iterations = Ext.Array.filter(iterations, function(iteration){
             var parent = iteration.get('Project').Parent,
@@ -266,7 +270,7 @@ Ext.define("utilization-chart", {
 
             if (current_project_oid == project_oid){ return true; }
 
-            if ( !parent ) { return false; }
+            if ( !parent || !project_scope_down ) { return false; }
             
             return (parent.ObjectID == current_project_oid ) ;
         });
@@ -290,7 +294,11 @@ Ext.define("utilization-chart", {
             fetch: model_fields,
             filters: filters,
             limit: 'Infinity',
-            sorters: sorters
+            sorters: sorters,
+            context: {
+                project: this.getContext().getProject()._ref,
+                projectScopeDown: true
+            }
         }).load({
             callback : function(records, operation, successful) {                
                 if (successful){

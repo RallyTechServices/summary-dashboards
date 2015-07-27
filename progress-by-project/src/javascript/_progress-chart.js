@@ -25,7 +25,7 @@ Ext.define('Rally.technicalservices.progressChart',{
                 min: 0,
                 max: 100,
                 title: {
-                    text: '% of Scheduled Stories by State'
+                    text: '% of Scheduled Stories by State by Points'
                 }
             }
         ],

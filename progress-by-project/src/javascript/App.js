@@ -9,9 +9,10 @@ Ext.override(Rally.ui.chart.Chart,{
     }
 });
 
-Ext.define('CustomApp', {
+Ext.define("TSProjectByProject", {
     extend: 'Rally.app.App',
     componentCls: 'app',
+    logger: new Rally.technicalservices.Logger(),
     items: [
         {xtype:'container',itemId:'settings_box'},
         {xtype:'container', itemId:'selector_box' }
@@ -23,21 +24,25 @@ Ext.define('CustomApp', {
     },
 
     launch: function() {
-
-        if (this.isExternal()){
-            this.showSettings(this.config);
-        } else {
-            this.onSettingsUpdate(this.getSettings());
-        }
+        var me = this;
+        this._getAvailableStates().then({
+            scope: this,
+            success: function(results) {
+                if (this.isExternal()){
+                    this.showSettings(this.config);
+                } else {
+                    this.onSettingsUpdate(this.getSettings());
+                }
+            }
+        });
+        
     },
 
     _launch: function(settings) {
-
         var that = this;
 
         that.rallyFunctions = Ext.create("RallyFunctions");
         
-        console.log("Settings:", settings);
         if ( settings.showScopeSelector === true || settings.showScopeSelector === "true" ) {
             this.down('#selector_box').add({
                 xtype : 'timebox-selector',
@@ -59,7 +64,7 @@ Ext.define('CustomApp', {
             this.publish('requestTimebox', this);
         }
         
-        that.run(release,iteration);
+        //that.run(release,iteration);
        
     },
 
@@ -76,8 +81,6 @@ Ext.define('CustomApp', {
     run : function(releaseName,iterationName) {
 
         var that = this;
-
-        console.log("run progress-by-project:", releaseName, iterationName);
         
         this.setLoading("Loading Stories in Project...");
         
@@ -88,7 +91,7 @@ Ext.define('CustomApp', {
 
         pr.readProjectWorkItems(function(error, stories, projects, states) {
             that.prepareChartData( stories, projects, states, function(error, categories, series) {
-              that.createChart( categories, series );
+                that.createChart( categories, series );
             });
         });
 
@@ -96,7 +99,6 @@ Ext.define('CustomApp', {
 
     _timeboxChanged : function(timebox) {
         var that = this;
-        console.log("Progress-By-Project:_timeboxChanged received");
         if (timebox.get("_type")==='release')
             that.run(timebox.get("Name"),null);
         else
@@ -126,7 +128,7 @@ Ext.define('CustomApp', {
     },
 
     prepareChartData : function(stories, projects, states, callback) {
-        console.log('states', states);
+        this.logger.log('states', states);
         var that = this;
 
         var projectKeys = _.map(projects,function(project) { return _.last(project.get("Name").split('>')); });
@@ -164,6 +166,8 @@ Ext.define('CustomApp', {
             };
         });
 
+        this.logger.log('seriesData:', seriesData);
+        
         callback(null, projectKeys, seriesData );
 
     },
@@ -204,19 +208,46 @@ Ext.define('CustomApp', {
             }
         });
     },
+    
+    _getAvailableStates: function() {
+        var deferred = Ext.create('Deft.Deferred');
+        var me = this;
+        
+        this.scheduleStates = [];
+        
+        Rally.data.ModelFactory.getModel({
+            type: 'UserStory',
+            success: function(model) {
+                model.getField('ScheduleState').getAllowedValueStore().load({
+                    callback: function(records, operation, success) {
+                        Ext.Array.each(records, function(allowedValue) {
+                            me.scheduleStates.push(allowedValue.get('StringValue'));
+                        });
+                        
+                        deferred.resolve(me.scheduleStates);
+                    }
+                });
+            }
+        });
+        return deferred.promise;
+    },
 
     // utilities below here ... 
     createSummaryRecord : function() { 
 
         var that = this;
-      
-        var summary = {
-            "Backlog" : ["Defined"],
-            "In-Progress" : ["In-Progress"],
-            "Complete":  ["Completed"],
-            "Accepted" : ["Accepted"],
-            "Released" : ["Released"]
-        };
+        var summary = {};
+        
+        Ext.Array.each(this.scheduleStates, function(state){
+            summary[state] = [ state ];
+        });
+//        var summary = {
+//            "Backlog" : ["Defined"],
+//            "In-Progress" : ["In-Progress"],
+//            "Complete":  ["Completed"],
+//            "Accepted" : ["Accepted"],
+//            "Released" : ["Released"]
+//        };
 
         // add initial and last states if necessary
         var first = _.first(that.scheduleStates);
@@ -234,6 +265,7 @@ Ext.define('CustomApp', {
     },
     //showSettings:  Override
     showSettings: function(options) {
+        this.logger.log('showSettings');
         this._appSettings = Ext.create('Rally.app.AppSettings', Ext.apply({
             fields: this.getSettingsFields(),
             settings: this.getSettings(),
@@ -262,7 +294,7 @@ Ext.define('CustomApp', {
     },
     //onSettingsUpdate:  Override
     onSettingsUpdate: function (settings){
-        console.log('onSettingsUpdate',settings);
+        this.logger.log('onSettingsUpdate',settings);
         Ext.apply(this, settings);
         this._launch(settings);
     },
@@ -281,6 +313,4 @@ Ext.define('CustomApp', {
             }
         ];
     }
-
-
 });

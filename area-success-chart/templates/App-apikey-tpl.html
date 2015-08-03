@@ -1,7 +1,6 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <title><%= name %></title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
     <!--  Build Date: <%= new Date() %> -->
@@ -11,11 +10,11 @@
         var CHECKSUM = [%= checksum %];
     </script>
     
-    <script type="text/javascript" src="/apps/<%= sdk %>/sdk.js"></script>
+    <script type="text/javascript" src="<%= server %>/apps/<%= sdk %>/sdk-debug.js?apiKey=<%= apiKey %>"></script>
 
     <script type="text/javascript">
         Rally.onReady(function() {
-            <%= ugly_contents %>
+            <%= js_contents %>
             
                Rally.launchApp('<%= className %>', {
                    name: '<%= name %>'

@@ -1,4 +1,4 @@
-Ext.define('CustomApp', {
+Ext.define("TSWIPLimitsChart", {
     extend: 'Rally.app.App',
     componentCls: 'app',
     items: [

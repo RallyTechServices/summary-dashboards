@@ -1,13 +1,14 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <title>WIP Limits Setter</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Mon Jun 29 2015 18:18:06 GMT-0600 (MDT) -->
+    <!--  Build Date: Mon Aug 03 2015 15:14:17 GMT-0700 (PDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Mon Jun 29 2015 18:18:06 GMT-0600 (MDT)";
-        var CHECKSUM = 4196200291;
+        var APP_BUILD_DATE = "Mon Aug 03 2015 15:14:17 GMT-0700 (PDT)";
+        var CHECKSUM = 4251370148;
     </script>
     
     <script type="text/javascript" src="/apps/2.0rc3/sdk.js"></script>
@@ -383,7 +384,9 @@ Ext.define("wip-limits", {
                     dataIndex : 'DefinedWIP',
                     flex : 0.8,
                     editor : {
-                        xtype : 'textfield'
+                        xtype : 'numberfield',
+                        minValue: 0,
+
                     },
                     renderer : that.renderLimit,
                     align : 'center'

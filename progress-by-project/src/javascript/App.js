@@ -23,21 +23,25 @@ Ext.define('CustomApp', {
     },
 
     launch: function() {
-
-        if (this.isExternal()){
-            this.showSettings(this.config);
-        } else {
-            this.onSettingsUpdate(this.getSettings());
-        }
+        var me = this;
+        this._getAvailableStates().then({
+            scope: this,
+            success: function(results) {
+                if (this.isExternal()){
+                    this.showSettings(this.config);
+                } else {
+                    this.onSettingsUpdate(this.getSettings());
+                }
+            }
+        });
+        
     },
 
     _launch: function(settings) {
-
         var that = this;
 
         that.rallyFunctions = Ext.create("RallyFunctions");
         
-        console.log("Settings:", settings);
         if ( settings.showScopeSelector === true || settings.showScopeSelector === "true" ) {
             this.down('#selector_box').add({
                 xtype : 'timebox-selector',
@@ -88,7 +92,7 @@ Ext.define('CustomApp', {
 
         pr.readProjectWorkItems(function(error, stories, projects, states) {
             that.prepareChartData( stories, projects, states, function(error, categories, series) {
-              that.createChart( categories, series );
+                that.createChart( categories, series );
             });
         });
 
@@ -164,6 +168,8 @@ Ext.define('CustomApp', {
             };
         });
 
+        console.log('seriesData:', seriesData);
+        
         callback(null, projectKeys, seriesData );
 
     },
@@ -204,19 +210,46 @@ Ext.define('CustomApp', {
             }
         });
     },
+    
+    _getAvailableStates: function() {
+        var deferred = Ext.create('Deft.Deferred');
+        var me = this;
+        
+        this.scheduleStates = [];
+        
+        Rally.data.ModelFactory.getModel({
+            type: 'UserStory',
+            success: function(model) {
+                model.getField('ScheduleState').getAllowedValueStore().load({
+                    callback: function(records, operation, success) {
+                        Ext.Array.each(records, function(allowedValue) {
+                            me.scheduleStates.push(allowedValue.get('StringValue'));
+                        });
+                        
+                        deferred.resolve(me.scheduleStates);
+                    }
+                });
+            }
+        });
+        return deferred.promise;
+    },
 
     // utilities below here ... 
     createSummaryRecord : function() { 
 
         var that = this;
-      
-        var summary = {
-            "Backlog" : ["Defined"],
-            "In-Progress" : ["In-Progress"],
-            "Complete":  ["Completed"],
-            "Accepted" : ["Accepted"],
-            "Released" : ["Released"]
-        };
+        var summary = {};
+        
+        Ext.Array.each(this.scheduleStates, function(state){
+            summary[state] = [ state ];
+        });
+//        var summary = {
+//            "Backlog" : ["Defined"],
+//            "In-Progress" : ["In-Progress"],
+//            "Complete":  ["Completed"],
+//            "Accepted" : ["Accepted"],
+//            "Released" : ["Released"]
+//        };
 
         // add initial and last states if necessary
         var first = _.first(that.scheduleStates);
@@ -234,6 +267,7 @@ Ext.define('CustomApp', {
     },
     //showSettings:  Override
     showSettings: function(options) {
+        console.log('showSettings');
         this._appSettings = Ext.create('Rally.app.AppSettings', Ext.apply({
             fields: this.getSettingsFields(),
             settings: this.getSettings(),

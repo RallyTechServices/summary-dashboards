@@ -49,7 +49,7 @@ Ext.define("TSWIPLimitsChart", {
             this.publish('requestTimebox', this);
         }
 
-        that.run(release,iteration);
+        //that.run(release,iteration);
 
     },
 

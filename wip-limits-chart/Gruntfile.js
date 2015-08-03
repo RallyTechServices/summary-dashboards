@@ -10,7 +10,12 @@ module.exports = function(grunt) {
     
         config = grunt.file.readJSON('config.json');
 
-        config.js_files = grunt.file.expand(['src/javascript/*.js']);
+        config.js_files = grunt.file.expand([
+            'src/javascript/*.js',
+            '../common/src/javascript/rally-functions.js',
+            '../common/src/javascript/project-stories.js',
+            '../common/src/javascript/scope_selector_component.js'
+        ]);
 
         config.ugly_files = grunt.file.expand(['deploy/app.min.*.js']);
         

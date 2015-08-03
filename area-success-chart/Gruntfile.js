@@ -10,11 +10,7 @@ module.exports = function(grunt) {
     
         config = grunt.file.readJSON('config.json');
 
-        config.js_files = grunt.file.expand(['src/javascript/*.js', 
-            '../common/src/javascript/project-stories.js',
-            '../common/src/javascript/rally-functions.js',
-            '../common/src/javascript/scope_selector_component.js'
-        ]);
+        config.js_files = grunt.file.expand(['src/javascript/*.js','../common/src/javascript/scope_selector_component.js']);
 
         config.ugly_files = grunt.file.expand(['deploy/app.min.*.js']);
         
@@ -49,14 +45,7 @@ module.exports = function(grunt) {
     
     grunt.initConfig({
         pkg: grunt.file.readJSON('package.json'),
-        uglify: {
-            options: {
-                mangle: true
-            },
-            ugly: {
-                files: { 'deploy/app.min.js': config.js_files }
-            }
-        },
+
         template: {
                 dev: {
                     src: 'templates/App-debug-tpl.html',
@@ -146,16 +135,13 @@ module.exports = function(grunt) {
     //load
     grunt.loadNpmTasks('grunt-templater');
     grunt.loadNpmTasks('grunt-contrib-jasmine');
-    grunt.loadNpmTasks('grunt-contrib-uglify');
     //tasks
-    grunt.registerTask('default', ['debug','build','ugly','apikey']);
+    grunt.registerTask('default', ['debug','build','apikey']);
     
     // (uses all the files in src/javascript)
     grunt.registerTask('build', "Create the html for deployment",['template:prod','setChecksum']);
     // 
     grunt.registerTask('debug', "Create an html file that can run in its own tab", ['template:dev']);
-    //
-    grunt.registerTask('ugly', "Create the ugly html for deployment",['uglify:ugly','template:ugly']);
     //
     grunt.registerTask('apikey', "Create an html file that can run on another server", ['template:apikey','template:confluence']);
 

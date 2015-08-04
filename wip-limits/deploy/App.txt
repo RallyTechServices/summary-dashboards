@@ -1,13 +1,14 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <title>WIP Limits Setter</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Mon Jun 29 2015 18:18:06 GMT-0600 (MDT) -->
+    <!--  Build Date: Mon Aug 03 2015 20:45:48 GMT-0700 (PDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Mon Jun 29 2015 18:18:06 GMT-0600 (MDT)";
-        var CHECKSUM = 4196200291;
+        var APP_BUILD_DATE = "Mon Aug 03 2015 20:45:48 GMT-0700 (PDT)";
+        var CHECKSUM = 5698126961;
     </script>
     
     <script type="text/javascript" src="/apps/2.0rc3/sdk.js"></script>
@@ -267,8 +268,8 @@ Ext.define("GridExporter", {
     }
 });
 
-Ext.define("wip-limits", {
-    extend: 'Rally.app.App',
+Ext.define('wip-limits', {
+    extend : 'Rally.app.App',
     layout : {
         type : "fit"
     },
@@ -277,98 +278,134 @@ Ext.define("wip-limits", {
     ],
     launch : function()
     {
-        this._updateBoard();
+        this._getAvailableStates().then({
+            scope: this,
+            success: function(states) {
+                this.states = states;
+                this._updateBoard();
+            }
+        });
     },
-    _updateBoard : function(portfolioTimeboxFilter, storyTimeboxFilter)
-    {
+    _updateBoard : function() {
+        this.setLoading('Finding Stories...');
+        
         var store = Ext.create('Rally.data.wsapi.Store', {
             model : 'hierarchicalrequirement',
             fetch : [
+                'ObjectID',
                 'Name',
                 'FormattedID',
                 'Project',
-                'ScheduleState'
+                'ScheduleState',
+                'Parent',
+                'Children'
             ],
             limit : Infinity
         });
         store.on('load', this._onStoriesLoaded, this);
         store.load();
     },
-    _onStoriesLoaded : function(store, stories)
-    {
+    
+    _onStoriesLoaded : function(store, stories) {
         var me = this;
-        var states = [
-            'Backlog',
-            'Defined',
-            'In-Progress',
-            'Completed',
-            'Accepted'
-        ];
-        var projectGroup = _.groupBy(stories, function(t)
-        {
-            return t.get("Project") ? t.get("Project")._refObjectName : "none";
+        var states = this.states;
+        
+        this.setLoading(false);
+        
+        var projects_by_oid = {};
+        Ext.Array.each(stories, function(story){
+            var project = story.get('Project');
+            var oid = project.ObjectID;
+            projects_by_oid[oid] = project;
         });
-        me.summaries = _.map(_.keys(projectGroup), function(project)
-        {
-            var stories = projectGroup[project];
-            this.currentProject = project;
-            var counts = _.countBy(stories, function(story)
-            {
+        
+        var projectGroup = _.groupBy(stories, function(t){
+            return t.get("Project") ? t.get("Project").ObjectID : "none";
+        });
+        
+        me.summaries = _.map(_.keys(projectGroup), function(project_oid) {
+            var stories = projectGroup[project_oid];
+            var project = projects_by_oid[project_oid] || "none";
+            
+            var counts = _.countBy(stories, function(story) {
                 return story.get('ScheduleState');
             });
+            
             var values = {};
-            _.each(states, function(state)
-            {
+            
+            _.each(states, function(state){
                 values[state] = _.isUndefined(counts[state]) ? 0 : counts[state];
                 var wipKey = state + 'WIP';
                 values[wipKey] = 0;
             });
-            values.project = this.currentProject;
+            values.project = project;
+            values.projectName = project.Name;
+            values.leaf = ( !project.Children || project.Children.Count === 0 );
+            
             return values;
         }, this);
-        me.newStore = Ext.create('Rally.data.custom.Store', {
-            data : me.summaries,
-            sorters : {
-                property : 'project',
-                direction : 'ASC'
-            }
-        });
-        _.each(me.summaries, function(row)
-        {
-            _.each(states, function(state)
-            {
+        
+        this.setLoading('Loading WIP Limits...');
+        var promises = [];
+        
+        Ext.Array.each(me.summaries, function(row) {
+            Ext.Array.each(states, function(state) {
                 var wipKey = state + 'WIP';
-                me._getWipLimit(row.project, wipKey);
+                promises.push(function() {
+                    return me._getWipLimit(wipKey,row);
+                });
             });
         });
-        me.newStore.addListener('update', function(store, record, op, fieldNames, eOpts)
-        {
-            if (op == 'edit')
-            {
-                var project = record.get('project');
-                var fieldName = _.first(fieldNames);
-                var value = record.get(fieldName);
-                me._setWipLimit(project, fieldName, value);
+
+        console.log('promises:', promises.length);
+        
+        Deft.Chain.sequence(promises).then({
+            scope: this,
+            success: function(rows) {
+                console.log('back:', me.summaries);
+                me.newStore = Ext.create('Rally.data.custom.Store', {
+                    data : me.summaries,
+                    sorters : {
+                        property : 'projectName',
+                        direction : 'ASC'
+                    }
+                });
+                
+                me.newStore.addListener('update', function(store, record, op, fieldNames, eOpts){
+                    if (op == 'edit') {
+                        var projectName = record.get('projectName');
+                        var fieldName = _.first(fieldNames);
+                        var value = record.get(fieldName);
+                        if ( record.get('leaf') ) {
+                            me._setWipLimit(projectName, fieldName, value);
+                        } else {
+                            console.log("Can only set wip on children");
+                        }
+                    }
+                }, store, {
+                // single: true
+                });
+                me._displayGrid(me.newStore);
+            },
+            failure: function(msg) {
+                alert(msg);
             }
-        }, store, {
-            // single: true
-        });
-        this._displayGrid(me.newStore);
+        }).always(function() { me.setLoading(false); });
     },
-    _displayGrid : function(store)
-    {
+    
+    _displayGrid : function(store) {
         var that = this;
         this.remove('workqueue');
         this.add({
             xtype : 'rallygrid',
             itemId : 'workqueue',
-            enablebulkeditable : true,
+            enablebulkeditable : false,
             enableEditing : true,
             store : store,
             columnCfgs : [
                 {
                     text : 'Project',
-                    dataIndex : 'project',
+                    dataIndex : 'projectName',
                     flex : 6,
                     align : 'center'
                 },
@@ -383,7 +420,7 @@ Ext.define("wip-limits", {
                     dataIndex : 'DefinedWIP',
                     flex : 0.8,
                     editor : {
-                        xtype : 'textfield'
+                        xtype : 'numberfield'
                     },
                     renderer : that.renderLimit,
                     align : 'center'
@@ -420,40 +457,47 @@ Ext.define("wip-limits", {
                     renderer : that.renderLimit,
                     align : 'center'
                 }
-            ]
+            ],
+            editingConfig: {
+                listeners: {
+                    'beforeEdit': function(editor, evt) {
+                        var record = evt.record;
+                        
+                        return record.get('leaf');
+                    }
+                }
+            }
         });
     },
-    renderLimit : function(value, meta, record, row, col, store, gridView)
-    {
-        // var field = null;
-        // switch (col) {
-        // case 2:
-        // field = "DefinedWIP";
-        // break;
-        // case 4:
-        // field = "In-ProgressWIP";
-        // break;
-        // case 6:
-        // field = "CompletedWIP";
-        // break;
-        // }
-        // if (value > record.get(field)) {
+    
+    renderLimit : function(value, meta, record, row, col, store, gridView) {
         meta.tdCls = 'limit';
-        // }
-        return value;
+        var display_value = value;
+        
+        if ( !record.get('leaf') ) {
+            display_value = "--";
+            meta.tdCls = 'parentProject';
+        }
+        
+        console.log(record.get('projectName'), record.get('leaf'));
+
+        return display_value;
     },
-    _setWipLimit : function(project, state, limit)
+    
+    _setWipLimit : function(projectName, state, limit)
     {
-        var key = this._getWipKey(project, state);
+        var key = this._getWipKey(projectName, state);
         var settings = {};
         settings[key] = Ext.JSON.encode(limit);
         var workspace = this.getContext().getWorkspace();
         Rally.data.PreferenceManager.update({
             workspace : workspace,
+            filterByName : key,
             settings : settings
         }).then({
             success : function(updatedRecords, notUpdatedRecord, options)
             {
+                console.log("Wrote WIP limit: ", key, settings, updatedRecords, notUpdatedRecord, options);
             },
             failure : function()
             {
@@ -465,36 +509,59 @@ Ext.define("wip-limits", {
     {
         return 'project-wip:' + project + ':' + state;
     },
-    _getWipLimit : function(project, state)
-    {
-        var me = this;
-        var key = this._getWipKey(project, state);
+    // TODO: get all prefs in one call and parcel out
+    _getWipLimit : function(state, row) {
+        var deferred = Ext.create('Deft.Deferred');
+        
+        console.log('_getWipLimit', row.projectName, state);
+        
+        var key = this._getWipKey(row.projectName, state);
         var workspace = this.getContext().getWorkspace();
-        console.log('workspace: ', workspace);
+        
         Rally.data.PreferenceManager.load({
             workspace : workspace,
             filterByName : key,
-            success : function(prefs)
-            {
-                if (prefs && prefs[key])
-                {
+            success : function(prefs) {
+                if (prefs && prefs[key]) {
                     var value = prefs[key];
-                    var row = _.find(me.summaries, function(r)
-                    {
-                        return r.project === project;
-                    });
                     row[state] = Ext.JSON.decode(value);
-                    me.newStore.load();
+                    
+                    deferred.resolve(row);
+                } else {
+                    deferred.resolve(row);
                 }
             },
-            failure : function()
-            {
-                console.log("Failed to get WIP limit: ", key);
+            failure : function(){
+                promise.reject("Failed to get WIP limit: ", key);
             }
         });
+        
+        return deferred.promise;
+    },
+    
+    _getAvailableStates: function() {
+        var deferred = Ext.create('Deft.Deferred');
+        var me = this;
+        
+        this.scheduleStates = [];
+        
+        Rally.data.ModelFactory.getModel({
+            type: 'UserStory',
+            success: function(model) {
+                model.getField('ScheduleState').getAllowedValueStore().load({
+                    callback: function(records, operation, success) {
+                        Ext.Array.each(records, function(allowedValue) {
+                            me.scheduleStates.push(allowedValue.get('StringValue'));
+                        });
+                        
+                        deferred.resolve(me.scheduleStates);
+                    }
+                });
+            }
+        });
+        return deferred.promise;
     }
 });
-
             
                Rally.launchApp('wip-limits', {
                    name: 'WIP Limits Setter'
@@ -525,6 +592,10 @@ Ext.define("wip-limits", {
     background-color: #d9d9d9 !important;
     color: black;
     font-weight: bold;
+}
+
+.parentProject {
+    background-color: #888;
 }
     </style>
 

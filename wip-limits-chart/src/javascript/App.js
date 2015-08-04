@@ -1,4 +1,4 @@
-Ext.define('CustomApp', {
+Ext.define("TSWIPLimitsChart", {
     extend: 'Rally.app.App',
     componentCls: 'app',
     items: [
@@ -49,7 +49,7 @@ Ext.define('CustomApp', {
             this.publish('requestTimebox', this);
         }
 
-        that.run(release,iteration);
+        //that.run(release,iteration);
 
     },
 

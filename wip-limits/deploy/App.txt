@@ -4,11 +4,11 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <title>WIP Limits Setter</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Mon Aug 03 2015 20:45:48 GMT-0700 (PDT) -->
+    <!--  Build Date: Wed Aug 05 2015 21:55:27 GMT-0700 (PDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Mon Aug 03 2015 20:45:48 GMT-0700 (PDT)";
-        var CHECKSUM = 5698126961;
+        var APP_BUILD_DATE = "Wed Aug 05 2015 21:55:27 GMT-0700 (PDT)";
+        var CHECKSUM = 11449639837;
     </script>
     
     <script type="text/javascript" src="/apps/2.0rc3/sdk.js"></script>
@@ -124,17 +124,13 @@ Ext.define('Rally.technicalservices.Logger',{
     constructor: function(config){
         Ext.apply(this,config);
     },
-    log: function(args){
-        var timestamp = "[ " + Ext.util.Format.date(new Date(), "Y-m-d H:i:s.u") + " ]";
-        //var output_args = arguments;
-        //output_args.unshift( [ "[ " + timestamp + " ]" ] );
-        //output_args = Ext.Array.push(output_args,arguments);
-        
-        var output_args = [];
-        output_args = Ext.Array.push(output_args,[timestamp]);
-        output_args = Ext.Array.push(output_args, Ext.Array.slice(arguments,0));
-
-        window.console && console.log.apply(console,output_args);
+    log: function(){
+        var i = -1, l = arguments.length, args = [], fn = 'console.log(args)';
+        while(++i<l){
+            args.push('args['+i+']');
+        };
+        fn = new Function('args',fn.replace(/args/,args.join(',')));
+        fn(arguments);
     }
 
 });
@@ -270,27 +266,87 @@ Ext.define("GridExporter", {
 
 Ext.define('wip-limits', {
     extend : 'Rally.app.App',
+    logger: new Rally.technicalservices.Logger(),
     layout : {
         type : "fit"
     },
     mixins : [
         'Rally.Messageable'
     ],
-    launch : function()
-    {
-        this._getAvailableStates().then({
+    
+    release: null,
+    iteration: null,
+    
+    keyPrefix: 'project-wip:',
+    
+    launch : function() {
+
+        this.subscribe(this, 'timeboxReleaseChanged', this._changeRelease, this);
+        this.subscribe(this, 'timeboxIterationChanged', this._changeIteration, this);
+        this.publish('requestTimebox', this);
+        this._launch();
+    },
+    
+    _launch: function(releaseName, iterationName) {
+        var me = this;
+        Deft.Promise.all([
+            this._getAvailableStates(),
+            this._getProjects(),
+            this._getPrefs()
+        ]).then({
             scope: this,
-            success: function(states) {
-                this.states = states;
+            success: function(results) {
+                this.states = results[0];
+                this.projects = results[1];
+                this.preferences = results[2];
+                console.log('prefs:', this.preferences);
+                
+                this.projects_by_oid = {};
+                Ext.Array.each(this.projects, function(project){
+                    var oid = project.get('ObjectID');
+                    this.projects_by_oid[oid] = project.getData();
+                },this);
+                
+                this.prefs_by_name = {};
+                Ext.Array.each(this.preferences, function(preference){
+                    var name = preference.get('Name');
+                    this.prefs_by_name[name] = preference;
+                },this);
+                
                 this._updateBoard();
             }
-        });
+        }).always(function() { me.setLoading(false); });
     },
+    
+    _changeRelease: function(release) {
+        if ( this.release !== release ) {
+            this.release = release;
+            console.log('New Release:', release.get('Name'));
+            this._launch();
+        }
+    },
+
+    _changeIteration: function(iteration) {
+        if ( iteration !== this.iteration ) {
+            this.iteration = iteration;
+            this._launch();
+        }
+    },
+    
     _updateBoard : function() {
         this.setLoading('Finding Stories...');
         
+        var filters = [];
+        if ( this.release ) { 
+            filters = { property:'Release.Name', value: this.release.get('Name') };
+        }
+        if ( this.iteration ) { 
+            filters = { property:'Iteration.Name', value: this.iteration.get('Name') };
+        }
+        
         var store = Ext.create('Rally.data.wsapi.Store', {
             model : 'hierarchicalrequirement',
+            filters: filters,
             fetch : [
                 'ObjectID',
                 'Name',
@@ -312,85 +368,197 @@ Ext.define('wip-limits', {
         
         this.setLoading(false);
         
-        var projects_by_oid = {};
-        Ext.Array.each(stories, function(story){
-            var project = story.get('Project');
-            var oid = project.ObjectID;
-            projects_by_oid[oid] = project;
-        });
-        
         var projectGroup = _.groupBy(stories, function(t){
             return t.get("Project") ? t.get("Project").ObjectID : "none";
         });
         
         me.summaries = _.map(_.keys(projectGroup), function(project_oid) {
             var stories = projectGroup[project_oid];
-            var project = projects_by_oid[project_oid] || "none";
-            
-            var counts = _.countBy(stories, function(story) {
-                return story.get('ScheduleState');
-            });
-            
-            var values = {};
-            
-            _.each(states, function(state){
-                values[state] = _.isUndefined(counts[state]) ? 0 : counts[state];
-                var wipKey = state + 'WIP';
-                values[wipKey] = 0;
-            });
-            values.project = project;
-            values.projectName = project.Name;
-            values.leaf = ( !project.Children || project.Children.Count === 0 );
-            
-            return values;
+            var project = me.projects_by_oid[project_oid] || "none";
+            return me._getSummary(stories, project);
         }, this);
         
-        this.setLoading('Loading WIP Limits...');
-        var promises = [];
-        
+        // set wip limits from memory
         Ext.Array.each(me.summaries, function(row) {
             Ext.Array.each(states, function(state) {
                 var wipKey = state + 'WIP';
-                promises.push(function() {
-                    return me._getWipLimit(wipKey,row);
-                });
+                me._getWipLimit(wipKey,row);
             });
         });
-
-        console.log('promises:', promises.length);
         
-        Deft.Chain.sequence(promises).then({
-            scope: this,
-            success: function(rows) {
-                console.log('back:', me.summaries);
-                me.newStore = Ext.create('Rally.data.custom.Store', {
-                    data : me.summaries,
-                    sorters : {
-                        property : 'projectName',
-                        direction : 'ASC'
-                    }
-                });
-                
-                me.newStore.addListener('update', function(store, record, op, fieldNames, eOpts){
-                    if (op == 'edit') {
-                        var projectName = record.get('projectName');
-                        var fieldName = _.first(fieldNames);
-                        var value = record.get(fieldName);
-                        if ( record.get('leaf') ) {
-                            me._setWipLimit(projectName, fieldName, value);
-                        } else {
-                            console.log("Can only set wip on children");
-                        }
-                    }
-                }, store, {
-                // single: true
-                });
-                me._displayGrid(me.newStore);
-            },
-            failure: function(msg) {
-                alert(msg);
+        // roll up data through tree
+        var rolled_up_data = me._rollUpValues(me.summaries);
+        
+        me.gridStore = Ext.create('Rally.data.custom.Store', {
+            data : rolled_up_data,
+            sorters : {
+                property : 'projectName',
+                direction : 'ASC'
             }
-        }).always(function() { me.setLoading(false); });
+        });
+        
+        me.gridStore.addListener('update', function(store, record, op, fieldNames, eOpts){
+            if (op == 'edit') {
+                var projectName = record.get('projectName');
+                var fieldName = _.first(fieldNames);
+                var value = record.get(fieldName) || 0;
+                if ( record.get('leaf') ) {
+                    var original_value = me.summaries_by_oid[record.get('ObjectID')][fieldName] || 0;
+                    var delta = value - original_value;
+                    
+                    if ( delta !== 0 ) {
+                        me._setWipLimit(projectName, fieldName, value);
+                        var parent = record.get('project').Parent;
+    
+                        me.summaries_by_oid[record.get('ObjectID')][fieldName] = value;
+                        me._rollUpToParent(fieldName, delta, record.getData(), me.summaries_by_oid[parent.ObjectID]);
+                        
+                        me._updateStoreValues(fieldName);
+                    }
+                } else {
+                    me.logger.log("Can only set wip on children");
+                }
+            }
+        }, store, {
+        // single: true
+        });
+        me._displayGrid(me.gridStore);
+
+    },
+    
+    _updateStoreValues: function(field){
+        this.logger.log('_updateStoreValues', field);
+        var store = this.gridStore;
+        Ext.Object.each(this.summaries_by_oid,function(oid,summary){
+            var record = store.findRecord('ObjectID',oid);
+            record.set(field, summary[field]);
+        });
+    },
+    
+    _getSummary: function(stories, project){
+        var me = this;
+        var counts = _.countBy(stories, function(story) {
+            return story.get('ScheduleState');
+        });
+        
+        var values = {};
+        
+        _.each(me.states, function(state){
+            values[state] = _.isUndefined(counts[state]) ? 0 : counts[state];
+            var wipKey = state + 'WIP';
+            values[wipKey] = 0;
+        });
+        values.project = project;
+        values.projectName = project.Name;
+        values.ObjectID = project.ObjectID;
+        
+        values.leaf = ( !project.Children || project.Children.Count === 0 );
+        
+        return values;
+    },
+    
+    _rollUpValues: function(summaries) {
+        var me = this;
+        this.logger.log('_rollUpValues');
+        
+        var leaves = Ext.Array.filter(summaries, function(summary) {
+            return ( summary.leaf );
+        });
+        
+        me.summaries_by_oid = {};
+        Ext.Array.each(summaries, function(summary){
+            me.summaries_by_oid[summary.project.ObjectID] = summary;
+        });
+        
+        Ext.Array.each( leaves, function(leaf){
+            if (! Ext.isEmpty( leaf.project.Parent ) ) {
+                Ext.Object.each(leaf, function(field, value){
+                    var parent = me.summaries_by_oid[leaf.project.Parent.ObjectID];
+                    if ( /WIP/.test(field) ) {
+                        this._rollUpToParent(field, value, leaf, parent);
+                    } 
+                },this);
+            } 
+        },this);
+        
+        var updated_summaries = Ext.Object.getValues(me.summaries_by_oid);
+        
+        var tops = Ext.Array.filter(updated_summaries, function(summary){ 
+            return (!summary.project.Parent); 
+        } );
+        
+        me.children_by_parent_oid = {};
+        Ext.Array.each(updated_summaries, function(summary){
+            var parent = summary.project.Parent;
+            if ( !Ext.isEmpty(parent) ) {
+                var parent_oid = parent.ObjectID;
+                if ( !me.children_by_parent_oid[parent_oid] ){
+                    me.children_by_parent_oid[parent_oid] = [];
+                }
+                me.children_by_parent_oid[parent_oid].push(summary);
+            }
+        });
+        
+        // go top down for when every node level can have a value
+        // (not just built up from the bottom like wip limits
+        Ext.Array.each(tops, function(top){
+            Ext.Object.each(top, function(field, value){
+                if ( Ext.Array.contains(me.states,field) ) {
+                    me._rollUpFromChildren(top,field);
+                } 
+            },this);
+        });
+        
+        return updated_summaries;
+        
+    },
+    
+    _rollUpFromChildren: function(parent, field){
+        var me = this;
+        var parent_oid = parent.project.ObjectID;
+        
+        var parent_value = me.summaries_by_oid[parent_oid][field] || 0;
+        var children = me.children_by_parent_oid[parent_oid];
+        var total_value = parent_value;
+        
+        Ext.Array.each(children, function(child){
+            var child_value = child[field] || 0;
+            if ( ! Ext.isEmpty( me.children_by_parent_oid[child.project.ObjectID] ) ) {
+                child_value = me._rollUpFromChildren(child,field);
+            }
+            total_value = child_value + total_value;
+        });
+        me.summaries_by_oid[parent_oid][field] = total_value;
+        return total_value;
+    },
+    
+    _rollUpToParent: function(field, value, child, parent) {
+        var me = this;
+        
+        if ( child.project.ObjectID !== this.getContext().getProject().ObjectID ) {
+           
+            if ( Ext.isEmpty(parent) ){
+                var parent_oid = child.project.Parent.ObjectID;
+                if ( ! me.summaries_by_oid[parent_oid] ) {
+                    parent_project = this.projects_by_oid[parent_oid];                    
+                    me.summaries_by_oid[parent_oid] = this._getSummary([],parent_project);
+                }
+                parent = me.summaries_by_oid[parent_oid];
+            }
+            
+            if ( parent ) {
+                var child_value = value || 0;
+                var parent_value = parent[field] || 0;
+
+                parent[field] = child_value + parent_value;
+                
+                var grand_parent = parent.project.Parent;
+                if ( !Ext.isEmpty(grand_parent) ) {
+                    me._rollUpToParent(field, value, parent,me.summaries_by_oid[grand_parent.ObjectID]);
+                }
+            }
+        }
+        return me.summaries_by_oid;
     },
     
     _displayGrid : function(store) {
@@ -399,9 +567,8 @@ Ext.define('wip-limits', {
         this.add({
             xtype : 'rallygrid',
             itemId : 'workqueue',
-            enablebulkeditable : false,
-            enableEditing : true,
             store : store,
+            showPagingToolbar: false,
             columnCfgs : [
                 {
                     text : 'Project',
@@ -475,17 +642,14 @@ Ext.define('wip-limits', {
         var display_value = value;
         
         if ( !record.get('leaf') ) {
-            display_value = "--";
             meta.tdCls = 'parentProject';
         }
-        
-        console.log(record.get('projectName'), record.get('leaf'));
 
         return display_value;
     },
     
-    _setWipLimit : function(projectName, state, limit)
-    {
+    _setWipLimit : function(projectName, state, limit) {
+        var me = this;
         var key = this._getWipKey(projectName, state);
         var settings = {};
         settings[key] = Ext.JSON.encode(limit);
@@ -497,45 +661,78 @@ Ext.define('wip-limits', {
         }).then({
             success : function(updatedRecords, notUpdatedRecord, options)
             {
-                console.log("Wrote WIP limit: ", key, settings, updatedRecords, notUpdatedRecord, options);
+                me.logger.log("Wrote WIP limit: ", key, settings, updatedRecords, notUpdatedRecord, options);
+                me.publish('ts-wip-change');
+            
             },
             failure : function()
             {
-                console.log("Failed to write preference: ", key, settings);
+                me.logger.log("Failed to write preference: ", key, settings);
             }
         });
     },
-    _getWipKey : function(project, state)
-    {
-        return 'project-wip:' + project + ':' + state;
+    
+    _getWipKey : function(project, state) {
+        return this.keyPrefix + project + ':' + state;
     },
-    // TODO: get all prefs in one call and parcel out
+    
     _getWipLimit : function(state, row) {
-        var deferred = Ext.create('Deft.Deferred');
-        
-        console.log('_getWipLimit', row.projectName, state);
-        
         var key = this._getWipKey(row.projectName, state);
-        var workspace = this.getContext().getWorkspace();
         
-        Rally.data.PreferenceManager.load({
-            workspace : workspace,
-            filterByName : key,
-            success : function(prefs) {
-                if (prefs && prefs[key]) {
-                    var value = prefs[key];
-                    row[state] = Ext.JSON.decode(value);
-                    
-                    deferred.resolve(row);
+        var pref = this.prefs_by_name[key];
+        if (pref && pref.get('Value') && row.leaf ) {
+            row[state] = parseInt( Ext.JSON.decode(pref.get('Value')), 10 );
+        }
+        return row;
+    },
+    
+    _getProjects: function() {
+        var deferred = Ext.create('Deft.Deferred');
+        var me = this;
+        this.setLoading("Loading projects");
+                  
+        Ext.create('Rally.data.wsapi.Store', {
+            model: 'Project',
+            fetch: ['ObjectID','Name','Parent','Children'],
+            filters: [{property:'State',value:'Open'}],
+            limit: 'Infinity'
+        }).load({
+            callback : function(records, operation, successful) {
+                me.setLoading(false);
+                
+                if (successful){
+                    deferred.resolve(records);
                 } else {
-                    deferred.resolve(row);
+                    me.logger.log("Failed: ", operation);
+                    deferred.reject('Problem loading: ' + operation.error.errors.join('. '));
                 }
-            },
-            failure : function(){
-                promise.reject("Failed to get WIP limit: ", key);
             }
         });
+        return deferred.promise;
+    },
+    
+    _getPrefs: function() {
+        var deferred = Ext.create('Deft.Deferred');
+        var me = this;
+        this.setLoading("Loading prefs");
         
+        Ext.create('Rally.data.wsapi.Store', {
+            model: 'Preference',
+            fetch: ['Name','Value','ObjectID'],
+            filters: [{property:'Name',operator:'contains',value:me.keyPrefix}],
+            limit: 'Infinity'
+        }).load({
+            callback : function(records, operation, successful) {
+                me.setLoading(false);
+                
+                if (successful){
+                    deferred.resolve(records);
+                } else {
+                    me.logger.log("Failed: ", operation);
+                    deferred.reject('Problem loading: ' + operation.error.errors.join('. '));
+                }
+            }
+        });
         return deferred.promise;
     },
     
@@ -589,13 +786,13 @@ Ext.define('wip-limits', {
     cursor: pointer;
 }
 .limit {
-    background-color: #d9d9d9 !important;
+    background-color: #eee !important;
     color: black;
     font-weight: bold;
 }
 
 .parentProject {
-    background-color: #888;
+    background-color: #ccc !important;
 }
     </style>
 

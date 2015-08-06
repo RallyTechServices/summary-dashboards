@@ -1,10 +1,13 @@
 Ext.define("TSWIPLimitsChart", {
     extend: 'Rally.app.App',
     componentCls: 'app',
+    keyPrefix: 'project-wip:',
+
     items: [
         {xtype:'container',itemId:'settings_box'},
         {xtype:'container', itemId:'selector_box' }
     ],
+    logger: new Rally.technicalservices.Logger(),
 
     release: null,
     iteration: null,
@@ -27,7 +30,6 @@ Ext.define("TSWIPLimitsChart", {
     _launch: function(settings) {
         var that = this;
 
-        console.log("Settings:", settings);
         if ( settings.showScopeSelector === true || settings.showScopeSelector === "true" ) {
             this.down('#selector_box').add({
                 xtype : 'timebox-selector',
@@ -48,46 +50,251 @@ Ext.define("TSWIPLimitsChart", {
             this.subscribe(this, 'timeboxIterationChanged', this._changeIteration, this);
             this.publish('requestTimebox', this);
         }
-
-        //that.run(release,iteration);
+        this.subscribe(this, 'ts-wip-change', this._updateWip, this);
 
     },
 
     _changeRelease: function(release) {
         if ( this.release !== release ) {
             this.release = release;
-            this.run(release.get("Name"),null);
+            this._getData(release.get("Name"),null);
         }
     },
 
     _changeIteration: function(iteration) {
         if ( iteration !== this.iteration ) {
             this.iteration = iteration;
-            this.run(null,iteration.get("Name"),null);
+            this._getData(null,iteration.get("Name"));
         }
     },
 
-
-    run : function(releaseName,iterationName) {
-
-        var that = this;
-
-        this.setLoading("Loading...");
+    _updateWip: function(store) {
+        this.logger.log('got new values!',store);
+        var releaseName = null;
+        var iterationName = null;
+        if ( this.release ) { releaseName = this.release.get('Name'); }
+        if ( this.iteration ) { iterationName = this.iteration.get('Name'); }
         
-        that.rallyFunctions = Ext.create("RallyFunctions");
+        this.wipStore = store;
+        
+        this._getData(releaseName, iterationName);
+    },
 
-        that.projectStories = Ext.create( "ProjectStories", {
-            ctx : that.getContext(),
-            filter : that.rallyFunctions.createFilter(releaseName,iterationName)
+    _getData: function(releaseName, iterationName) {
+        var me = this;
+        Deft.Promise.all([
+            this._getAvailableStates(),
+            this._getProjects(),
+            this._getPrefs()
+        ]).then({
+            scope: this,
+            success: function(results) {
+                this.states = results[0];
+                this.projects = results[1];
+                this.preferences = results[2];
+                
+                this.projects_by_oid = {};
+                Ext.Array.each(this.projects, function(project){
+                    var oid = project.get('ObjectID');
+                    this.projects_by_oid[oid] = project.getData();
+                },this);
+                
+                this.prefs_by_name = {};
+                Ext.Array.each(this.preferences, function(preference){
+                    var name = preference.get('Name');
+                    this.prefs_by_name[name] = preference;
+                },this);
+                
+                this._getStories(releaseName,iterationName);
+            }
+        }).always(function() { me.setLoading(false); });
+    },
+    
+    _getStories: function(releaseName,iterationName) {
+        this.setLoading('Finding Stories...');
+        
+        var filters = [];
+        if ( releaseName ) { 
+            filters = { property:'Release.Name', value: releaseName };
+        }
+        if ( iterationName ) { 
+            filters = { property:'Iteration.Name', value: iterationName };
+        }
+        
+        var store = Ext.create('Rally.data.wsapi.Store', {
+            model : 'hierarchicalrequirement',
+            filters: filters,
+            fetch : [
+                'ObjectID',
+                'Name',
+                'FormattedID',
+                'Project',
+                'ScheduleState',
+                'Parent',
+                'Children'
+            ],
+            limit : Infinity
         });
-
-        that.projectStories.readProjectWorkItems(function(error, stories, projects, states){
-            that.readWipValues(projects,function(error,wipLimits) {
-                that.prepareChartData(stories, projects, wipLimits, function(error, categories, series) {
-                    that.createChart(categories,series);
-                });
+        store.on('load', this._onStoriesLoaded, this);
+        store.load();
+    },
+    
+    _onStoriesLoaded : function(store, stories) {
+        var me = this;
+        var states = this.states;
+        
+        this.setLoading(false);
+        
+        var projectGroup = _.groupBy(stories, function(t){
+            return t.get("Project") ? t.get("Project").ObjectID : "none";
+        });
+        
+        me.summaries = _.map(_.keys(projectGroup), function(project_oid) {
+            var stories = projectGroup[project_oid];
+            var project = me.projects_by_oid[project_oid] || "none";
+            return me._getSummary(stories, project);
+        }, this);
+        
+        // set wip limits from memory
+        Ext.Array.each(me.summaries, function(row) {
+            Ext.Array.each(states, function(state) {
+                var wipKey = state + 'WIP';
+                me._getWipLimit(wipKey,row);
             });
         });
+       
+        // roll up data through tree
+        var rolled_up_data = me._rollUpValues(me.summaries);
+        
+        var chart_data = me.prepareChartData(rolled_up_data);
+        this.createChart(chart_data);
+        
+    },
+    
+    _getSummary: function(stories, project){
+        var me = this;
+        var counts = _.countBy(stories, function(story) {
+            return story.get('ScheduleState');
+        });
+        
+        var values = {};
+        
+        _.each(me.states, function(state){
+            values[state] = _.isUndefined(counts[state]) ? 0 : counts[state];
+            var wipKey = state + 'WIP';
+            values[wipKey] = 0;
+        });
+        values.project = project;
+        values.projectName = project.Name;
+        values.ObjectID = project.ObjectID;
+        
+        values.leaf = ( !project.Children || project.Children.Count === 0 );
+        
+        return values;
+    },
+    
+    _rollUpValues: function(summaries) {
+        var me = this;
+        this.logger.log('_rollUpValues');
+        
+        var leaves = Ext.Array.filter(summaries, function(summary) {
+            return ( summary.leaf );
+        });
+        
+        me.summaries_by_oid = {};
+        Ext.Array.each(summaries, function(summary){
+            me.summaries_by_oid[summary.project.ObjectID] = summary;
+        });
+        
+        Ext.Array.each( leaves, function(leaf){
+            if (! Ext.isEmpty( leaf.project.Parent ) ) {
+                Ext.Object.each(leaf, function(field, value){
+                    var parent = me.summaries_by_oid[leaf.project.Parent.ObjectID];
+                    if ( /WIP/.test(field) ) {
+                        this._rollUpToParent(field, value, leaf, parent);
+                    } 
+                },this);
+            } 
+        },this);
+        
+        var updated_summaries = Ext.Object.getValues(me.summaries_by_oid);
+        
+        var tops = Ext.Array.filter(updated_summaries, function(summary){ 
+            return (!summary.project.Parent); 
+        } );
+        
+        me.children_by_parent_oid = {};
+        Ext.Array.each(updated_summaries, function(summary){
+            var parent = summary.project.Parent;
+            if ( !Ext.isEmpty(parent) ) {
+                var parent_oid = parent.ObjectID;
+                if ( !me.children_by_parent_oid[parent_oid] ){
+                    me.children_by_parent_oid[parent_oid] = [];
+                }
+                me.children_by_parent_oid[parent_oid].push(summary);
+            }
+        });
+        
+        // go top down for when every node level can have a value
+        // (not just built up from the bottom like wip limits
+        Ext.Array.each(tops, function(top){
+            Ext.Object.each(top, function(field, value){
+                if ( Ext.Array.contains(me.states,field) ) {
+                    me._rollUpFromChildren(top,field);
+                } 
+            },this);
+        });
+        
+        return updated_summaries;
+        
+    },
+    
+    _rollUpFromChildren: function(parent, field){
+        var me = this;
+        var parent_oid = parent.project.ObjectID;
+        
+        var parent_value = me.summaries_by_oid[parent_oid][field] || 0;
+        var children = me.children_by_parent_oid[parent_oid];
+        var total_value = parent_value;
+        
+        Ext.Array.each(children, function(child){
+            var child_value = child[field] || 0;
+            if ( ! Ext.isEmpty( me.children_by_parent_oid[child.project.ObjectID] ) ) {
+                child_value = me._rollUpFromChildren(child,field);
+            }
+            total_value = child_value + total_value;
+        });
+        me.summaries_by_oid[parent_oid][field] = total_value;
+        return total_value;
+    },
+    
+    _rollUpToParent: function(field, value, child, parent) {
+        var me = this;
+        
+        if ( child.project.ObjectID !== this.getContext().getProject().ObjectID ) {
+           
+            if ( Ext.isEmpty(parent) ){
+                var parent_oid = child.project.Parent.ObjectID;
+                if ( ! me.summaries_by_oid[parent_oid] ) {
+                    parent_project = this.projects_by_oid[parent_oid];                    
+                    me.summaries_by_oid[parent_oid] = this._getSummary([],parent_project);
+                }
+                parent = me.summaries_by_oid[parent_oid];
+            }
+            
+            if ( parent ) {
+                var child_value = value || 0;
+                var parent_value = parent[field] || 0;
+
+                parent[field] = child_value + parent_value;
+                
+                var grand_parent = parent.project.Parent;
+                if ( !Ext.isEmpty(grand_parent) ) {
+                    me._rollUpToParent(field, value, parent,me.summaries_by_oid[grand_parent.ObjectID]);
+                }
+            }
+        }
+        return me.summaries_by_oid;
     },  
 
     _timeboxChanged : function(timebox) {
@@ -119,92 +326,140 @@ Ext.define("TSWIPLimitsChart", {
         }
     },
 
-    // project-wip:IA-Program > IM FT Client outcomes > CAP DELIVERY 2 Scrum Team:DefinedWIP
-    // "project-wip:IA-Program > Big Data Analytics & Shared Services > BDASS:CompletedWIP"
-
-    readWipValues : function(projects,callback) {
-
+    prepareChartData : function(data) {
         var that = this;
-
-        var projectKeys = _.map( projects, function(p) { return p.get("Name"); });
-
+        
         var states = ["In-Progress","Completed"];
 
-        var keys = _.flatten(_.map(projectKeys,function(pKey) {
-            return _.map(states,function(state) {
-                return "project-wip:" + pKey + ":" + state + "WIP";
-            });
-        }));
-
-        that.projectStories.readPreferenceValues(keys).then( {
-            success: function(values) {
-                callback(null,_.flatten(values));
-            },
-            failure: function() {
-                //handle error
-            },
-            scope: this
-        });
-    },
-
-    prepareChartData : function(stories,projects,wipLimits,callback) {
-
-        var that = this;
-
-        var categories = _.map(projects, function(p) { return _.last(p.get("Name").split('>')); });
-
-        var states = ["In-Progress","Completed"];
-
-        var pointsValue = function(value) {
-            return !_.isUndefined(value) && !_.isNull(value) ? value : 0;
-        };
-
-        // totals points for a set of work items based on if they are in a set of states
-        var summarize = function( workItems, states ) {
-            var stateTotal = _.reduce(  workItems, function(memo,workItem) {
-                    return memo + ( _.indexOf(states,workItem.get("ScheduleState")) > -1 ? 
-                            1 : 0);
-                },0);
-            return stateTotal;
-        };
-
-        var wipForProjectAndState = function( project, state ) {
-            var wip = _.find( wipLimits, function( limit ) {
-                return limit.get("Name").indexOf(project.get("Name"))!==-1 &&
-                    limit.get("Name").indexOf(state)!==-1;
-            });
-            if (!_.isUndefined(wip) && !_.isNull(wip)) {
-                var val = wip.get("Value").replace(/"/g,"");
-                return parseInt(val,10);
-            } else {
-                return 0;
+        var current_project = this.getContext().getProject();
+        console.log('current:', current_project);
+        
+        var current_project_oids = Ext.Array.map(
+            Ext.Array.filter(that.projects, function(project){
+                var parent = project.get('Parent');
+                return (parent && parent.ObjectID == current_project.ObjectID );
+            }), function(project) {
+                return project.get('ObjectID');
             }
-        };
-
-        var seriesData = _.map( states, function( state ) {
-
-            var counts = _.map( categories, function( project, index ) {
-                return summarize( stories[index], [state]);
-            });
-            var wips = _.map( categories, function( project, index) {
-                return wipForProjectAndState( projects[index], state);
-            });
-
-            return {
-                name : state,
-                data : _.map( categories, function( project, index) {
-                    return counts[index] - wips[index];
-                })
-            };
+        );
+        
+        var filtered_data = Ext.Array.filter(data, function(datum){
+            return ( Ext.Array.contains(current_project_oids, datum.ObjectID) );
         });
-
-        callback(null,categories,seriesData);
-
+        
+        var categories = Ext.Array.map( filtered_data, function(datum) {
+            var name_array = datum.projectName.split('>');
+            return name_array[name_array.length - 1];
+        });
+        
+        
+        var seriesData = Ext.Array.map(states, function(state){
+            var counts = Ext.Array.map(filtered_data, function(datum){
+                return datum[state] - datum[state + "WIP"];
+            });
+            return {
+                name: state,
+                data: counts
+            }
+        });
+        
+        return [ categories, seriesData ];
+    },
+    
+    _getWipKey : function(project, state) {
+        return this.keyPrefix + project + ':' + state;
+    },
+    
+    _getWipLimit : function(state, row) {
+        var key = this._getWipKey(row.projectName, state);
+        
+        var pref = this.prefs_by_name[key];
+        if (pref && pref.get('Value') && row.leaf ) {
+            row[state] = parseInt( Ext.JSON.decode(pref.get('Value')), 10 );
+        }
+        return row;
+    },
+    
+    _getProjects: function() {
+        var deferred = Ext.create('Deft.Deferred');
+        var me = this;
+        this.setLoading("Loading projects");
+                  
+        Ext.create('Rally.data.wsapi.Store', {
+            model: 'Project',
+            fetch: ['ObjectID','Name','Parent','Children'],
+            filters: [{property:'State',value:'Open'}],
+            limit: 'Infinity'
+        }).load({
+            callback : function(records, operation, successful) {
+                me.setLoading(false);
+                
+                if (successful){
+                    deferred.resolve(records);
+                } else {
+                    me.logger.log("Failed: ", operation);
+                    deferred.reject('Problem loading: ' + operation.error.errors.join('. '));
+                }
+            }
+        });
+        return deferred.promise;
+    },
+    
+    _getPrefs: function() {
+        var deferred = Ext.create('Deft.Deferred');
+        var me = this;
+        this.setLoading("Loading prefs");
+        
+        Ext.create('Rally.data.wsapi.Store', {
+            model: 'Preference',
+            fetch: ['Name','Value','ObjectID'],
+            filters: [{property:'Name',operator:'contains',value:me.keyPrefix}],
+            limit: 'Infinity'
+        }).load({
+            callback : function(records, operation, successful) {
+                me.setLoading(false);
+                
+                if (successful){
+                    deferred.resolve(records);
+                } else {
+                    me.logger.log("Failed: ", operation);
+                    deferred.reject('Problem loading: ' + operation.error.errors.join('. '));
+                }
+            }
+        });
+        return deferred.promise;
+    },
+    
+    _getAvailableStates: function() {
+        var deferred = Ext.create('Deft.Deferred');
+        var me = this;
+        
+        this.scheduleStates = [];
+        
+        Rally.data.ModelFactory.getModel({
+            type: 'UserStory',
+            success: function(model) {
+                model.getField('ScheduleState').getAllowedValueStore().load({
+                    callback: function(records, operation, success) {
+                        Ext.Array.each(records, function(allowedValue) {
+                            me.scheduleStates.push(allowedValue.get('StringValue'));
+                        });
+                        
+                        deferred.resolve(me.scheduleStates);
+                    }
+                });
+            }
+        });
+        return deferred.promise;
     },
 
-    createChart : function(categories,seriesData,callback) {
+    createChart : function(chart_data) {
 
         var that = this;
+        
+        var categories = chart_data[0];
+        var seriesData = chart_data[1];
+        
         this.setLoading(false);
         
         if (!_.isUndefined(that.chart)) {

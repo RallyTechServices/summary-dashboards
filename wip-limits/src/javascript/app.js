@@ -65,8 +65,6 @@ Ext.define('wip-limits', {
             return me._getSummary(stories, project);
         }, this);
         
-        console.log('summaries',me.summaries);
-        
         this.setLoading('Loading WIP Limits...');
         var promises = [];
         
@@ -142,6 +140,7 @@ Ext.define('wip-limits', {
     
     _rollUpValues: function(summaries) {
         var me = this;
+        this.logger.log('_rollUpValues');
         
         var leaves = Ext.Array.filter(summaries, function(summary) {
             return ( summary.leaf );
@@ -156,18 +155,64 @@ Ext.define('wip-limits', {
             if (! Ext.isEmpty( leaf.project.Parent ) ) {
                 Ext.Object.each(leaf, function(field, value){
                     var parent = me.summaries_by_oid[leaf.project.Parent.ObjectID];
-                    if ( /WIP/.test(field) || Ext.Array.contains(me.states, field) ) {
+                    if ( /WIP/.test(field) ) {
                         this._rollUpToParent(field, value, leaf, parent);
                     } 
                 },this);
             } 
         },this);
         
-        return Ext.Object.getValues(me.summaries_by_oid);
+        var updated_summaries = Ext.Object.getValues(me.summaries_by_oid);
+        
+        var tops = Ext.Array.filter(updated_summaries, function(summary){ 
+            return (!summary.project.Parent); 
+        } );
+        
+        me.children_by_parent_oid = {};
+        Ext.Array.each(updated_summaries, function(summary){
+            var parent = summary.project.Parent;
+            if ( !Ext.isEmpty(parent) ) {
+                var parent_oid = parent.ObjectID;
+                if ( !me.children_by_parent_oid[parent_oid] ){
+                    me.children_by_parent_oid[parent_oid] = [];
+                }
+                me.children_by_parent_oid[parent_oid].push(summary);
+            }
+        });
+        
+        // go top down for when every node level can have a value
+        // (not just built up from the bottom like wip limits
+        Ext.Array.each(tops, function(top){
+            Ext.Object.each(top, function(field, value){
+                if ( Ext.Array.contains(me.states,field) ) {
+                    me._rollUpFromChildren(top,field);
+                } 
+            },this);
+        });
+        
+        return updated_summaries;
         
     },
- 
-    // TODO -- figure out what to do with middle node projects that have stories 
+    
+    _rollUpFromChildren: function(parent, field){
+        var me = this;
+        var parent_oid = parent.project.ObjectID;
+        
+        var parent_value = me.summaries_by_oid[parent_oid][field] || 0;
+        var children = me.children_by_parent_oid[parent_oid];
+        var total_value = parent_value;
+        
+        Ext.Array.each(children, function(child){
+            var child_value = child[field] || 0;
+            if ( ! Ext.isEmpty( me.children_by_parent_oid[child.project.ObjectID] ) ) {
+                child_value = me._rollUpFromChildren(child,field);
+            }
+            total_value = child_value + total_value;
+        });
+        me.summaries_by_oid[parent_oid][field] = total_value;
+        return total_value;
+    },
+    
     _rollUpToParent: function(field, value, child, parent) {
         var me = this;
         if ( child.project.ObjectID !== this.getContext().getProject().ObjectID ) {
@@ -175,9 +220,7 @@ Ext.define('wip-limits', {
             if ( Ext.isEmpty(parent) ){
                 var parent_oid = child.project.Parent.ObjectID;
                 if ( ! me.summaries_by_oid[parent_oid] ) {
-                    parent_project = this.projects_by_oid[parent_oid];
-                    console.log('creating summary for:', parent_project.Name);
-                    
+                    parent_project = this.projects_by_oid[parent_oid];                    
                     me.summaries_by_oid[parent_oid] = this._getSummary([],parent_project);
                 }
                 parent = me.summaries_by_oid[parent_oid];
@@ -186,10 +229,7 @@ Ext.define('wip-limits', {
             if ( parent ) {
                 var child_value = value || 0;
                 var parent_value = parent[field] || 0;
-                        
-                if ( parent.projectName == 'Very Top' && field == 'Defined' ) {
-                    console.log("adding to top", parent_value, child_value);
-                }
+
                 parent[field] = child_value + parent_value;
                 
                 var grand_parent = parent.project.Parent;

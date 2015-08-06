@@ -85,10 +85,12 @@ Ext.define('wip-limits', {
             });
         });
         
+        
+        
         // roll up data through tree
         var rolled_up_data = me._rollUpValues(me.summaries);
         
-        me.newStore = Ext.create('Rally.data.custom.Store', {
+        me.gridStore = Ext.create('Rally.data.custom.Store', {
             data : rolled_up_data,
             sorters : {
                 property : 'projectName',
@@ -97,14 +99,24 @@ Ext.define('wip-limits', {
         });
         
         // TODO: update calculations after change to wip
-        // TODO: publish change so chart changes
-        me.newStore.addListener('update', function(store, record, op, fieldNames, eOpts){
+        me.gridStore.addListener('update', function(store, record, op, fieldNames, eOpts){
             if (op == 'edit') {
                 var projectName = record.get('projectName');
                 var fieldName = _.first(fieldNames);
-                var value = record.get(fieldName);
+                var value = record.get(fieldName) || 0;
                 if ( record.get('leaf') ) {
-                    me._setWipLimit(projectName, fieldName, value);
+                    var original_value = me.summaries_by_oid[record.get('ObjectID')][fieldName] || 0;
+                    var delta = value - original_value;
+                    
+                    if ( delta !== 0 ) {
+                        me._setWipLimit(projectName, fieldName, value);
+                        var parent = record.get('project').Parent;
+    
+                        me.summaries_by_oid[record.get('ObjectID')][fieldName] = value;
+                        me._rollUpToParent(fieldName, delta, record.getData(), me.summaries_by_oid[parent.ObjectID]);
+                        
+                        me._updateStoreValues(fieldName);
+                    }
                 } else {
                     me.logger.log("Can only set wip on children");
                 }
@@ -112,8 +124,17 @@ Ext.define('wip-limits', {
         }, store, {
         // single: true
         });
-        me._displayGrid(me.newStore);
+        me._displayGrid(me.gridStore);
 
+    },
+    
+    _updateStoreValues: function(field){
+        this.logger.log('_updateStoreValues', field);
+        var store = this.gridStore;
+        Ext.Object.each(this.summaries_by_oid,function(oid,summary){
+            var record = store.findRecord('ObjectID',oid);
+            record.set(field, summary[field]);
+        });
     },
     
     _getSummary: function(stories, project){
@@ -131,6 +152,8 @@ Ext.define('wip-limits', {
         });
         values.project = project;
         values.projectName = project.Name;
+        values.ObjectID = project.ObjectID;
+        
         values.leaf = ( !project.Children || project.Children.Count === 0 );
         
         return values;
@@ -213,6 +236,7 @@ Ext.define('wip-limits', {
     
     _rollUpToParent: function(field, value, child, parent) {
         var me = this;
+        
         if ( child.project.ObjectID !== this.getContext().getProject().ObjectID ) {
            
             if ( Ext.isEmpty(parent) ){
@@ -236,7 +260,7 @@ Ext.define('wip-limits', {
                 }
             }
         }
-        return;
+        return me.summaries_by_oid;
     },
     
     _displayGrid : function(store) {

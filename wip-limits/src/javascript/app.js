@@ -8,20 +8,32 @@ Ext.define('wip-limits', {
         'Rally.Messageable'
     ],
     
+    keyPrefix: 'project-wip:',
+    
     launch : function() {
         var me = this;
         Deft.Promise.all([
             this._getAvailableStates(),
-            this._getProjects()
+            this._getProjects(),
+            this._getPrefs()
         ]).then({
             scope: this,
             success: function(results) {
                 this.states = results[0];
                 this.projects = results[1];
+                this.preferences = results[2];
+                console.log('prefs:', this.preferences);
+                
                 this.projects_by_oid = {};
                 Ext.Array.each(this.projects, function(project){
                     var oid = project.get('ObjectID');
                     this.projects_by_oid[oid] = project.getData();
+                },this);
+                
+                this.prefs_by_name = {};
+                Ext.Array.each(this.preferences, function(preference){
+                    var name = preference.get('Name');
+                    this.prefs_by_name[name] = preference;
                 },this);
                 
                 this._updateBoard();
@@ -65,57 +77,43 @@ Ext.define('wip-limits', {
             return me._getSummary(stories, project);
         }, this);
         
-        this.setLoading('Loading WIP Limits...');
-        var promises = [];
-        
+        // set wip limits from memory
         Ext.Array.each(me.summaries, function(row) {
             Ext.Array.each(states, function(state) {
                 var wipKey = state + 'WIP';
-                promises.push(function() {
-                    return me._getWipLimit(wipKey,row);
-                });
+                me._getWipLimit(wipKey,row);
             });
         });
-
-        this.logger.log('promises:', promises.length);
         
-        Deft.Chain.sequence(promises).then({
-            scope: this,
-            success: function(rows) {
-                this.logger.log('back:', me.summaries);
-                
-                var rolled_up_data = me._rollUpValues(me.summaries);
-                
-                me.newStore = Ext.create('Rally.data.custom.Store', {
-                    data : rolled_up_data,
-                    sorters : {
-                        property : 'projectName',
-                        direction : 'ASC'
-                    }
-                });
-                
-                // TODO: update calculations after change to wip
-                // TODO: publish change so chart changes
-                me.newStore.addListener('update', function(store, record, op, fieldNames, eOpts){
-                    if (op == 'edit') {
-                        var projectName = record.get('projectName');
-                        var fieldName = _.first(fieldNames);
-                        var value = record.get(fieldName);
-                        if ( record.get('leaf') ) {
-                            me._setWipLimit(projectName, fieldName, value);
-                        } else {
-                            me.logger.log("Can only set wip on children");
-                        }
-                    }
-                }, store, {
-                // single: true
-                });
-                me._displayGrid(me.newStore);
-            },
-            failure: function(msg) {
-                alert(msg);
+        // roll up data through tree
+        var rolled_up_data = me._rollUpValues(me.summaries);
+        
+        me.newStore = Ext.create('Rally.data.custom.Store', {
+            data : rolled_up_data,
+            sorters : {
+                property : 'projectName',
+                direction : 'ASC'
             }
-        }).always(function() { me.setLoading(false); });
+        });
+        
+        // TODO: update calculations after change to wip
+        // TODO: publish change so chart changes
+        me.newStore.addListener('update', function(store, record, op, fieldNames, eOpts){
+            if (op == 'edit') {
+                var projectName = record.get('projectName');
+                var fieldName = _.first(fieldNames);
+                var value = record.get(fieldName);
+                if ( record.get('leaf') ) {
+                    me._setWipLimit(projectName, fieldName, value);
+                } else {
+                    me.logger.log("Can only set wip on children");
+                }
+            }
+        }, store, {
+        // single: true
+        });
+        me._displayGrid(me.newStore);
+
     },
     
     _getSummary: function(stories, project){
@@ -348,39 +346,19 @@ Ext.define('wip-limits', {
             }
         });
     },
-    _getWipKey : function(project, state)
-    {
-        return 'project-wip:' + project + ':' + state;
+    
+    _getWipKey : function(project, state) {
+        return this.keyPrefix + project + ':' + state;
     },
-    // TODO: get all prefs in one call and parcel out
+    
     _getWipLimit : function(state, row) {
-        var deferred = Ext.create('Deft.Deferred');
-                
         var key = this._getWipKey(row.projectName, state);
-        var workspace = this.getContext().getWorkspace();
         
-        Rally.data.PreferenceManager.load({
-            workspace : workspace,
-            filterByName : key,
-            success : function(prefs) {
-                if (prefs && prefs[key]) {
-                    var value = prefs[key];
-                    
-                    if ( row.leaf ) {
-                        row[state] = parseInt( Ext.JSON.decode(value), 10 );
-                    }
-                    
-                    deferred.resolve(row);
-                } else {
-                    deferred.resolve(row);
-                }
-            },
-            failure : function(){
-                promise.reject("Failed to get WIP limit: ", key);
-            }
-        });
-        
-        return deferred.promise;
+        var pref = this.prefs_by_name[key];
+        if (pref && pref.get('Value') && row.leaf ) {
+            row[state] = parseInt( Ext.JSON.decode(pref.get('Value')), 10 );
+        }
+        return row;
     },
     
     _getProjects: function() {
@@ -392,6 +370,31 @@ Ext.define('wip-limits', {
             model: 'Project',
             fetch: ['ObjectID','Name','Parent','Children'],
             filters: [{property:'State',value:'Open'}],
+            limit: 'Infinity'
+        }).load({
+            callback : function(records, operation, successful) {
+                me.setLoading(false);
+                
+                if (successful){
+                    deferred.resolve(records);
+                } else {
+                    me.logger.log("Failed: ", operation);
+                    deferred.reject('Problem loading: ' + operation.error.errors.join('. '));
+                }
+            }
+        });
+        return deferred.promise;
+    },
+    
+    _getPrefs: function() {
+        var deferred = Ext.create('Deft.Deferred');
+        var me = this;
+        this.setLoading("Loading prefs");
+        
+        Ext.create('Rally.data.wsapi.Store', {
+            model: 'Preference',
+            fetch: ['Name','Value','ObjectID'],
+            filters: [{property:'Name',operator:'contains',value:me.keyPrefix}],
             limit: 'Infinity'
         }).load({
             callback : function(records, operation, successful) {

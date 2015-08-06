@@ -8,9 +8,20 @@ Ext.define('wip-limits', {
         'Rally.Messageable'
     ],
     
+    release: null,
+    iteration: null,
+    
     keyPrefix: 'project-wip:',
     
     launch : function() {
+
+        this.subscribe(this, 'timeboxReleaseChanged', this._changeRelease, this);
+        this.subscribe(this, 'timeboxIterationChanged', this._changeIteration, this);
+        this.publish('requestTimebox', this);
+        this._launch();
+    },
+    
+    _launch: function(releaseName, iterationName) {
         var me = this;
         Deft.Promise.all([
             this._getAvailableStates(),
@@ -41,11 +52,35 @@ Ext.define('wip-limits', {
         }).always(function() { me.setLoading(false); });
     },
     
+    _changeRelease: function(release) {
+        if ( this.release !== release ) {
+            this.release = release;
+            console.log('New Release:', release.get('Name'));
+            this._launch();
+        }
+    },
+
+    _changeIteration: function(iteration) {
+        if ( iteration !== this.iteration ) {
+            this.iteration = iteration;
+            this._launch();
+        }
+    },
+    
     _updateBoard : function() {
         this.setLoading('Finding Stories...');
         
+        var filters = [];
+        if ( this.release ) { 
+            filters = { property:'Release.Name', value: this.release.get('Name') };
+        }
+        if ( this.iteration ) { 
+            filters = { property:'Iteration.Name', value: this.iteration.get('Name') };
+        }
+        
         var store = Ext.create('Rally.data.wsapi.Store', {
             model : 'hierarchicalrequirement',
+            filters: filters,
             fetch : [
                 'ObjectID',
                 'Name',
@@ -85,8 +120,6 @@ Ext.define('wip-limits', {
             });
         });
         
-        
-        
         // roll up data through tree
         var rolled_up_data = me._rollUpValues(me.summaries);
         
@@ -98,7 +131,6 @@ Ext.define('wip-limits', {
             }
         });
         
-        // TODO: update calculations after change to wip
         me.gridStore.addListener('update', function(store, record, op, fieldNames, eOpts){
             if (op == 'edit') {
                 var projectName = record.get('projectName');
@@ -270,6 +302,7 @@ Ext.define('wip-limits', {
             xtype : 'rallygrid',
             itemId : 'workqueue',
             store : store,
+            showPagingToolbar: false,
             columnCfgs : [
                 {
                     text : 'Project',
@@ -363,6 +396,8 @@ Ext.define('wip-limits', {
             success : function(updatedRecords, notUpdatedRecord, options)
             {
                 me.logger.log("Wrote WIP limit: ", key, settings, updatedRecords, notUpdatedRecord, options);
+                me.publish('ts-wip-change');
+            
             },
             failure : function()
             {

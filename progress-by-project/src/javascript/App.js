@@ -22,7 +22,8 @@ Ext.define("TSProjectByProject", {
             showScopeSelector :  false
         }
     },
-
+    chart: null,
+    
     launch: function() {
         var me = this;
         this._getAvailableStates().then({
@@ -69,18 +70,23 @@ Ext.define("TSProjectByProject", {
     },
 
     _changeRelease: function(release) {
+        this.release = release;
         this.run(release.get("Name"),null);
     },
 
     _changeIteration: function(iteration) {
+        this.iteration = iteration;
         if ( !Ext.isEmpty(iteration) ) {
-            this.run(null,iteration.get("Name"),null);
+            this.run(null,iteration.get("Name"));
         }
     },
 
     run : function(releaseName,iterationName) {
 
         var that = this;
+        if ( ! Ext.isEmpty(this.chart) ) {
+            this.chart.destroy();
+        }
         
         this.setLoading("Loading Stories in Project...");
         
@@ -128,7 +134,6 @@ Ext.define("TSProjectByProject", {
     },
 
     prepareChartData : function(stories, projects, states, callback) {
-        this.logger.log('states', states);
         var that = this;
 
         var projectKeys = _.map(projects,function(project) { return _.last(project.get("Name").split('>')); });
@@ -165,26 +170,76 @@ Ext.define("TSProjectByProject", {
                 })
             };
         });
-
-        this.logger.log('seriesData:', seriesData);
         
         callback(null, projectKeys, seriesData );
 
     },
 
     createChart : function(categories,seriesData,callback) {
-
         var that = this;
         that.setLoading(false);
-        
-        if (!_.isUndefined(that.chart)) {
-            that.remove(that.chart);
-        }
 
-        that.chart = Ext.create('Rally.technicalservices.progressChart', {
+        var timebox_progress_plotline = this._getPlotLineForCurrentPoint(this.release,this.iteration);
+        
+//        that.chart = Ext.create('Rally.technicalservices.progressChart', {
+//            itemId: 'rally-chart',
+//            chartData: { series : seriesData, categories : categories },
+//            title: 'Progress By Project',
+//            plotLine: timebox_progress_plotline
+//        });
+        
+        // for some reason the original approach of the subclassed chart wasn't replacing
+        // the plotline when destroyed and recreated
+        
+        var yAxis = {
+            min: 0,
+            max: 100,
+            title: {
+                text: '% of Scheduled Stories by State by Points'
+            }
+        };
+        
+        if ( !Ext.isEmpty(timebox_progress_plotline) ) {
+            yAxis.plotLines = [timebox_progress_plotline];
+        }
+        
+        that.chart = Ext.create('Rally.ui.chart.Chart',{
             itemId: 'rally-chart',
+            chartColors : ["#ee6c19","#FAD200","#3F86C9","#8DC63F", "#888", "#222"],
             chartData: { series : seriesData, categories : categories },
-            title: 'Progress By Project'
+            chartConfig: {
+                colors : ["#ee6c19","#FAD200","#3F86C9","#8DC63F", "#888", "#222"],
+                chart: {
+                    type: 'bar'
+                },
+                title: {
+                    text: 'Progress by Project'
+                },
+                xAxis: {
+                    tickInterval: 1,
+                    title: {
+                        text: ''
+                    }
+                },
+                yAxis: [ yAxis ],
+                legend: {
+                    reversed: true
+                },
+                plotOptions: {
+                    series: {
+                        dataLabels: {
+                            enabled: true,
+                            align: 'center',
+                            formatter : function() {
+                                return (this.y !== 0) ? (Math.round(this.y) + " %") : "";
+                            },
+                            color: '#FFFFFF'
+                        },
+                        stacking: 'normal'
+                    }        
+                },
+                tooltip: { enabled: false }
+            }
         });
 
         that.add(that.chart);
@@ -241,13 +296,6 @@ Ext.define("TSProjectByProject", {
         Ext.Array.each(this.scheduleStates, function(state){
             summary[state] = [ state ];
         });
-//        var summary = {
-//            "Backlog" : ["Defined"],
-//            "In-Progress" : ["In-Progress"],
-//            "Complete":  ["Completed"],
-//            "Accepted" : ["Accepted"],
-//            "Released" : ["Released"]
-//        };
 
         // add initial and last states if necessary
         var first = _.first(that.scheduleStates);
@@ -259,13 +307,63 @@ Ext.define("TSProjectByProject", {
 
         return summary;
     },
+    
+    _getPlotLineForCurrentPoint: function(release,iteration){
+        if ( Ext.isEmpty(iteration) && Ext.isEmpty(release) ) {
+            return null;
+        }
+        
+        var timebox_start = null;
+        var timebox_end = null;
+        var timebox_type = null;
+        
+        if ( !Ext.isEmpty(release) ) {
+            timebox_start = release.get('ReleaseStartDate');
+            timebox_end = release.get('ReleaseDate');
+            timebox_type = 'Release';
+        }
+        
+        if ( !Ext.isEmpty(iteration) ) {
+            timebox_start = iteration.get('StartDate');
+            timebox_end = iteration.get('EndDate');
+            timebox_type = 'Iteration';
+        }
+        
+        var today = new Date();
+        
+        var timebox_length = Rally.util.DateTime.getDifference(timebox_end, timebox_start, 'day');
+        var time_since_start = Rally.util.DateTime.getDifference(today, timebox_start, 'day');
+        
+        this.logger.log('-- timebox length:', timebox_length, timebox_start, timebox_end);
+        this.logger.log('-- point in time: ', time_since_start, timebox_start,today);
+        
+        var progress = time_since_start / timebox_length;
+        
+        if ( progress < 0 || progress > 1 ) {
+            return null;
+        }
+        
+        var plotline = {
+            value: 100 * progress,
+            color: 'green',
+            dashStyle: 'shortdash',
+            width: 2,
+            label: {
+                text: 'today'
+            },
+            zIndex: 5 // to put on top
+        };
+        
+        console.log('plotline', plotline);
+        
+        return plotline;
+    },
 
     isExternal: function(){
         return typeof(this.getAppId()) == 'undefined';
     },
     //showSettings:  Override
     showSettings: function(options) {
-        this.logger.log('showSettings');
         this._appSettings = Ext.create('Rally.app.AppSettings', Ext.apply({
             fields: this.getSettingsFields(),
             settings: this.getSettings(),
@@ -294,7 +392,6 @@ Ext.define("TSProjectByProject", {
     },
     //onSettingsUpdate:  Override
     onSettingsUpdate: function (settings){
-        this.logger.log('onSettingsUpdate',settings);
         Ext.apply(this, settings);
         this._launch(settings);
     },

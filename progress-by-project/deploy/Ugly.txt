@@ -4,10 +4,10 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <title>Progress by Project</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Mon Aug 03 2015 15:01:46 GMT-0700 (PDT) -->
+    <!--  Build Date: Thu Aug 06 2015 19:25:25 GMT-0700 (PDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Mon Aug 03 2015 15:01:46 GMT-0700 (PDT)";
+        var APP_BUILD_DATE = "Thu Aug 06 2015 19:25:25 GMT-0700 (PDT)";
         var CHECKSUM = [%= checksum %];
     </script>
     
@@ -42,6 +42,8 @@
     margin-right: 5px;
     cursor: pointer;
 }
+
+
     </style>
 
 </head>

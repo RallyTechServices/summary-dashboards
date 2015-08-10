@@ -3,11 +3,11 @@
 <head>
     <title>Threat Matrix</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Mon Jun 29 2015 17:12:03 GMT-0600 (MDT) -->
+    <!--  Build Date: Mon Aug 10 2015 15:19:11 GMT-0700 (PDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Mon Jun 29 2015 17:12:03 GMT-0600 (MDT)";
-        var CHECKSUM = 47815815233;
+        var APP_BUILD_DATE = "Mon Aug 10 2015 15:19:11 GMT-0700 (PDT)";
+        var CHECKSUM = 49272486071;
     </script>
 
    <script type="text/javascript" src="/apps/2.0rc3/sdk.js"></script>
@@ -441,6 +441,7 @@ Ext.define('Rally.technicalservices.ThreatCalculator', {
                 x: artifact.get('age'),
                 y: artifact.get('density'),
                 dependencies: dependencies,
+                artifact: artifact.getData(),
                 paths: []
             }],
             showInLegend: false,
@@ -449,12 +450,22 @@ Ext.define('Rally.technicalservices.ThreatCalculator', {
             xAxis: isUserStory ? 1 : 0,
             point: {
                 events: {
+                    click: this._pointClick,
                     select: this._drawDependency,
                     unselect: this._drawDependency
                 }
             }
         };
     },
+    
+    _pointClick: function(evt) {
+        var point = evt.point;
+        if ( evt.altKey ) {
+            console.log('alt click', point, evt);
+            Rally.nav.Manager.showDetail(point.artifact._ref);
+        }
+    },
+    
     _drawDependency: function(evt, point){
         if (!point){
             point = this;
@@ -691,7 +702,7 @@ Ext.define("threat-matrix", {
     logger: new Rally.technicalservices.Logger(),
     defaults: { margin: 10 },
     items: [
-        {xtype:'tsinfolink',minHeight: 14},
+        {xtype:'tsinfolink',minHeight: 14,informationHtml:'Alt-click on a point to open its details page'},
         {xtype:'container',itemId:'settings_box'},
         {xtype:'container', itemId:'selector_box' }
     ],
@@ -1118,8 +1129,15 @@ Ext.define("threat-matrix", {
                 fieldLabel: 'Risk Multiplier for User Stories',
                 labelWidth: 200,
                 labelAlign: 'right',
-                 minValue: 0,
-                 margin: '0 0 20 0'
+                 minValue: 0
+            },{
+                name: 'programRiskSize',
+                xtype: 'rallynumberfield',
+                fieldLabel: 'Size for Program Level Risk Features',
+                labelWidth: 200,
+                labelAlign: 'right',
+                minValue: 3,
+                margin: '0 0 20 0'
             },{
                 name: 'showDataLabels',
                 xtype: 'rallycheckboxfield',
@@ -1237,6 +1255,9 @@ Ext.define('timebox-selector', {
     _updateIterationCombo : function(release)
     {
         this.remove('globaliterationpicker');
+        this.fireEvent('iterationchange',null);
+        this.publish('timeboxIterationChanged', null);
+                    
         var endFilter = Ext.create('Rally.data.wsapi.Filter', {
             property : "EndDate",
             operator : "<=",

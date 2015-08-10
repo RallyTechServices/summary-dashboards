@@ -4,7 +4,7 @@ Ext.define("threat-matrix", {
     logger: new Rally.technicalservices.Logger(),
     defaults: { margin: 10 },
     items: [
-        {xtype:'tsinfolink',minHeight: 14},
+        {xtype:'tsinfolink',minHeight: 14,informationHtml:'Alt-click on a point to open its details page'},
         {xtype:'container',itemId:'settings_box'},
         {xtype:'container', itemId:'selector_box' }
     ],
@@ -91,28 +91,33 @@ Ext.define("threat-matrix", {
         this.logger.log('filters', filters.toString());
         return filters;
     },
+    
     onTimeboxScopeChange: function(newTimeboxScope) {
         this.logger.log('newTimeboxScope',newTimeboxScope);
-        this.getBody().removeAll();
-        if ((newTimeboxScope) && (newTimeboxScope.get('_type') === 'iteration')) {
-            this.selectedIteration = newTimeboxScope;
-        }
-        if ((newTimeboxScope) && (newTimeboxScope.get('_type') === 'release')) {
-            this.selectedRelease = newTimeboxScope;
-        }
-        if (this.selectedIteration || this.selectedRelease){
-            this.run(this.selectedRelease, this.selectedIteration);
-        } else {
-            this.getBody().add({
-                xtype: 'container',
-                html: Ext.String.format('Please select Release to view the Threat Matrix')
-            });
+        if ( ! Ext.isEmpty(newTimeboxScope) ) {
+            this.getBody().removeAll();
+            if ((newTimeboxScope) && (newTimeboxScope.get('_type') === 'iteration')) {
+                this.selectedIteration = newTimeboxScope;
+            }
+            if ((newTimeboxScope) && (newTimeboxScope.get('_type') === 'release')) {
+                this.selectedRelease = newTimeboxScope;
+            }
+            if (this.selectedIteration || this.selectedRelease){
+                this.run(this.selectedRelease, this.selectedIteration);
+            } else {
+                this.getBody().add({
+                    xtype: 'container',
+                    html: Ext.String.format('Please select Release to view the Threat Matrix')
+                });
+            }
         }
     },
 
     run: function(release, iteration){
 
         this.logger.log('run',release, iteration);
+        
+        if ( this.down('#rally-chart') ) { this.down('#rally-chart').destroy(); }
         if (release){
             this.getBody().removeAll();
             this.setLoading(true);
@@ -431,7 +436,7 @@ Ext.define("threat-matrix", {
                 fieldLabel: 'Risk Multiplier for User Stories',
                 labelWidth: 200,
                 labelAlign: 'right',
-                 minValue: 0
+                minValue: 0
             },{
                 name: 'programRiskSize',
                 xtype: 'rallynumberfield',

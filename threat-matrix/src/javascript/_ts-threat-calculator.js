@@ -300,6 +300,7 @@ Ext.define('Rally.technicalservices.ThreatCalculator', {
                 x: artifact.get('age'),
                 y: artifact.get('density'),
                 dependencies: dependencies,
+                artifact: artifact.getData(),
                 paths: []
             }],
             showInLegend: false,
@@ -308,12 +309,22 @@ Ext.define('Rally.technicalservices.ThreatCalculator', {
             xAxis: isUserStory ? 1 : 0,
             point: {
                 events: {
+                    click: this._pointClick,
                     select: this._drawDependency,
                     unselect: this._drawDependency
                 }
             }
         };
     },
+    
+    _pointClick: function(evt) {
+        var point = evt.point;
+        if ( evt.altKey ) {
+            console.log('alt click', point, evt);
+            Rally.nav.Manager.showDetail(point.artifact._ref);
+        }
+    },
+    
     _drawDependency: function(evt, point){
         if (!point){
             point = this;

@@ -3,11 +3,11 @@
 <head>
     <title>Threat Matrix</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Mon Aug 10 2015 15:19:11 GMT-0700 (PDT) -->
+    <!--  Build Date: Mon Aug 10 2015 16:43:23 GMT-0700 (PDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Mon Aug 10 2015 15:19:11 GMT-0700 (PDT)";
-        var CHECKSUM = 49272486071;
+        var APP_BUILD_DATE = "Mon Aug 10 2015 16:43:23 GMT-0700 (PDT)";
+        var CHECKSUM = 49576820774;
     </script>
 
    <script type="text/javascript" src="/apps/2.0rc3/sdk.js"></script>
@@ -789,28 +789,33 @@ Ext.define("threat-matrix", {
         this.logger.log('filters', filters.toString());
         return filters;
     },
+    
     onTimeboxScopeChange: function(newTimeboxScope) {
         this.logger.log('newTimeboxScope',newTimeboxScope);
-        this.getBody().removeAll();
-        if ((newTimeboxScope) && (newTimeboxScope.get('_type') === 'iteration')) {
-            this.selectedIteration = newTimeboxScope;
-        }
-        if ((newTimeboxScope) && (newTimeboxScope.get('_type') === 'release')) {
-            this.selectedRelease = newTimeboxScope;
-        }
-        if (this.selectedIteration || this.selectedRelease){
-            this.run(this.selectedRelease, this.selectedIteration);
-        } else {
-            this.getBody().add({
-                xtype: 'container',
-                html: Ext.String.format('Please select Release to view the Threat Matrix')
-            });
+        if ( ! Ext.isEmpty(newTimeboxScope) ) {
+            this.getBody().removeAll();
+            if ((newTimeboxScope) && (newTimeboxScope.get('_type') === 'iteration')) {
+                this.selectedIteration = newTimeboxScope;
+            }
+            if ((newTimeboxScope) && (newTimeboxScope.get('_type') === 'release')) {
+                this.selectedRelease = newTimeboxScope;
+            }
+            if (this.selectedIteration || this.selectedRelease){
+                this.run(this.selectedRelease, this.selectedIteration);
+            } else {
+                this.getBody().add({
+                    xtype: 'container',
+                    html: Ext.String.format('Please select Release to view the Threat Matrix')
+                });
+            }
         }
     },
 
     run: function(release, iteration){
 
         this.logger.log('run',release, iteration);
+        
+        if ( this.down('#rally-chart') ) { this.down('#rally-chart').destroy(); }
         if (release){
             this.getBody().removeAll();
             this.setLoading(true);
@@ -1129,7 +1134,7 @@ Ext.define("threat-matrix", {
                 fieldLabel: 'Risk Multiplier for User Stories',
                 labelWidth: 200,
                 labelAlign: 'right',
-                 minValue: 0
+                minValue: 0
             },{
                 name: 'programRiskSize',
                 xtype: 'rallynumberfield',

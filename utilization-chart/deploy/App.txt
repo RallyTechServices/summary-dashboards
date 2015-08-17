@@ -1,20 +1,23 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <title>Utilization Chart</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Mon Aug 17 2015 08:34:40 GMT-0600 (MDT) -->
+    <!--  Build Date: Mon Aug 17 2015 13:39:27 GMT-0700 (PDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Mon Aug 17 2015 08:34:40 GMT-0600 (MDT)";
-        var CHECKSUM = 47855271040;
+        var APP_BUILD_DATE = "Mon Aug 17 2015 13:39:27 GMT-0700 (PDT)";
+        var CHECKSUM = 48314326036;
     </script>
     
         <script type="text/javascript" src="/apps/2.0rc3/sdk.js"></script>
 
 
     <script type="text/javascript">
+        
+        if (!window.location.origin) {
+            window.location.origin = window.location.protocol + "//" + window.location.hostname + (window.location.port ? ':' + window.location.port: '');
+        }
         
         Rally.onReady(function() {
              
@@ -256,6 +259,7 @@ Ext.define('Rally.technicalservices.InfoLink',{
     }
 });
 
+
 /*
  */
 Ext.define('Rally.technicalservices.Logger',{
@@ -263,17 +267,17 @@ Ext.define('Rally.technicalservices.Logger',{
         Ext.apply(this,config);
     },
     log: function(args){
-        var timestamp = "[ " + Ext.util.Format.date(new Date(), "Y-m-d H:i:s.u") + " ]";
-        var i = -1, l = arguments.length, args = [], fn = 'console.log(args)';
-        while(++i<l){
-            args.push('args['+i+']');
-        };
-        fn = new Function('args',fn.replace(/args/,args.join(',')));
-        fn(arguments);
+        if ( !Ext.isIE9m ) {
+            var timestamp = "[ " + Ext.util.Format.date(new Date(), "Y-m-d H:i:s.u") + " ]";
+            var output_args = [];
+            output_args = Ext.Array.push(output_args,[timestamp]);
+            output_args = Ext.Array.push(output_args, Ext.Array.slice(arguments,0));
+    
+            window.console && console.log.apply(console,output_args);
+        }
     }
 
 });
-
 Ext.define('Rally.technicalservices.ModelBuilder',{
     singleton: true,
 

@@ -6,6 +6,12 @@
     <script type="text/javascript" src="/apps/2.0rc3/sdk.js"></script>
 
     <script type="text/javascript">
+        
+        if (!window.location.origin) {
+            window.location.origin = window.location.protocol + "//" + window.location.hostname + (window.location.port ? ':' + window.location.port: '');
+        }
+        
+        
         Rally.onReady(function () {
                 /** this class is configured with { series : [] } where series is a single dimensional array of 
     data values that is filled to full extent of the date range with future values filled with 

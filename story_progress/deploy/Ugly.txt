@@ -3,10 +3,10 @@
 <head>
     <title>Story Progress Pie</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Sun Jun 07 2015 23:26:03 GMT-0700 (PDT) -->
+    <!--  Build Date: Mon Aug 17 2015 08:32:22 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Sun Jun 07 2015 23:26:03 GMT-0700 (PDT)";
+        var APP_BUILD_DATE = "Mon Aug 17 2015 08:32:22 GMT-0600 (MDT)";
         var CHECKSUM = [%= checksum %];
     </script>
     

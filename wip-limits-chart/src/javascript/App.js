@@ -299,8 +299,7 @@ Ext.define("TSWIPLimitsChart", {
 
     _timeboxChanged : function(timebox) {
         var that = this;
-        console.log("WIP Limits Chart:_timeboxChanged received");
-        if (timebox.get("_type")==='release')
+         if (timebox.get("_type")==='release')
             that.run(timebox.get("Name"),null);
         else
             that.run(null,timebox.get("Name"));
@@ -332,8 +331,7 @@ Ext.define("TSWIPLimitsChart", {
         var states = ["In-Progress","Completed"];
 
         var current_project = this.getContext().getProject();
-        console.log('current:', current_project);
-        
+
         var current_project_oids = Ext.Array.map(
             Ext.Array.filter(that.projects, function(project){
                 var parent = project.get('Parent');
@@ -530,7 +528,6 @@ Ext.define("TSWIPLimitsChart", {
     },
     //onSettingsUpdate:  Override
     onSettingsUpdate: function (settings){
-        console.log('onSettingsUpdate',settings);
         Ext.apply(this, settings);
         this._launch(settings);
     },

@@ -9,7 +9,6 @@ Ext.define('Rally.technicalservices.UserStoryValidationRules',{
     constructor: function(config){
         Ext.apply(this, config);
         this.requiredFields = ['Owner','PlanEstimate'];
-        console.log('schedulestates', this.orderedScheduleStates, this.definedScheduleStateIndex);
     },
     ruleFn_unscheduledIterationScheduleState: function(r){
         /**

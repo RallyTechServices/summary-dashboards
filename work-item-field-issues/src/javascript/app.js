@@ -141,7 +141,7 @@ Ext.define("work-item-field-issues", {
                         var projects        = records[3];
                         var project_preferences = records[4];
                         var iterations      = records[5];
-                        console.log('preferences', project_preferences);
+
                         var featureRules = Ext.create('Rally.technicalservices.FeatureValidationRules',{
                                 stories: stories
                             }),

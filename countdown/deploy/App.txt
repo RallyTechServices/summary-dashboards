@@ -4,11 +4,11 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <title>Countdown</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Wed Jul 15 2015 17:01:57 GMT-0700 (PDT) -->
+    <!--  Build Date: Mon Aug 17 2015 08:24:41 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Wed Jul 15 2015 17:01:57 GMT-0700 (PDT)";
-        var CHECKSUM = 9113347681;
+        var APP_BUILD_DATE = "Mon Aug 17 2015 08:24:41 GMT-0600 (MDT)";
+        var CHECKSUM = 8369206510;
     </script>
     
     <script type="text/javascript" src="/apps/2.0rc3/sdk.js"></script>
@@ -66,7 +66,7 @@ Ext.define('timebox-selector', {
                 {
                     var release = t.getRecord();
                     this.fireEvent('releasechange',release);
-                    console.log("Publishing Release:", release);
+
                     this.publish('timeboxReleaseChanged', release);
                     this._updateIterationCombo(release);
                 },
@@ -131,15 +131,12 @@ Ext.define('timebox-selector', {
         });
     },
     _requestTimebox : function(source) {
-        console.log('Got request timebox message', source);
-        var release = this.getReleaseRecord();
-        console.log('release',release);
+         var release = this.getReleaseRecord();
         if (release) {
             this.publish('timeboxReleaseChanged', release);
         } 
         
         var iteration = this.getIterationRecord();
-        console.log('iteration', iteration);
         if (iteration) {
             this.publish("timeboxIterationChanged",  iteration);
         }
@@ -213,7 +210,6 @@ Ext.define('Rally.technicalservices.InfoLink',{
                 text = response.responseText;
                 if ( CHECKSUM ) {
                     if ( CHECKSUM !== me._generateChecksum(text) ) {
-                        console.log("Checksums don't match!");
                         if ( me.dialog ) {
                             me.dialog.add({xtype:'container',html:'Checksums do not match'});
                         }
@@ -267,15 +263,6 @@ Ext.define('Rally.technicalservices.Logger',{
     },
     log: function(){
         var timestamp = "[ " + Ext.util.Format.date(new Date(), "Y-m-d H:i:s.u") + " ]";
-        //var output_args = arguments;
-        //output_args.unshift( [ "[ " + timestamp + " ]" ] );
-        //output_args = Ext.Array.push(output_args,arguments);
-        
-//        var output_args = [];
-//        output_args = Ext.Array.push(output_args,[timestamp]);
-//        output_args = Ext.Array.push(output_args, Ext.Array.slice(arguments,0));
-//
-//        window.console && console.log.apply(console,output_args);
             var i = -1, l = arguments.length, args = [], fn = 'console.log(args)';
             while(++i<l){
                 args.push('args['+i+']');
@@ -344,8 +331,6 @@ Ext.define('Rally.technicalservices.CountDownClock',{
     },
     
     setEndDate: function(end_date) {
-        console.log("setEndDate",end_date);
-        
         this.endDate = end_date;
         this.updateCounters();
     },
@@ -502,7 +487,6 @@ Ext.define("TSCountdown", {
                 }
             });
         } else {
-            console.log("Countdown, subscribing");
             this.subscribe(this, 'timeboxReleaseChanged', this._changeRelease, this);
             this.subscribe(this, 'timeboxIterationChanged', this._changeIteration, this);
 

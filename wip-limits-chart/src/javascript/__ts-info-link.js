@@ -51,7 +51,7 @@ Ext.define('Rally.technicalservices.InfoLink',{
     
     _checkChecksum: function(container) {
         var deferred = Ext.create('Deft.Deferred');
-        console.log("_checkChecksum", container);
+
         var me = this;
         
         Ext.Ajax.request({

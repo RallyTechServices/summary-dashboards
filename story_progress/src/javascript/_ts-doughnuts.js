@@ -136,7 +136,7 @@
         Ext.Array.each(this.outside_records, function(record) {
             var parent = record.get(this.record_link_field);
             if ( !parent ) {
-                console.log("No parent for ", record.get('FormattedID'));
+
             } else {
                 var parent_id = parent.FormattedID;
                 var parent_size = parent[this.inside_size_field];
@@ -268,8 +268,7 @@
      },
      
      _addChart: function() {
-        console.log("adding chart");
-        
+
         var series = [{
             name: 'Stories',
             data: this.data[0],
@@ -328,14 +327,6 @@
             }
         });
         
-//        var me = this;
-//        chart.on('chartRendered', function() {
-//            console.log("Resizing", this, this.getWidth(), this.getHeight());
-//            chart.setSize(this.getWidth() * 0.85, this.getWidth() * 0.85);
-//        }, this, { single: true });
-
-//        console.log("setting height");
-        //this.getBody().setSize(this.getWidth() * 0.95);
      }
 
 });

@@ -230,9 +230,7 @@ Ext.define("TSUtilization", {
                 this._makeGrid(timebox_type, table_series);
             },
             failure: function(error_message){
-                console.log("oops:",error_message);
-                
-               // alert(error_message);
+                this.logger.log("oops:",error_message);
             }
         }).always(function() {
             me.setLoading(false);
@@ -243,9 +241,9 @@ Ext.define("TSUtilization", {
         var tcfd = {};
         var me = this;
         
-        console.log('cfd:',cfd);
-        console.log('releases_by_project', this.releases_by_project);
-        console.log('iterations_by_project', this.iterations_by_project);
+        me.logger.log('cfd:',cfd);
+        me.logger.log('releases_by_project', this.releases_by_project);
+        me.logger.log('iterations_by_project', this.iterations_by_project);
         
         Ext.Array.each(projects_in_scope, function(project){
             var project_oid = project.get('ObjectID');
@@ -283,7 +281,6 @@ Ext.define("TSUtilization", {
                 
         Ext.Object.each(iterations, function(day,iteration){
             var project = iteration.get('Project').Name;
-            console.log('iteration', team, project, day, iteration);
             if ( project == team ) {
                 var value = iteration.get('PlannedVelocity') || 0;
                 total += value;
@@ -402,8 +399,7 @@ Ext.define("TSUtilization", {
                         me.iterations_by_team[iteration.get('Project').Name] = [];
                     }
                     me.iterations_by_team[iteration.get('Project').Name].push(iteration);
-                    console.log("ITERATION:",me.iterations_by_team);
-                    
+
                     var saved_plan =  iterations_by_start[start_date].get('PlannedVelocity') || 0 ;
                     iterations_by_start[start_date].set('PotentialVelocity',saved_plan+planned);
                 });
@@ -499,7 +495,6 @@ Ext.define("TSUtilization", {
                         }
                     });
                 } else {
-                    console.log('no releases');
                     deferred.resolve([]);
                 }
             },
@@ -585,8 +580,7 @@ Ext.define("TSUtilization", {
         
         if ( timebox_type == "iteration" ) {
             Ext.Array.each(Ext.Array.flatten(iterations), function(iteration) {
-                console.log('iteration:', iteration);
-                
+
                 iteration.set('team',team);
                 iteration.set('total_start',total_each_day[days[0]] || 0 );
                 iteration.set('total_end', total_each_day[days[days.length-1]]);
@@ -597,11 +591,9 @@ Ext.define("TSUtilization", {
         }
         
         if ( timebox_type == "release" ) {
-            console.log("-----",me.iterations_by_team);
-            
+
             Ext.Array.each(me.iterations_by_team[team], function(iteration) {
-                console.log('iteration:', iteration);
-                
+
                 iteration.set('team',team);
                 iteration.set('total_start',total_each_day[days[0]] || 0 );
                 iteration.set('total_end', total_each_day[days[days.length-1]]);

@@ -3,11 +3,11 @@
 <head>
     <title>Threat Matrix</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Mon Aug 17 2015 08:33:05 GMT-0600 (MDT) -->
+    <!--  Build Date: Mon Aug 17 2015 08:55:04 GMT-0700 (PDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Mon Aug 17 2015 08:33:05 GMT-0600 (MDT)";
-        var CHECKSUM = 48590307364;
+        var APP_BUILD_DATE = "Mon Aug 17 2015 08:55:04 GMT-0700 (PDT)";
+        var CHECKSUM = 48733701386;
     </script>
 
    <script type="text/javascript" src="/apps/2.0rc3/sdk.js"></script>
@@ -120,24 +120,25 @@ Ext.define('Rally.technicalservices.InfoLink',{
     }
 });
 
+
 /*
  */
 Ext.define('Rally.technicalservices.Logger',{
     constructor: function(config){
         Ext.apply(this,config);
     },
-    log: function(){
-        var timestamp = "[ " + Ext.util.Format.date(new Date(), "Y-m-d H:i:s.u") + " ]";
-        var i = -1, l = arguments.length, args = [], fn = 'console.log(args)';
-        while(++i<l){
-            args.push('args['+i+']');
-        };
-        fn = new Function('args',fn.replace(/args/,args.join(',')));
-        fn(arguments);
+    log: function(args){
+        if ( !Ext.isIE9m ) {
+            var timestamp = "[ " + Ext.util.Format.date(new Date(), "Y-m-d H:i:s.u") + " ]";
+            var output_args = [];
+            output_args = Ext.Array.push(output_args,[timestamp]);
+            output_args = Ext.Array.push(output_args, Ext.Array.slice(arguments,0));
+    
+            window.console && console.log.apply(console,output_args);
+        }
     }
 
 });
-
 Ext.define('Rally.technicalservices.ThreatCalculator', {
     logger: new Rally.technicalservices.Logger(),
 

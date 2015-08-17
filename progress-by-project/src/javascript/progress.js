@@ -26,6 +26,8 @@ Ext.define("TSProjectByProject", {
     
     launch: function() {
         var me = this;
+        console.log('launch');
+        
         this._getAvailableStates().then({
             scope: this,
             success: function(results) {
@@ -41,7 +43,8 @@ Ext.define("TSProjectByProject", {
 
     _launch: function(settings) {
         var that = this;
-
+        console.log('_launch');
+        
         that.rallyFunctions = Ext.create("RallyFunctions");
         
         if ( settings.showScopeSelector === true || settings.showScopeSelector === "true" ) {

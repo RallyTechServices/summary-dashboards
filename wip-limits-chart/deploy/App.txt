@@ -4,18 +4,224 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <title>WIP Limits Chart</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Mon Aug 17 2015 08:38:47 GMT-0600 (MDT) -->
+    <!--  Build Date: Mon Aug 17 2015 11:25:50 GMT-0700 (PDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Mon Aug 17 2015 08:38:47 GMT-0600 (MDT)";
-        var CHECKSUM = 28594368395;
+        var APP_BUILD_DATE = "Mon Aug 17 2015 11:25:50 GMT-0700 (PDT)";
+        var CHECKSUM = 29165221403;
     </script>
     
     <script type="text/javascript" src="/apps/2.0rc3/sdk.js"></script>
 
     <script type="text/javascript">
+        if (!window.location.origin) {
+            window.location.origin = window.location.protocol + "//" + window.location.hostname + (window.location.port ? ':' + window.location.port: '');
+        }
+        
         Rally.onReady(function() {
              
+/**
+ * A link that pops up a version dialog box
+ */
+
+Ext.define('Rally.technicalservices.InfoLink',{
+    extend: 'Rally.ui.dialog.Dialog',
+    alias: 'widget.tsinfolink',
+    
+    /**
+     * @cfg {String} informationHtml
+     * Additional text to be displayed on the popup dialog (for exmaple,
+     * to add a description of the app's use or functionality)
+     */
+    informationHtml: null,
+    
+    /**
+     * 
+     * cfg {String} title
+     * The title for the dialog box
+     */
+    title: "Build Information",
+    
+    defaults: { padding: 5, margin: 5 },
+
+    closable: true,
+     
+    draggable: true,
+
+    autoShow: true,
+   
+    width: 350, 
+    
+    initComponent: function() {
+        var id = Ext.id(this);
+        this.title =  "<span class='icon-help'> </span>" + this.title;
+        this.callParent(arguments);
+    },
+    
+    _generateChecksum: function(string){
+        var chk = 0x12345678,
+            i;
+        string = string.replace(/var CHECKSUM = .*;/,"");
+        string = string.replace(/\s/g,"");  //Remove all whitespace from the string.
+        
+        for (i = 0; i < string.length; i++) {
+            chk += (string.charCodeAt(i) * i);
+        }
+    
+        return chk;
+    },
+    
+    _checkChecksum: function(container) {
+        var deferred = Ext.create('Deft.Deferred');
+
+        var me = this;
+        
+        Ext.Ajax.request({
+            url: document.URL,
+            params: {
+                id: 1
+            },
+            success: function (response) {
+                text = response.responseText;
+                if ( CHECKSUM ) {
+                    if ( CHECKSUM !== me._generateChecksum(text) ) {
+                        deferred.resolve(false);
+                        return;
+                    }
+                }
+                deferred.resolve(true);
+            }
+        });
+        
+        return deferred.promise;
+    },
+    
+    afterRender: function() {
+        var app = Rally.getApp();
+        
+        if (! app.isExternal() ) {
+                
+            this._checkChecksum(app).then({
+                scope: this,
+                success: function(result){
+                    if ( !result ) {
+                        this.addDocked({
+                            xtype:'container',
+                            cls: 'build-info',
+                            padding: 2,
+                            html:'<span class="icon-warning"> </span>Checksums do not match'
+                        });
+                    }
+                },
+                failure: function(msg){
+                }
+            });
+        } else {
+            this.addDocked({
+                xtype:'container',
+                cls: 'build-info',
+                padding: 2,
+                html:'... Running externally'
+            });
+        }
+        this.callParent(arguments);
+    },
+    
+    beforeRender: function() {
+        var me = this;
+        this.callParent(arguments);
+
+        if (this.informationHtml) {
+            this.addDocked({
+                xtype: 'component',
+                componentCls: 'intro-panel',
+                padding: 2,
+                html: this.informationHtml
+            });
+        }
+        
+        this.addDocked({
+            xtype:'container',
+            cls: 'build-info',
+            padding: 2,
+            html:"This app was created by the Rally Technical Services Team."
+        });
+        
+        if ( APP_BUILD_DATE ) {
+            this.addDocked({
+                xtype:'container',
+                cls: 'build-info',
+                padding: 2,
+                html:'Build date/time: ' + APP_BUILD_DATE
+            });
+        }
+    }
+});
+
+
+/*
+ */
+Ext.define('Rally.technicalservices.Logger',{
+    constructor: function(config){
+        Ext.apply(this,config);
+    },
+    log: function(args){
+        if ( !Ext.isIE9m ) {
+            var timestamp = "[ " + Ext.util.Format.date(new Date(), "Y-m-d H:i:s.u") + " ]";
+            var output_args = [];
+            output_args = Ext.Array.push(output_args,[timestamp]);
+            output_args = Ext.Array.push(output_args, Ext.Array.slice(arguments,0));
+    
+            window.console && console.log.apply(console,output_args);
+        }
+    }
+
+});
+Ext.define('Rally.technicalservices.wipChart',{
+    extend: 'Rally.ui.chart.Chart',
+    alias: 'widget.wipchart',
+
+    itemId: 'rally-chart',
+    chartData: {},
+    loadMask: false,
+    chartColors : [],
+    chartConfig: {
+        colors : [/*"#E0E0E0",*/"#00a9e0","#8dc63f"],
+        chart: {
+            type: 'bar'
+        },
+        title: {
+            text: 'WIP Limits Chart'
+        },
+        xAxis: {
+        },        
+        yAxis: [
+            {
+                title: {
+                    text: 'Under / Over WIP Limits'
+                }
+            }
+        ],
+        plotOptions: {
+            series: {
+                dataLabels: {
+                    enabled: true,
+                    color: '#FFFFFF'
+                },
+                stacking: 'normal'
+            }        
+        }
+    },
+    constructor: function (config) {
+        this.callParent(arguments);
+        if (config.title){
+            this.chartConfig.title = config.title;
+        }
+        if (!_.isUndefined(config.stacking)) {
+            this.chartConfig.plotOptions.series.stacking = (config.stacking===true ? 'normal' : null);
+        }
+    }
+});
 Ext.define("TSWIPLimitsChart", {
     extend: 'Rally.app.App',
     componentCls: 'app',
@@ -571,207 +777,6 @@ Ext.define("TSWIPLimitsChart", {
         ];
     }
 
-});
-/**
- * A link that pops up a version dialog box
- */
-
-Ext.define('Rally.technicalservices.InfoLink',{
-    extend: 'Rally.ui.dialog.Dialog',
-    alias: 'widget.tsinfolink',
-    
-    /**
-     * @cfg {String} informationHtml
-     * Additional text to be displayed on the popup dialog (for exmaple,
-     * to add a description of the app's use or functionality)
-     */
-    informationHtml: null,
-    
-    /**
-     * 
-     * cfg {String} title
-     * The title for the dialog box
-     */
-    title: "Build Information",
-    
-    defaults: { padding: 5, margin: 5 },
-
-    closable: true,
-     
-    draggable: true,
-
-    autoShow: true,
-   
-    width: 350, 
-    
-    initComponent: function() {
-        var id = Ext.id(this);
-        this.title =  "<span class='icon-help'> </span>" + this.title;
-        this.callParent(arguments);
-    },
-    
-    _generateChecksum: function(string){
-        var chk = 0x12345678,
-            i;
-        string = string.replace(/var CHECKSUM = .*;/,"");
-        string = string.replace(/\s/g,"");  //Remove all whitespace from the string.
-        
-        for (i = 0; i < string.length; i++) {
-            chk += (string.charCodeAt(i) * i);
-        }
-    
-        return chk;
-    },
-    
-    _checkChecksum: function(container) {
-        var deferred = Ext.create('Deft.Deferred');
-
-        var me = this;
-        
-        Ext.Ajax.request({
-            url: document.URL,
-            params: {
-                id: 1
-            },
-            success: function (response) {
-                text = response.responseText;
-                if ( CHECKSUM ) {
-                    if ( CHECKSUM !== me._generateChecksum(text) ) {
-                        deferred.resolve(false);
-                        return;
-                    }
-                }
-                deferred.resolve(true);
-            }
-        });
-        
-        return deferred.promise;
-    },
-    
-    afterRender: function() {
-        var app = Rally.getApp();
-        
-        if (! app.isExternal() ) {
-                
-            this._checkChecksum(app).then({
-                scope: this,
-                success: function(result){
-                    if ( !result ) {
-                        this.addDocked({
-                            xtype:'container',
-                            cls: 'build-info',
-                            padding: 2,
-                            html:'<span class="icon-warning"> </span>Checksums do not match'
-                        });
-                    }
-                },
-                failure: function(msg){
-                }
-            });
-        } else {
-            this.addDocked({
-                xtype:'container',
-                cls: 'build-info',
-                padding: 2,
-                html:'... Running externally'
-            });
-        }
-        this.callParent(arguments);
-    },
-    
-    beforeRender: function() {
-        var me = this;
-        this.callParent(arguments);
-
-        if (this.informationHtml) {
-            this.addDocked({
-                xtype: 'component',
-                componentCls: 'intro-panel',
-                padding: 2,
-                html: this.informationHtml
-            });
-        }
-        
-        this.addDocked({
-            xtype:'container',
-            cls: 'build-info',
-            padding: 2,
-            html:"This app was created by the Rally Technical Services Team."
-        });
-        
-        if ( APP_BUILD_DATE ) {
-            this.addDocked({
-                xtype:'container',
-                cls: 'build-info',
-                padding: 2,
-                html:'Build date/time: ' + APP_BUILD_DATE
-            });
-        }
-    }
-});
-
-/*
- */
-Ext.define('Rally.technicalservices.Logger',{
-    constructor: function(config){
-        Ext.apply(this,config);
-    },
-    log: function(){
-        var timestamp = "[ " + Ext.util.Format.date(new Date(), "Y-m-d H:i:s.u") + " ]";
-            var i = -1, l = arguments.length, args = [], fn = 'console.log(args)';
-            while(++i<l){
-                args.push('args['+i+']');
-            };
-            fn = new Function('args',fn.replace(/args/,args.join(',')));
-            fn(arguments);
-    }
-
-});
-
-Ext.define('Rally.technicalservices.wipChart',{
-    extend: 'Rally.ui.chart.Chart',
-    alias: 'widget.wipchart',
-
-    itemId: 'rally-chart',
-    chartData: {},
-    loadMask: false,
-    chartColors : [],
-    chartConfig: {
-        colors : [/*"#E0E0E0",*/"#00a9e0","#8dc63f"],
-        chart: {
-            type: 'bar'
-        },
-        title: {
-            text: 'WIP Limits Chart'
-        },
-        xAxis: {
-        },        
-        yAxis: [
-            {
-                title: {
-                    text: 'Under / Over WIP Limits'
-                }
-            }
-        ],
-        plotOptions: {
-            series: {
-                dataLabels: {
-                    enabled: true,
-                    color: '#FFFFFF'
-                },
-                stacking: 'normal'
-            }        
-        }
-    },
-    constructor: function (config) {
-        this.callParent(arguments);
-        if (config.title){
-            this.chartConfig.title = config.title;
-        }
-        if (!_.isUndefined(config.stacking)) {
-            this.chartConfig.plotOptions.series.stacking = (config.stacking===true ? 'normal' : null);
-        }
-    }
 });
 /** this class is configured with { series : [] } where series is a single dimensional array of 
     data values that is filled to full extent of the date range with future values filled with 

@@ -1,19 +1,24 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <title>Progress by Project</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Mon Aug 17 2015 11:09:36 GMT-0700 (PDT) -->
+    <!--  Build Date: Mon Aug 17 2015 11:44:35 GMT-0700 (PDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Mon Aug 17 2015 11:09:36 GMT-0700 (PDT)";
-        var CHECKSUM = 16503998795;
+        var APP_BUILD_DATE = "Mon Aug 17 2015 11:44:35 GMT-0700 (PDT)";
+        var CHECKSUM = 16613981034;
     </script>
     
     <script type="text/javascript" src="/apps/2.0rc3/sdk.js"></script>
 
     <script type="text/javascript">
+        
+        if (!window.location.origin) {
+            window.location.origin = window.location.protocol + "//" + window.location.hostname + (window.location.port ? ':' + window.location.port: '');
+        }
+        
+        
         Rally.onReady(function() {
              
 
@@ -63,7 +68,6 @@ Ext.define("TSProjectByProject", {
     
     launch: function() {
         var me = this;
-        console.log('launch');
         
         this._getAvailableStates().then({
             scope: this,
@@ -80,7 +84,6 @@ Ext.define("TSProjectByProject", {
 
     _launch: function(settings) {
         var that = this;
-        console.log('_launch');
         
         that.rallyFunctions = Ext.create("RallyFunctions");
         

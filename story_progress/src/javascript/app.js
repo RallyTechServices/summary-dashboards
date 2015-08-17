@@ -72,6 +72,10 @@ Ext.define("TSWorkQueue", {
         var me = this;
         this.logger.log("Iteration changed:", iteration);
         
+        if ( Ext.isEmpty(iteration) ) {
+            return;
+        }
+        
         this._setInfo(); 
                 
         var base_filter = [  {property:'Iteration.Name',value:iteration.get('Name')}];

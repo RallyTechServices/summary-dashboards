@@ -4,11 +4,11 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <title>WIP Limits Setter</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Wed Aug 05 2015 21:55:27 GMT-0700 (PDT) -->
+    <!--  Build Date: Mon Aug 17 2015 08:35:51 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Wed Aug 05 2015 21:55:27 GMT-0700 (PDT)";
-        var CHECKSUM = 11449639837;
+        var APP_BUILD_DATE = "Mon Aug 17 2015 08:35:51 GMT-0600 (MDT)";
+        var CHECKSUM = 11291166848;
     </script>
     
     <script type="text/javascript" src="/apps/2.0rc3/sdk.js"></script>
@@ -72,7 +72,6 @@ Ext.define('Rally.technicalservices.InfoLink',{
                 text = response.responseText;
                 if ( CHECKSUM ) {
                     if ( CHECKSUM !== me._generateChecksum(text) ) {
-                        console.log("Checksums don't match!");
                         if ( me.dialog ) {
                             me.dialog.add({xtype:'container',html:'Checksums do not match'});
                         }
@@ -221,7 +220,6 @@ Ext.define("GridExporter", {
 
         Ext.Array.each(cols, function(col, colIndex) {
             if (col.hidden !== true) {
-                console.log('header: ', col.text);
                 sheet.cells(1,colIndex + 1).value = col.text;
             }
         });
@@ -299,7 +297,7 @@ Ext.define('wip-limits', {
                 this.states = results[0];
                 this.projects = results[1];
                 this.preferences = results[2];
-                console.log('prefs:', this.preferences);
+                this.logger.log('prefs:', this.preferences);
                 
                 this.projects_by_oid = {};
                 Ext.Array.each(this.projects, function(project){
@@ -321,7 +319,6 @@ Ext.define('wip-limits', {
     _changeRelease: function(release) {
         if ( this.release !== release ) {
             this.release = release;
-            console.log('New Release:', release.get('Name'));
             this._launch();
         }
     },

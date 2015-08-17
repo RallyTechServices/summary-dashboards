@@ -3,11 +3,11 @@
 <head>
     <title>Threat Matrix</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Mon Aug 10 2015 16:43:23 GMT-0700 (PDT) -->
+    <!--  Build Date: Mon Aug 17 2015 08:33:05 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Mon Aug 10 2015 16:43:23 GMT-0700 (PDT)";
-        var CHECKSUM = 49576820774;
+        var APP_BUILD_DATE = "Mon Aug 17 2015 08:33:05 GMT-0600 (MDT)";
+        var CHECKSUM = 48590307364;
     </script>
 
    <script type="text/javascript" src="/apps/2.0rc3/sdk.js"></script>
@@ -75,7 +75,6 @@ Ext.define('Rally.technicalservices.InfoLink',{
                 text = response.responseText;
                 if ( CHECKSUM ) {
                     if ( CHECKSUM !== me._generateChecksum(text) ) {
-                        console.log("Checksums don't match!");
                         if ( me.dialog ) {
                             me.dialog.add({xtype:'container',html:'Checksums do not match'});
                         }
@@ -461,7 +460,6 @@ Ext.define('Rally.technicalservices.ThreatCalculator', {
     _pointClick: function(evt) {
         var point = evt.point;
         if ( evt.altKey ) {
-            console.log('alt click', point, evt);
             Rally.nav.Manager.showDetail(point.artifact._ref);
         }
     },
@@ -621,14 +619,6 @@ Ext.define('Rally.technicalservices.ThreatChart',{
 
             type: 'scatter',
             zoom: 'xy'
-            //events: {
-            //    load: function(){
-            //        _.each(this.series, function(s){
-            //            console.log('chart load', s);
-            //        });
-            //
-            //    }
-            //}
         },
         title: {
             text: 'Threat Matrix'
@@ -1249,7 +1239,7 @@ Ext.define('timebox-selector', {
                 {
                     var release = t.getRecord();
                     this.fireEvent('releasechange',release);
-                    console.log("Publishing Release:", release);
+
                     this.publish('timeboxReleaseChanged', release);
                     this._updateIterationCombo(release);
                 },
@@ -1314,15 +1304,12 @@ Ext.define('timebox-selector', {
         });
     },
     _requestTimebox : function(source) {
-        console.log('Got request timebox message', source);
-        var release = this.getReleaseRecord();
-        console.log('release',release);
+         var release = this.getReleaseRecord();
         if (release) {
             this.publish('timeboxReleaseChanged', release);
         } 
         
         var iteration = this.getIterationRecord();
-        console.log('iteration', iteration);
         if (iteration) {
             this.publish("timeboxIterationChanged",  iteration);
         }

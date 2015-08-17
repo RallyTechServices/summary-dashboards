@@ -21,8 +21,6 @@ Ext.define("ProjectStories", function() {
 
         readProjectWorkItems : function(callback) {
 
-            console.log('readProjectWorkItems', self.featureFilter);
-            
             var fns = [
                 self.readStates,
                 self.readProjects,
@@ -43,7 +41,6 @@ Ext.define("ProjectStories", function() {
                 },
                 failure: function(error) {
                     //oh noes!
-                    console.log("Error:",error);
                 }
             });
         },
@@ -96,7 +93,6 @@ Ext.define("ProjectStories", function() {
         },    
 
         readStories : function(projects) {
-            console.log('readStories', projects, self.filter);
             var me = this;
 
             var promises = _.map(projects,function(project) {
@@ -111,7 +107,6 @@ Ext.define("ProjectStories", function() {
                     }).then({
                     scope: me,
                     success: function(stories) {
-                        console.log('stories',stories);
                         deferred.resolve(stories);
                     }
                 });

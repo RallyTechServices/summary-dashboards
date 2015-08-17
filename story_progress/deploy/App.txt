@@ -3,11 +3,11 @@
 <head>
     <title>Story Progress Pie</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Sun Jun 07 2015 23:26:03 GMT-0700 (PDT) -->
+    <!--  Build Date: Mon Aug 17 2015 08:32:22 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Sun Jun 07 2015 23:26:03 GMT-0700 (PDT)";
-        var CHECKSUM = 21055416128;
+        var APP_BUILD_DATE = "Mon Aug 17 2015 08:32:22 GMT-0600 (MDT)";
+        var CHECKSUM = 19541793131;
     </script>
 
     <script type="text/javascript" src="/apps/2.0rc3/sdk.js"></script>
@@ -68,7 +68,7 @@ Ext.define('timebox-selector', {
                 {
                     var release = t.getRecord();
                     this.fireEvent('releasechange',release);
-                    console.log("Publishing Release:", release);
+
                     this.publish('timeboxReleaseChanged', release);
                     this._updateIterationCombo(release);
                 },
@@ -79,6 +79,9 @@ Ext.define('timebox-selector', {
     _updateIterationCombo : function(release)
     {
         this.remove('globaliterationpicker');
+        this.fireEvent('iterationchange',null);
+        this.publish('timeboxIterationChanged', null);
+                    
         var endFilter = Ext.create('Rally.data.wsapi.Filter', {
             property : "EndDate",
             operator : "<=",
@@ -130,15 +133,12 @@ Ext.define('timebox-selector', {
         });
     },
     _requestTimebox : function(source) {
-        console.log('Got request timebox message', source);
-        var release = this.getReleaseRecord();
-        console.log('release',release);
+         var release = this.getReleaseRecord();
         if (release) {
             this.publish('timeboxReleaseChanged', release);
         } 
         
         var iteration = this.getIterationRecord();
-        console.log('iteration', iteration);
         if (iteration) {
             this.publish("timeboxIterationChanged",  iteration);
         }
@@ -212,7 +212,6 @@ Ext.define('Rally.technicalservices.InfoLink',{
                 text = response.responseText;
                 if ( CHECKSUM ) {
                     if ( CHECKSUM !== me._generateChecksum(text) ) {
-                        console.log("Checksums don't match!");
                         if ( me.dialog ) {
                             me.dialog.add({xtype:'container',html:'Checksums do not match'});
                         }
@@ -266,15 +265,6 @@ Ext.define('Rally.technicalservices.Logger',{
     },
     log: function(){
         var timestamp = "[ " + Ext.util.Format.date(new Date(), "Y-m-d H:i:s.u") + " ]";
-        //var output_args = arguments;
-        //output_args.unshift( [ "[ " + timestamp + " ]" ] );
-        //output_args = Ext.Array.push(output_args,arguments);
-        
-//        var output_args = [];
-//        output_args = Ext.Array.push(output_args,[timestamp]);
-//        output_args = Ext.Array.push(output_args, Ext.Array.slice(arguments,0));
-//
-//        window.console && console.log.apply(console,output_args);
             var i = -1, l = arguments.length, args = [], fn = 'console.log(args)';
             while(++i<l){
                 args.push('args['+i+']');
@@ -423,7 +413,7 @@ Ext.define('Rally.technicalservices.Logger',{
         Ext.Array.each(this.outside_records, function(record) {
             var parent = record.get(this.record_link_field);
             if ( !parent ) {
-                console.log("No parent for ", record.get('FormattedID'));
+
             } else {
                 var parent_id = parent.FormattedID;
                 var parent_size = parent[this.inside_size_field];
@@ -555,8 +545,7 @@ Ext.define('Rally.technicalservices.Logger',{
      },
      
      _addChart: function() {
-        console.log("adding chart");
-        
+
         var series = [{
             name: 'Stories',
             data: this.data[0],
@@ -615,14 +604,6 @@ Ext.define('Rally.technicalservices.Logger',{
             }
         });
         
-//        var me = this;
-//        chart.on('chartRendered', function() {
-//            console.log("Resizing", this, this.getWidth(), this.getHeight());
-//            chart.setSize(this.getWidth() * 0.85, this.getWidth() * 0.85);
-//        }, this, { single: true });
-
-//        console.log("setting height");
-        //this.getBody().setSize(this.getWidth() * 0.95);
      }
 
 });

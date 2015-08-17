@@ -46,7 +46,6 @@ Ext.define("TSCountdown", {
                 }
             });
         } else {
-            console.log("Countdown, subscribing");
             this.subscribe(this, 'timeboxReleaseChanged', this._changeRelease, this);
             this.subscribe(this, 'timeboxIterationChanged', this._changeIteration, this);
 

@@ -4,11 +4,11 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <title>Progress by Project</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Thu Aug 06 2015 19:25:25 GMT-0700 (PDT) -->
+    <!--  Build Date: Mon Aug 17 2015 08:27:49 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Thu Aug 06 2015 19:25:25 GMT-0700 (PDT)";
-        var CHECKSUM = 16837055966;
+        var APP_BUILD_DATE = "Mon Aug 17 2015 08:27:49 GMT-0600 (MDT)";
+        var CHECKSUM = 16211919496;
     </script>
     
     <script type="text/javascript" src="/apps/2.0rc3/sdk.js"></script>
@@ -16,22 +16,6 @@
     <script type="text/javascript">
         Rally.onReady(function() {
              
-/*
- */
-Ext.define('Rally.technicalservices.Logger',{
-    constructor: function(config){
-        Ext.apply(this,config);
-    },
-    log: function(){
-        var i = -1, l = arguments.length, args = [], fn = 'console.log(args)';
-        while(++i<l){
-            args.push('args['+i+']');
-        };
-        fn = new Function('args',fn.replace(/args/,args.join(',')));
-        fn(arguments);
-    }
-
-});
 /**
  * the loading mask wasn't going away!
  */
@@ -387,9 +371,7 @@ Ext.define("TSProjectByProject", {
             },
             zIndex: 5 // to put on top
         };
-        
-        console.log('plotline', plotline);
-        
+
         return plotline;
     },
 
@@ -446,6 +428,22 @@ Ext.define("TSProjectByProject", {
     }
 });
 
+/*
+ */
+Ext.define('Rally.technicalservices.Logger',{
+    constructor: function(config){
+        Ext.apply(this,config);
+    },
+    log: function(){
+        var i = -1, l = arguments.length, args = [], fn = 'console.log(args)';
+        while(++i<l){
+            args.push('args['+i+']');
+        };
+        fn = new Function('args',fn.replace(/args/,args.join(',')));
+        fn(arguments);
+    }
+
+});
 /** this class is configured with { series : [] } where series is a single dimensional array of 
     data values that is filled to full extent of the date range with future values filled with 
     nulls.
@@ -469,8 +467,6 @@ Ext.define("ProjectStories", function() {
 
         readProjectWorkItems : function(callback) {
 
-            console.log('readProjectWorkItems', self.featureFilter);
-            
             var fns = [
                 self.readStates,
                 self.readProjects,
@@ -491,7 +487,6 @@ Ext.define("ProjectStories", function() {
                 },
                 failure: function(error) {
                     //oh noes!
-                    console.log("Error:",error);
                 }
             });
         },
@@ -544,7 +539,6 @@ Ext.define("ProjectStories", function() {
         },    
 
         readStories : function(projects) {
-            console.log('readStories', projects, self.filter);
             var me = this;
 
             var promises = _.map(projects,function(project) {
@@ -559,7 +553,6 @@ Ext.define("ProjectStories", function() {
                     }).then({
                     scope: me,
                     success: function(stories) {
-                        console.log('stories',stories);
                         deferred.resolve(stories);
                     }
                 });
@@ -814,7 +807,7 @@ Ext.define('timebox-selector', {
                 {
                     var release = t.getRecord();
                     this.fireEvent('releasechange',release);
-                    console.log("Publishing Release:", release);
+
                     this.publish('timeboxReleaseChanged', release);
                     this._updateIterationCombo(release);
                 },
@@ -879,15 +872,12 @@ Ext.define('timebox-selector', {
         });
     },
     _requestTimebox : function(source) {
-        console.log('Got request timebox message', source);
-        var release = this.getReleaseRecord();
-        console.log('release',release);
+         var release = this.getReleaseRecord();
         if (release) {
             this.publish('timeboxReleaseChanged', release);
         } 
         
         var iteration = this.getIterationRecord();
-        console.log('iteration', iteration);
         if (iteration) {
             this.publish("timeboxIterationChanged",  iteration);
         }

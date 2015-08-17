@@ -353,9 +353,7 @@ Ext.define("TSProjectByProject", {
             },
             zIndex: 5 // to put on top
         };
-        
-        console.log('plotline', plotline);
-        
+
         return plotline;
     },
 

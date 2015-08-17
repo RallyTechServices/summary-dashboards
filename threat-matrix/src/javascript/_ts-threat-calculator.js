@@ -320,7 +320,6 @@ Ext.define('Rally.technicalservices.ThreatCalculator', {
     _pointClick: function(evt) {
         var point = evt.point;
         if ( evt.altKey ) {
-            console.log('alt click', point, evt);
             Rally.nav.Manager.showDetail(point.artifact._ref);
         }
     },

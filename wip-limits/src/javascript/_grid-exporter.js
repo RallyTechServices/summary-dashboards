@@ -84,7 +84,6 @@ Ext.define("GridExporter", {
 
         Ext.Array.each(cols, function(col, colIndex) {
             if (col.hidden !== true) {
-                console.log('header: ', col.text);
                 sheet.cells(1,colIndex + 1).value = col.text;
             }
         });

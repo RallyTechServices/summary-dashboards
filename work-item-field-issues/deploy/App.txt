@@ -3,11 +3,11 @@
 <head>
     <title>Work Item Field Issues</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Mon Jun 29 2015 12:39:48 GMT-0600 (MDT) -->
+    <!--  Build Date: Mon Aug 17 2015 08:39:55 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Mon Jun 29 2015 12:39:48 GMT-0600 (MDT)";
-        var CHECKSUM = 43605988358;
+        var APP_BUILD_DATE = "Mon Aug 17 2015 08:39:55 GMT-0600 (MDT)";
+        var CHECKSUM = 41817320501;
     </script>
     
     <script type="text/javascript" src="/apps/2.0rc3/sdk.js"></script>
@@ -74,7 +74,6 @@ Ext.define('Rally.technicalservices.InfoLink',{
                 text = response.responseText;
                 if ( CHECKSUM ) {
                     if ( CHECKSUM !== me._generateChecksum(text) ) {
-                        console.log("Checksums don't match!");
                         if ( me.dialog ) {
                             me.dialog.add({xtype:'container',html:'Checksums do not match'});
                         }
@@ -128,15 +127,6 @@ Ext.define('Rally.technicalservices.Logger',{
     },
     log: function(){
         var timestamp = "[ " + Ext.util.Format.date(new Date(), "Y-m-d H:i:s.u") + " ]";
-        //var output_args = arguments;
-        //output_args.unshift( [ "[ " + timestamp + " ]" ] );
-        //output_args = Ext.Array.push(output_args,arguments);
-
-//        var output_args = [];
-//        output_args = Ext.Array.push(output_args,[timestamp]);
-//        output_args = Ext.Array.push(output_args, Ext.Array.slice(arguments,0));
-//
-//        window.console && console.log.apply(console,output_args);
         var i = -1, l = arguments.length, args = [], fn = 'console.log(args)';
         while(++i<l){
             args.push('args['+i+']');
@@ -144,7 +134,6 @@ Ext.define('Rally.technicalservices.Logger',{
         fn = new Function('args',fn.replace(/args/,args.join(',')));
         fn(arguments);
     }
-
 });
 
 Ext.define('Rally.technicalservices.ValidationRules',{
@@ -427,7 +416,7 @@ Ext.define("work-item-field-issues", {
                         var projects        = records[3];
                         var project_preferences = records[4];
                         var iterations      = records[5];
-                        console.log('preferences', project_preferences);
+
                         var featureRules = Ext.create('Rally.technicalservices.FeatureValidationRules',{
                                 stories: stories
                             }),
@@ -1009,7 +998,7 @@ Ext.define('Rally.technicalservices.ProjectValidationRules',{
         var checkWIPTypes = ["Completed","Defined","In-Progress"];
         
         var prefs = this._getPrefForProject(r.get('Name'));
-        console.log('prefs', prefs, r.get('Name'));
+
         Ext.Array.each(checkWIPTypes, function(checkType){
             if ( !prefs[checkType] || prefs[checkType] === "" || prefs[checkType] == "0" ) {
                 missingWIPTypes.push(checkType);
@@ -1030,7 +1019,6 @@ Ext.define('Rally.technicalservices.ProjectValidationRules',{
         var projectRegex = new RegExp(project_name);
         Ext.Array.each(this.projectPrefs, function(pref){
             var key = pref.get('Name');
-            console.log('key',key);
             // project-wip:IA-Program > OR Solution Architecture Team:CompletedWIP
             //"project-wip:" + projectname + ":" + state + "WIP";
             if ( projectRegex.test(key) ) {
@@ -1054,7 +1042,6 @@ Ext.define('Rally.technicalservices.UserStoryValidationRules',{
     constructor: function(config){
         Ext.apply(this, config);
         this.requiredFields = ['Owner','PlanEstimate'];
-        console.log('schedulestates', this.orderedScheduleStates, this.definedScheduleStateIndex);
     },
     ruleFn_unscheduledIterationScheduleState: function(r){
         /**
@@ -1244,7 +1231,7 @@ Ext.define('timebox-selector', {
                 {
                     var release = t.getRecord();
                     this.fireEvent('releasechange',release);
-                    console.log("Publishing Release:", release);
+
                     this.publish('timeboxReleaseChanged', release);
                     this._updateIterationCombo(release);
                 },
@@ -1255,6 +1242,9 @@ Ext.define('timebox-selector', {
     _updateIterationCombo : function(release)
     {
         this.remove('globaliterationpicker');
+        this.fireEvent('iterationchange',null);
+        this.publish('timeboxIterationChanged', null);
+                    
         var endFilter = Ext.create('Rally.data.wsapi.Filter', {
             property : "EndDate",
             operator : "<=",
@@ -1306,15 +1296,12 @@ Ext.define('timebox-selector', {
         });
     },
     _requestTimebox : function(source) {
-        console.log('Got request timebox message', source);
-        var release = this.getReleaseRecord();
-        console.log('release',release);
+         var release = this.getReleaseRecord();
         if (release) {
             this.publish('timeboxReleaseChanged', release);
         } 
         
         var iteration = this.getIterationRecord();
-        console.log('iteration', iteration);
         if (iteration) {
             this.publish("timeboxIterationChanged",  iteration);
         }

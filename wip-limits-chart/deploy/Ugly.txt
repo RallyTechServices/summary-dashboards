@@ -4,10 +4,10 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <title>WIP Limits Chart</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Wed Aug 05 2015 21:56:07 GMT-0700 (PDT) -->
+    <!--  Build Date: Mon Aug 17 2015 08:38:48 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Wed Aug 05 2015 21:56:07 GMT-0700 (PDT)";
+        var APP_BUILD_DATE = "Mon Aug 17 2015 08:38:48 GMT-0600 (MDT)";
         var CHECKSUM = [%= checksum %];
     </script>
     

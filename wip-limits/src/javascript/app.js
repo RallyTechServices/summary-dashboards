@@ -33,7 +33,7 @@ Ext.define('wip-limits', {
                 this.states = results[0];
                 this.projects = results[1];
                 this.preferences = results[2];
-                console.log('prefs:', this.preferences);
+                this.logger.log('prefs:', this.preferences);
                 
                 this.projects_by_oid = {};
                 Ext.Array.each(this.projects, function(project){
@@ -55,7 +55,6 @@ Ext.define('wip-limits', {
     _changeRelease: function(release) {
         if ( this.release !== release ) {
             this.release = release;
-            console.log('New Release:', release.get('Name'));
             this._launch();
         }
     },

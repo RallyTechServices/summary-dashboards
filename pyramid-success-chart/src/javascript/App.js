@@ -22,8 +22,6 @@ Ext.define('CustomApp', {
 
     launch: function() {
 
-        console.log("launch");
-
         if (this.isExternal()){
             this.showSettings(this.config);
         } else {
@@ -32,7 +30,6 @@ Ext.define('CustomApp', {
     },
 
     _launch: function(settings) {
-        console.log("_launch");
         var that = this;
 
         if ( settings.showScopeSelector === true || settings.showScopeSelector === "true" ) {
@@ -71,8 +68,7 @@ Ext.define('CustomApp', {
 
 
     run : function(releaseName,iterationName) {
-        console.log('run',releaseName,iterationName);
-        
+
         this.setLoading('loading data...');
         
         var that = this;
@@ -81,7 +77,6 @@ Ext.define('CustomApp', {
 
         var chartFeatures = that.getSetting('features')===true;
 
-        console.log('chartFeatures', chartFeatures);
         if (chartFeatures===true) {
             if (releaseName == null) { //Iteration changed
                 Rally.ui.notify.Notifier.showWarning({message: 'Features are not explicitly associated with Iterations.  The iteration will be ignored and all features for the selected Release will be included in the Success Donut'});
@@ -119,8 +114,7 @@ Ext.define('CustomApp', {
 
     _timeboxChanged : function(timebox) {
         var that = this;
-        console.log("Pyramid Chart:_timeboxChanged received");
-        if (timebox.get("_type")==='release') {
+       if (timebox.get("_type")==='release') {
             that.releaseName = timebox.get("Name");
             that.run(that.releaseName,null);
         } else
@@ -149,8 +143,7 @@ Ext.define('CustomApp', {
     },
 
     prepareChartData : function(stories, projects, states, callback) {
-        console.log('prepareChartData',stories,projects);
-        
+
         var that = this;
         var categories = _.map( projects, function(p) { return p.get("Name"); });
         var acceptedStates = ["Accepted",_.last(states)],
@@ -230,8 +223,7 @@ Ext.define('CustomApp', {
         return label 
     },
     prepareFeatureChartData : function(features, projects, callback) {
-        console.log('prepareFeatureChartData', features, projects);
-        
+
         var categories = _.map( projects, function(p) { return p.get("Name"); });
         
         var data = _.map(categories,function(project,index){
@@ -241,7 +233,6 @@ Ext.define('CustomApp', {
                 words = this._getFeatureWords(features[index]),
                 label = this._getProjectLabel(project,total,accepted,released,'Accepted','Released');
 
-            console.log('words',words);
             return [ label, total, accepted, words, released];
 
         }, this);
@@ -278,7 +269,6 @@ Ext.define('CustomApp', {
 
         return _.reduce(workItems, function(memo,workItem){
             var state = workItem.get('State') ? workItem.get('State').Name : null;
-            console.log('state',workItem.get('FormattedID'),state, state==releaseState, workItem.get('PercentDoneByStoryCount'));
             return memo + ((state == releaseState && workItem.get("PercentDoneByStoryCount") >= 1) ? 1 : 0);
         },0);
     },
@@ -307,8 +297,7 @@ Ext.define('CustomApp', {
     
     createPolarChart: function(categories, seriesData,callback){
         this.setLoading(false);
-        console.log('createPolarChart', categories ,seriesData);
-        var isEmpty = function(series) {
+       var isEmpty = function(series) {
             var total = _.reduce(_.first(series).data,function(memo,d) {
                 return memo + d[1];
             },0);
@@ -376,30 +365,24 @@ Ext.define('CustomApp', {
                 resize: function(panel) {
                 },
                 afterrender : function(panel) {
-                    console.log('afterrender');
                     var chart = $('#chart-container').highcharts(chartConfig);
-                    console.log('chart',chart,panel);
                 }
             }
         });
 
-        if (!isEmpty(seriesData))
+        if (!isEmpty(seriesData)){
             that.add(that.x);
-        else {
-            console.log("no data",seriesData);
         }
 
     },
     
     createAreaChart: function(categories, seriesData,callback){
         this.setLoading(false);
-        console.log('createAreaChart', categories ,seriesData);
-        
+
         if ( categories.length == 1 ) {
             // we're at a leaf node!
             // don't want it to look like two dots!
-            console.log('categories are 1');
-            categories = ["",categories[0],""];
+           categories = ["",categories[0],""];
             Ext.Array.each(seriesData, function(series){
                 series.data = [ 0, series.data[0], 0 ];
             });
@@ -478,23 +461,18 @@ Ext.define('CustomApp', {
                 resize: function(panel) {
                 },
                 afterrender : function(panel) {
-                    console.log('afterrender');
-                    var chart = $('#chart-container').highcharts(chartConfig);
-                    console.log('chart',chart,panel);
-                }
+                   var chart = $('#chart-container').highcharts(chartConfig);
+                 }
             }
         });
 
-        if (!isEmpty(seriesData))
+        if (!isEmpty(seriesData)){
             that.add(that.x);
-        else {
-            console.log("no data",seriesData);
         }
 
     },
     createDonutChart: function(categories, seriesData, statusData, callback){
         this.setLoading(false);
-        console.log('createDonutChart', categories ,seriesData);
         var isEmpty = function(series) {
             var total = _.reduce(_.first(series).data,function(memo,d) {
                 return memo + d[1];
@@ -549,10 +527,8 @@ Ext.define('CustomApp', {
             }
         });
 
-        if (!isEmpty(seriesData))
+        if (!isEmpty(seriesData)){
             that.add(that.x);
-        else {
-            console.log("no data",seriesData);
         }
     },
 
@@ -627,15 +603,12 @@ Ext.define('CustomApp', {
             }
         });
 
-        if (!isEmpty(seriesData))
+        if (!isEmpty(seriesData)){
             that.add(that.x);
-        else {
-            console.log("no data",seriesData);
         }
     },
 
     renderFeatureWords : function() {
-        console.log('renderfeaturestories',this);
 
         var ren = this.renderer;
         var wordHeight = 11;
@@ -646,7 +619,6 @@ Ext.define('CustomApp', {
             var numWords = series.length <= 6 ? 3 : 1;
             if (series.options.featureWords){
                 featureWordsExist = true;
-                console.log('featureworkds',series.options.featureWords[index]);
                 var featureWords = [] || _.compact(series.options.featureWords[index]).slice(0,numWords) || [];  // || _.compact(series.options.featureWords[index]).slice(0,numWords);
                 var y = point.plotY - (( featureWords.length * wordHeight)/2);
                 _.each(featureWords,function(fw,x) {

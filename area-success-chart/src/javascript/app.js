@@ -14,7 +14,6 @@ Ext.define("AreaSuccessChart", {
     }],
 
     launch : function() {
-        console.log("launch");
 
         if (this.isExternal()) {
             this.showSettings(this.config);
@@ -24,8 +23,7 @@ Ext.define("AreaSuccessChart", {
     },
 
     _launch : function(settings) {
-        console.log("_launch");
-        var that = this;
+         var that = this;
 
         if (settings.showScopeSelector === true
                 || settings.showScopeSelector === "true") {
@@ -65,13 +63,11 @@ Ext.define("AreaSuccessChart", {
     },
 
     run : function(releaseName, iterationName) {
-        console.log('run', releaseName, iterationName);
         this.setLoading('Loading Data...');
         
         var chart_by_features = this.getSetting('features') === true;
         
-        console.log('chart by features:', chart_by_features);
-        
+
         if ( chart_by_features ) {
             
         } else {

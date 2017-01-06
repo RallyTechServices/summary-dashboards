@@ -86,7 +86,7 @@ module.exports = function(grunt) {
         },
         watch: {
             files: ['test/fast/*-spec.js',config.js_files, config.css_files],
-            tasks: ['test-and-deploy']
+            tasks: ['deploy']
         },
         jasmine: {
             fast: {

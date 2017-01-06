@@ -1,13 +1,3 @@
-/**
- * the loading mask wasn't going away!
- */
-
-Ext.override(Rally.ui.chart.Chart,{
-    onRender: function () {
-        this.callParent(arguments);
-        this._unmask();
-    }
-});
 
 Ext.define("TSProjectByProject", {
     extend: 'Rally.app.App',
@@ -15,11 +5,11 @@ Ext.define("TSProjectByProject", {
     logger: new Rally.technicalservices.Logger(),
     items: [
         {xtype:'container',itemId:'settings_box'},
-        {xtype:'container', itemId:'selector_box' }
+        {xtype:'container', itemId:'selector_box', layout: 'hbox' }
     ],
     config: {
         defaultSettings: {
-            showScopeSelector :  false
+            showScopeSelector :  true
         }
     },
     chart: null,
@@ -27,14 +17,19 @@ Ext.define("TSProjectByProject", {
     launch: function() {
         var me = this;
         
-        this._getAvailableStates().then({
+        Deft.Chain.sequence([
+            this._getPortfolioItemTypes,
+            this._getAvailableStates
+        ],this).then({
             scope: this,
             success: function(results) {
-                if (this.isExternal()){
-                    this.showSettings(this.config);
-                } else {
-                    this.onSettingsUpdate(this.getSettings());
-                }
+                var states = results[1],
+                    types = results[0];
+                    
+                this.bottom_type_path = types[0].get('TypePath');
+
+                this._launch(this.getSettings());
+                
             }
         });
         
@@ -66,8 +61,29 @@ Ext.define("TSProjectByProject", {
             this.publish('requestTimebox', this);
         }
         
-        //that.run(release,iteration);
-       
+        if ( this.getSetting('filterField') ) {
+
+            this.fieldValuePicker = this.down('#selector_box').add({
+                xtype: 'rallyfieldvaluecombobox',
+                fieldLabel: 'Restrict ' + this.getSetting('filterField') + ' to:',
+                labelWidth: 225,
+                labelAlign: 'right',
+                margin: '7 0 0 25',
+                minWidth: 300,
+                value: ['zz'],
+                allowClear: false,
+                setUseNullForNoEntryValue: true,
+                model: this.bottom_type_path,
+                field: this.getSetting('filterField'),
+                multiSelect: true,
+                listeners: {
+                    scope: this,
+                    blur: function() {
+                        this.run(this.release && this.release.get('Name'),this.iteration && this.iteration.get('Name'));
+                    }
+                }
+            });
+        }
     },
 
     _changeRelease: function(release) {
@@ -83,17 +99,34 @@ Ext.define("TSProjectByProject", {
     },
 
     run : function(releaseName,iterationName) {
-
+        this.logger.log('release/iteration', releaseName, iterationName);
+        
         var that = this;
         if ( ! Ext.isEmpty(this.chart) ) {
             this.chart.destroy();
         }
         
+        var filter_values =  this.fieldValuePicker && this.fieldValuePicker.getValue() || [];
+        var filter_field  = this.getSetting('filterField');
+
         this.setLoading("Loading Stories in Project...");
+        
+        var filter = that.rallyFunctions.createFilter(releaseName,iterationName);
+        
+        if ( filter_field && filter_values && filter_values.length > 0 ) {
+            var feature_field = this._getFeatureFieldName();
+            
+            var filter_ors = Ext.Array.map(filter_values, function(value){
+                if ( value == "None" ) { value = ""; }
+                return {property: feature_field + "." + filter_field, value: value};
+            });
+            var or_filter = Rally.data.wsapi.Filter.or(filter_ors);
+            filter = filter.and(or_filter);
+        }
         
         var pr = Ext.create( "ProjectStories", {
             ctx : that.getContext(),
-            filter : that.rallyFunctions.createFilter(releaseName,iterationName)
+            filter : filter
         });
 
         pr.readProjectWorkItems(function(error, stories, projects, states) {
@@ -264,6 +297,48 @@ Ext.define("TSProjectByProject", {
             }
         });
     },
+        
+    _getPortfolioItemTypes: function(workspace) {
+        var deferred = Ext.create('Deft.Deferred');
+                
+        var store_config = {
+            fetch: ['Name','ElementName','TypePath'],
+            model: 'TypeDefinition',
+            filters: [
+                {
+                    property: 'Parent.Name',
+                    operator: '=',
+                    value: 'Portfolio Item'
+                },
+                {
+                    property: 'Creatable',
+                    operator: '=',
+                    value: 'true'
+                }
+            ],
+            autoLoad: true,
+            listeners: {
+                load: function(store, records, successful) {
+                    if (successful){
+                        deferred.resolve(records);
+                    } else {
+                        deferred.reject('Failed to load types');
+                    }
+                }
+            }
+        };
+        
+        if ( !Ext.isEmpty(workspace) ) {            
+            store_config.context = { 
+                project:null,
+                workspace: workspace._ref ? workspace._ref : workspace.get('_ref')
+            };
+        }
+                
+        var store = Ext.create('Rally.data.wsapi.Store', store_config );
+                    
+        return deferred.promise;
+    },
     
     _getAvailableStates: function() {
         var deferred = Ext.create('Deft.Deferred');
@@ -313,7 +388,7 @@ Ext.define("TSProjectByProject", {
         if ( Ext.isEmpty(iteration) && Ext.isEmpty(release) ) {
             return null;
         }
-        
+                
         var timebox_start = null;
         var timebox_end = null;
         var timebox_type = null;
@@ -324,7 +399,7 @@ Ext.define("TSProjectByProject", {
             timebox_type = 'Release';
         }
         
-        if ( !Ext.isEmpty(iteration) ) {
+        if ( !Ext.isEmpty(iteration) && !Ext.isEmpty(iteration.get('StartDate') ) ) {
             timebox_start = iteration.get('StartDate');
             timebox_end = iteration.get('EndDate');
             timebox_type = 'Iteration';
@@ -334,9 +409,6 @@ Ext.define("TSProjectByProject", {
         
         var timebox_length = Rally.util.DateTime.getDifference(timebox_end, timebox_start, 'day');
         var time_since_start = Rally.util.DateTime.getDifference(today, timebox_start, 'day');
-        
-        this.logger.log('-- timebox length:', timebox_length, timebox_start, timebox_end);
-        this.logger.log('-- point in time: ', time_since_start, timebox_start,today);
         
         var progress = time_since_start / timebox_length;
         
@@ -358,47 +430,36 @@ Ext.define("TSProjectByProject", {
         return plotline;
     },
 
-    isExternal: function(){
-        return typeof(this.getAppId()) == 'undefined';
+    _getFeatureFieldName: function() {
+        var path = this.bottom_type_path || "Feature";
+        path = path.replace(/^.*\//,'');
+        return path;
     },
-    //showSettings:  Override
-    showSettings: function(options) {
-        this._appSettings = Ext.create('Rally.app.AppSettings', Ext.apply({
-            fields: this.getSettingsFields(),
-            settings: this.getSettings(),
-            defaultSettings: this.getDefaultSettings(),
-            context: this.getContext(),
-            settingsScope: this.settingsScope,
-            autoScroll: true
-        }, options));
-
-        this._appSettings.on('cancel', this._hideSettings, this);
-        this._appSettings.on('save', this._onSettingsSaved, this);
-        if (this.isExternal()){
-            if (this.down('#settings_box').getComponent(this._appSettings.id)===undefined){
-                this.down('#settings_box').add(this._appSettings);
-            }
-        } else {
-            this.hide();
-            this.up().add(this._appSettings);
-        }
-        return this._appSettings;
-    },
-    _onSettingsSaved: function(settings){
-        Ext.apply(this.settings, settings);
-        this._hideSettings();
-        this.onSettingsUpdate(settings);
-    },
-    //onSettingsUpdate:  Override
-    onSettingsUpdate: function (settings){
-        Ext.apply(this, settings);
-        this._launch(settings);
-    },
-
+    
     getSettingsFields: function() {
         var me = this;
-
+        
         return [ 
+            {
+                name: 'filterField',
+                xtype: 'rallyfieldcombobox',
+                fieldLabel: 'Filter Field',
+                labelWidth: 85,
+                labelAlign: 'left',
+                minWidth: 175,
+                margin: 25,
+                autoExpand: false,
+                alwaysExpanded: false,                
+                model: this.bottom_type_path,
+                _isNotHidden: function(field) {
+                    if ( field.hidden ) { return false; }
+                    var defn = field.attributeDefinition;
+                    if ( Ext.isEmpty(defn) ) { return false; }
+                    
+                    return ( defn.Constrained && ( defn.AttributeType == 'STRING' || defn.AttributeType == 'RATING' ));
+                }
+            },
+            
             {
                 name: 'showScopeSelector',
                 xtype: 'rallycheckboxfield',

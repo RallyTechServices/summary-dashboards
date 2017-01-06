@@ -1,5 +1,7 @@
 #Progress by Project
 
+![screenshot](./images/screenshot.png "Screenshot")
+
 ## Development Notes
 
 ### First Load
@@ -53,7 +55,7 @@ to get set up to develop:
 Use grunt debug to create the debug html file.  You only need to run this when you have added new files to
 the src directories.
 
-##### grunt build
+##### grunt pretty / grunt ugly
 
 Use grunt build to create the production html file.  We still have to copy the html file to a panel to test.
 

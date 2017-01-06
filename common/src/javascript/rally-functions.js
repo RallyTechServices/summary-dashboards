@@ -37,7 +37,7 @@ Ext.define("RallyFunctions", function() {
             }         
             Ext.create('Rally.data.WsapiDataStore', storeConfig);
         },
-
+   
         // create a filter based on a combination of release and/or iteration
         createFilter : function( releaseName, iterationName ) { 
             var filter = null;

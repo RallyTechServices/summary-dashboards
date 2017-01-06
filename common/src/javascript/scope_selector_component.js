@@ -4,7 +4,7 @@ Ext.define('timebox-selector', {
     alias : 'widget.timebox-selector',
     cls : 'timebox-selector',
     layout : 'hbox',
-    width : '100%',
+    //width : '100%',
     mixins : [
         'Rally.Messageable'
     ],
@@ -89,7 +89,7 @@ Ext.define('timebox-selector', {
             growToLongestValue : true,
             stateId : 'iterationcombo',
             allowBlank : true,
-            allowClear : true,
+            allowClear : false,
             allowNoEntry : true,
             noEntryText : 'PI Scope',
             emptyText : 'PI Scope',

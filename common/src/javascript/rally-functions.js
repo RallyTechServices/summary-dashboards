@@ -39,15 +39,22 @@ Ext.define("RallyFunctions", function() {
         },
    
         // create a filter based on a combination of release and/or iteration
-        createFilter : function( releaseName, iterationName ) { 
+        createFilter : function( releaseName, iterationName, featureFieldName ) { 
             var filter = null;
 
             if (!_.isNull(releaseName)) {
-                filter = Ext.create('Rally.data.wsapi.Filter', {
+            	var filters = [{
                     property: 'Release.Name',
-                    operator: '=',
                     value: releaseName
-                });
+                }];
+            	
+            	if ( featureFieldName ) {
+            		filters.push({
+                        property: featureFieldName + '.Release.Name',
+                        value: releaseName
+                    });
+            	}
+                filter = Rally.data.wsapi.Filter.or(filters);
             }
 
             if (!_.isNull(iterationName)) {

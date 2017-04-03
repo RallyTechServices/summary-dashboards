@@ -1,6 +1,19 @@
-#Progress by Project
+# Progress by Project
+
+This app shows the states of items in a release as percentages.  There is a dotted
+vertical line at the percentage that represents the position of today in the program
+increment (release).  The selection can be limited by stories that have a feature with
+a filter field set to a particular value.
 
 ![screenshot](./images/screenshot.png "Screenshot")
+
+When a release is chosen, a story qualifies for the chart if it is directly associated
+with the release name or if its lowest level PI is associated with the release name. 
+
+Percentage is calculated from PlanEstimate.
+
+"Projects" on the y axis are the direct children of the current Rally project.  Data is aggregated from
+their descendants. 
 
 ## Development Notes
 

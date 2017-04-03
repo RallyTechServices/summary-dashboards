@@ -1,11 +1,11 @@
 
-Ext.define("TSProjectByProject", {
+Ext.define("TSProgressByProject", {
     extend: 'Rally.app.App',
     componentCls: 'app',
     logger: new Rally.technicalservices.Logger(),
     items: [
         {xtype:'container',itemId:'settings_box'},
-        {xtype:'container', itemId:'selector_box', layout: 'hbox' }
+        {xtype:'container',itemId:'selector_box', layout: 'hbox' }
     ],
     config: {
         defaultSettings: {
@@ -106,15 +106,16 @@ Ext.define("TSProjectByProject", {
             this.chart.destroy();
         }
         
+        var feature_field = this._getFeatureFieldName();
+
         var filter_values =  this.fieldValuePicker && this.fieldValuePicker.getValue() || [];
         var filter_field  = this.getSetting('filterField');
 
         this.setLoading("Loading Stories in Project...");
         
-        var filter = that.rallyFunctions.createFilter(releaseName,iterationName);
+        var filter = that.rallyFunctions.createFilter(releaseName,iterationName, feature_field);
         
         if ( filter_field && filter_values && filter_values.length > 0 ) {
-            var feature_field = this._getFeatureFieldName();
             
             var filter_ors = Ext.Array.map(filter_values, function(value){
                 if ( value == "None" ) { value = ""; }

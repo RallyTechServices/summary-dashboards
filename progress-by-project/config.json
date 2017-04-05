@@ -1,8 +1,8 @@
 {
     "name": "Progress by Project",
-    "className": "TSProjectByProject",
+    "className": "TSProgressByProject",
     "sdk": "2.1",
-    "story": "TBD",
+    "story": "...US1237",
     "javascript": [
         "src/javascript/__ts-logger.js", 
         "src/javascript/progress.js",

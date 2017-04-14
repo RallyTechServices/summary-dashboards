@@ -9,7 +9,8 @@ Ext.define("TSProgressByProject", {
     ],
     config: {
         defaultSettings: {
-            showScopeSelector :  true
+            showScopeSelector :  true,
+            iterationNoEntryText: 'PI Scope'
         }
     },
     chart: null,
@@ -44,6 +45,7 @@ Ext.define("TSProgressByProject", {
             this.down('#selector_box').add({
                 xtype : 'timebox-selector',
                 context : this.getContext(),
+                iterationNoEntryText: this.getSetting('iterationNoEntryText'),
                 listeners: {
                     releasechange: function(release){
                         this._changeRelease(release);
@@ -463,7 +465,15 @@ Ext.define("TSProgressByProject", {
                     return ( defn.Constrained && ( defn.AttributeType == 'STRING' || defn.AttributeType == 'RATING' ));
                 }
             },
-            
+            {
+                name: 'iterationNoEntryText',
+                xtype: 'rallytextfield',
+                fieldLabel: 'Text for No Selection Iteration',
+                labelWidth: 85,
+                labelAlign: 'left',
+                minWidth: 175,
+                margin: 25
+            },
             {
                 name: 'showScopeSelector',
                 xtype: 'rallycheckboxfield',

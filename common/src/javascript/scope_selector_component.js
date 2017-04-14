@@ -5,6 +5,10 @@ Ext.define('timebox-selector', {
     cls : 'timebox-selector',
     layout : 'hbox',
     //width : '100%',
+    configs: {
+    	iterationNoEntryText: 'PI Scope'
+    },
+    
     mixins : [
         'Rally.Messageable'
     ],
@@ -96,8 +100,8 @@ Ext.define('timebox-selector', {
             allowBlank : true,
             allowClear : false,
             allowNoEntry : true,
-            noEntryText : 'PI Scope',
-            emptyText : 'PI Scope',
+            noEntryText : this.iterationNoEntryText,
+            emptyText : this.iterationNoEntryText,
             noEntryValue : null,
             defaultToCurrentTimebox : false,
             defaultSelectPosition : 'first',

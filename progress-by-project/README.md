@@ -15,7 +15,18 @@ Percentage is calculated from PlanEstimate.
 "Projects" on the y axis are the direct children of the current Rally project.  Data is aggregated from
 their descendants. 
 
+The admin settings panel will allow you to pick the text that appears for when no iteration has been selected.  It defaults
+to "PI Scope."
+
+This app CAN be put onto a release scoped custom page.  If it is on a non-scoped page, the app's scope selector will show
+a dropdown for release.  Otherwise, it uses the release from the page scoping.
+
+
 ## Development Notes
+
+* Need two settings fields to hold the restriction filter field so that the display name of the field can be used on the page, so we put
+a hiddent rallytextfield that gets updated with the display name when the field is chosen.
+
 
 ### First Load
 

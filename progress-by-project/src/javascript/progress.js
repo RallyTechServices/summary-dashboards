@@ -9,7 +9,9 @@ Ext.define("TSProgressByProject", {
     ],
     config: {
         defaultSettings: {
-            showScopeSelector :  true
+            showScopeSelector :  true,
+            filterFieldName: 'Commitment for Release',
+            iterationNoEntryText: 'PI Scope'
         }
     },
     chart: null,
@@ -44,6 +46,7 @@ Ext.define("TSProgressByProject", {
             this.down('#selector_box').add({
                 xtype : 'timebox-selector',
                 context : this.getContext(),
+                iterationNoEntryText: this.getSetting('iterationNoEntryText'),
                 listeners: {
                     releasechange: function(release){
                         this._changeRelease(release);
@@ -62,10 +65,12 @@ Ext.define("TSProgressByProject", {
         }
         
         if ( this.getSetting('filterField') ) {
-
+            var display_name = this.getSetting('filterFieldName') || this.getSetting('filterField');
+        	var label = Ext.String.format('Restrict {0} to:', display_name);
+        	
             this.fieldValuePicker = this.down('#selector_box').add({
                 xtype: 'rallyfieldvaluecombobox',
-                fieldLabel: 'Restrict ' + this.getSetting('filterField') + ' to:',
+                fieldLabel: label,
                 labelWidth: 225,
                 labelAlign: 'right',
                 margin: '7 0 0 25',
@@ -98,7 +103,7 @@ Ext.define("TSProgressByProject", {
         }
     },
 
-    run : function(releaseName,iterationName) {
+    run: function(releaseName,iterationName) {
         this.logger.log('release/iteration', releaseName, iterationName);
         
         var that = this;
@@ -139,11 +144,13 @@ Ext.define("TSProgressByProject", {
     },
 
     _timeboxChanged : function(timebox) {
-        var that = this;
-        if (timebox.get("_type")==='release')
-            that.run(timebox.get("Name"),null);
-        else
-            that.run(null,timebox.get("Name"));
+        this.logger.log('_timeboxChanged', timebox);
+        
+        if (timebox.get("_type")==='release') {
+        	this.run(timebox.get("Name"),null);
+        } else {
+            this.run(null,timebox.get("Name"));
+        }
     },
 
 
@@ -157,7 +164,8 @@ Ext.define("TSProgressByProject", {
     },
 
     onTimeboxScopeChange: function(newTimeboxScope) {
-
+    	this.logger.log('onTimeboxScopeChange', newTimeboxScope);
+    	
         this.callParent(arguments);
         if ((newTimeboxScope) && (newTimeboxScope.getType() === 'iteration')) {
             this.run(null,newTimeboxScope.getRecord().get("Name"));
@@ -441,13 +449,18 @@ Ext.define("TSProgressByProject", {
         var me = this;
         
         return [ 
+        	{
+            	name: 'filterFieldName',
+            	xtype:'rallytextfield',
+            	hidden: true
+            },
             {
                 name: 'filterField',
                 xtype: 'rallyfieldcombobox',
                 fieldLabel: 'Filter Field',
-                labelWidth: 85,
+                labelWidth: 80,
                 labelAlign: 'left',
-                minWidth: 175,
+                width: 250,
                 margin: 25,
                 autoExpand: false,
                 alwaysExpanded: false,                
@@ -458,9 +471,32 @@ Ext.define("TSProgressByProject", {
                     if ( Ext.isEmpty(defn) ) { return false; }
                     
                     return ( defn.Constrained && ( defn.AttributeType == 'STRING' || defn.AttributeType == 'RATING' ));
+                },
+                listeners: {
+                	change: function(cb) {
+                		var display_name = "";
+                		var field = cb.getRecord();
+                		if ( field ) {
+                			name = field.get('name');
+                		}
+                		var name_holders = Ext.ComponentQuery.query('[name=filterFieldName]');
+                		if ( name_holders && name_holders[0] ) {
+                			name_holders[0].setValue(name);
+                		} else {
+                			console.log('nope');
+                		}
+                	}
                 }
             },
-            
+            {
+                name: 'iterationNoEntryText',
+                xtype: 'rallytextfield',
+                fieldLabel: 'Text for No Selection Iteration',
+                labelWidth: 80,
+                labelAlign: 'left',
+                width: 250,
+                margin: 25
+            },
             {
                 name: 'showScopeSelector',
                 xtype: 'rallycheckboxfield',

@@ -10,6 +10,7 @@ Ext.define("TSProgressByProject", {
     config: {
         defaultSettings: {
             showScopeSelector :  true,
+            filterFieldName: 'Commitment for Release',
             iterationNoEntryText: 'PI Scope'
         }
     },
@@ -64,10 +65,12 @@ Ext.define("TSProgressByProject", {
         }
         
         if ( this.getSetting('filterField') ) {
-
+            var display_name = this.getSetting('filterFieldName') || this.getSetting('filterField');
+        	var label = Ext.String.format('Restrict {0} to:', display_name);
+        	
             this.fieldValuePicker = this.down('#selector_box').add({
                 xtype: 'rallyfieldvaluecombobox',
-                fieldLabel: 'Restrict ' + this.getSetting('filterField') + ' to:',
+                fieldLabel: label,
                 labelWidth: 225,
                 labelAlign: 'right',
                 margin: '7 0 0 25',
@@ -446,13 +449,18 @@ Ext.define("TSProgressByProject", {
         var me = this;
         
         return [ 
+        	{
+            	name: 'filterFieldName',
+            	xtype:'rallytextfield',
+            	hidden: true
+            },
             {
                 name: 'filterField',
                 xtype: 'rallyfieldcombobox',
                 fieldLabel: 'Filter Field',
-                labelWidth: 85,
+                labelWidth: 80,
                 labelAlign: 'left',
-                minWidth: 175,
+                width: 250,
                 margin: 25,
                 autoExpand: false,
                 alwaysExpanded: false,                
@@ -463,15 +471,30 @@ Ext.define("TSProgressByProject", {
                     if ( Ext.isEmpty(defn) ) { return false; }
                     
                     return ( defn.Constrained && ( defn.AttributeType == 'STRING' || defn.AttributeType == 'RATING' ));
+                },
+                listeners: {
+                	change: function(cb) {
+                		var display_name = "";
+                		var field = cb.getRecord();
+                		if ( field ) {
+                			name = field.get('name');
+                		}
+                		var name_holders = Ext.ComponentQuery.query('[name=filterFieldName]');
+                		if ( name_holders && name_holders[0] ) {
+                			name_holders[0].setValue(name);
+                		} else {
+                			console.log('nope');
+                		}
+                	}
                 }
             },
             {
                 name: 'iterationNoEntryText',
                 xtype: 'rallytextfield',
                 fieldLabel: 'Text for No Selection Iteration',
-                labelWidth: 85,
+                labelWidth: 80,
                 labelAlign: 'left',
-                minWidth: 175,
+                width: 250,
                 margin: 25
             },
             {

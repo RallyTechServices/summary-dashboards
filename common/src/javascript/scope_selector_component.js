@@ -13,8 +13,7 @@ Ext.define('timebox-selector', {
         this.stateId = Rally.environment.getContext().getScopedStateId('timebox-filter');
         this.callParent(arguments);
     },
-    initComponent : function()
-    {
+    initComponent : function() {
         this.callParent(arguments);
         this._createReleaseCombo();
         this.addEvents('releasechange','iterationchange');
@@ -24,8 +23,15 @@ Ext.define('timebox-selector', {
         this.subscribe(this, 'requestTimebox', this._requestTimebox, this);
         
     },
-    _createReleaseCombo : function()
-    {
+    _createReleaseCombo : function() {
+    	var timeboxScope = Rally.getApp().getContext().getTimeboxScope();
+    	if ( timeboxScope && timeboxScope.getType() === "release" ) {
+    		var release = timeboxScope.getRecord();
+    		this.fireEvent('releasechange',release);
+    		this.publish('timeboxReleaseChanged', release);
+            this._updateIterationCombo(release);
+    		return;
+    	}
         this._releaseCombo = this.add({
             xtype : 'rallyreleasecombobox',
             fieldLabel : 'Program Increment',
@@ -55,8 +61,7 @@ Ext.define('timebox-selector', {
             }
         });
     },
-    _updateIterationCombo : function(release)
-    {
+    _updateIterationCombo : function(release) {
         this.remove('globaliterationpicker');
         this.fireEvent('iterationchange',null);
         this.publish('timeboxIterationChanged', null);
@@ -76,7 +81,7 @@ Ext.define('timebox-selector', {
         this._iterationCombo = this.add({
             xtype : 'rallyiterationcombobox',
             itemId : 'globaliterationpicker',
-            fieldLabel : 'Sprint/Iteration',
+            fieldLabel : 'Iteration',
             hideLabel : false,
             labelPad : 5,
             labelSeparator : ':',

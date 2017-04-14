@@ -98,7 +98,7 @@ Ext.define("TSProgressByProject", {
         }
     },
 
-    run : function(releaseName,iterationName) {
+    run: function(releaseName,iterationName) {
         this.logger.log('release/iteration', releaseName, iterationName);
         
         var that = this;
@@ -139,11 +139,13 @@ Ext.define("TSProgressByProject", {
     },
 
     _timeboxChanged : function(timebox) {
-        var that = this;
-        if (timebox.get("_type")==='release')
-            that.run(timebox.get("Name"),null);
-        else
-            that.run(null,timebox.get("Name"));
+        this.logger.log('_timeboxChanged', timebox);
+        
+        if (timebox.get("_type")==='release') {
+        	this.run(timebox.get("Name"),null);
+        } else {
+            this.run(null,timebox.get("Name"));
+        }
     },
 
 
@@ -157,7 +159,8 @@ Ext.define("TSProgressByProject", {
     },
 
     onTimeboxScopeChange: function(newTimeboxScope) {
-
+    	this.logger.log('onTimeboxScopeChange', newTimeboxScope);
+    	
         this.callParent(arguments);
         if ((newTimeboxScope) && (newTimeboxScope.getType() === 'iteration')) {
             this.run(null,newTimeboxScope.getRecord().get("Name"));

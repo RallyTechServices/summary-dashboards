@@ -40,7 +40,7 @@ Ext.define("RallyFunctions", function() {
    
         // create a filter based on a combination of release and/or iteration
         createFilter : function( releaseName, iterationName, featureFieldName ) { 
-            var filter = null;
+            var filter = Rally.data.wsapi.Filter.and([{property:'DirectChildrenCount',value:0}]);
 
             if (!_.isNull(releaseName)) {
             	var filters = [{
@@ -54,7 +54,7 @@ Ext.define("RallyFunctions", function() {
                         value: releaseName
                     });
             	}
-                filter = Rally.data.wsapi.Filter.or(filters);
+                filter = filter.and( Rally.data.wsapi.Filter.or(filters) );
             }
 
             if (!_.isNull(iterationName)) {

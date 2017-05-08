@@ -11,13 +11,16 @@ Ext.define("TSProgressByProject", {
         defaultSettings: {
             showScopeSelector :  true,
             filterFieldName: 'Commitment for Release',
-            iterationNoEntryText: 'PI Scope'
+            iterationNoEntryText: 'PI Scope',
+            considerVelocity: true
         }
     },
     chart: null,
     
     launch: function() {
         var me = this;
+        
+        this.considerVelocity = this.getSetting('considerVelocity');
         
         Deft.Chain.sequence([
             this._getPortfolioItemTypes,
@@ -140,9 +143,9 @@ Ext.define("TSProgressByProject", {
         });
 
         pr.readProjectWorkItems(function(error, stories, projects, states) {
-            that._getVelocitiesByProjectOid(projects).then({
-                success: function(velocities_by_project_oid) {
-                    that.prepareChartData( stories, projects, states, velocities_by_project_oid, function(error, categories, series) {
+            that._getVelocitiesByProjectName(projects).then({
+                success: function(velocities_by_project_name) {
+                    that.prepareChartData( stories, projects, states, velocities_by_project_name, function(error, categories, series) {
                         that.createChart( categories, series );
                     }); 
                 },
@@ -154,7 +157,7 @@ Ext.define("TSProgressByProject", {
         });
     },
     
-    _getVelocitiesByProjectOid: function(projects) {
+    _getVelocitiesByProjectName: function(projects) {
         var me = this, 
             deferred = Ext.create('Deft.Deferred');
         
@@ -166,13 +169,13 @@ Ext.define("TSProgressByProject", {
         Deft.Chain.sequence(promises,this).then({
             success: function(velocities) {
                 me.logger.log("Velocities:", velocities);
-                var velocities_by_project_oid = {};
+                var velocities_by_project_name = {};
                 Ext.Array.each(velocities, function(velocity,idx) {
-                    var project_oid = projects[idx].get('ObjectID');
-                    velocities_by_project_oid[project_oid] = velocity;
+                    var project_name = projects[idx].get('Name');
+                    velocities_by_project_name[project_name] = velocity;
                 });
                 
-                deferred.resolve(velocities_by_project_oid);
+                deferred.resolve(velocities_by_project_name);
             },
             failure: function(msg){
                 deferred.reject(msg);
@@ -280,10 +283,10 @@ Ext.define("TSProgressByProject", {
         }
     },
 
-    prepareChartData : function(stories, projects, states, velocities_by_project_oid, callback) {
+    prepareChartData : function(stories, projects, states, velocities_by_project_name, callback) {
         var that = this;
 
-        this.logger.log("prepareChartData", velocities_by_project_oid);
+        this.logger.log("prepareChartData", velocities_by_project_name);
         
         var projectKeys = _.map(projects,function(project) { return _.last(project.get("Name").split('>')); });
 
@@ -293,20 +296,26 @@ Ext.define("TSProgressByProject", {
         };
 
         // totals points for a set of work items based on if they are in a set of states
-        var summarize = function( workItems, states ) {
+        var summarize = function( workItems, states, past_velocity ) {
 
             // calc total points
             var total = _.reduce(workItems, function(memo,workItem) {
                     return memo + pointsValue(workItem.get("PlanEstimate"));
             },0);
+            
+            console.log( 'total, past velocity', total, past_velocity);
 
+            var denominator = total;
+            if ( total <= past_velocity && that.considerVelocity) {
+                denominator = past_velocity;
+            }
             // totals points for a set of work items based on if they are in a set of states
             var stateTotal = _.reduce(  workItems, function(memo,workItem) {
                 return memo + ( _.indexOf(states,workItem.get("ScheduleState")) > -1 ? 
                             pointsValue(workItem.get("PlanEstimate")) : 0);
             },0);
 
-            var p = ( total > 0 ? ((stateTotal/total)*100) : 0);
+            var p = ( denominator > 0 ? ((stateTotal/denominator)*100) : 0);
             return p;
         };
 
@@ -316,7 +325,7 @@ Ext.define("TSProgressByProject", {
             return {
                 name : summaryKey,
                 data : _.map( projectKeys, function( projectKey, index ) {
-                    return summarize( stories[index] , summary[summaryKey]);
+                    return summarize( stories[index] , summary[summaryKey], velocities_by_project_name[projectKey]);
                 })
             };
         });
@@ -341,11 +350,15 @@ Ext.define("TSProgressByProject", {
         // for some reason the original approach of the subclassed chart wasn't replacing
         // the plotline when destroyed and recreated
         
+        var ytext = '% of Scheduled Stories by State by Points';
+        if ( that.considerVelocity ) {
+            ytext = 'Scheduled Stories by State by Points (as a % of Average Velocity)'
+        }
         var yAxis = {
             min: 0,
             max: 100,
             title: {
-                text: '% of Scheduled Stories by State by Points'
+                text: ytext
             }
         };
         
@@ -603,6 +616,14 @@ Ext.define("TSProgressByProject", {
                 labelAlign: 'left',
                 width: 250,
                 margin: 25
+            },
+            {
+                name: 'considerVelocity',
+                xtype: 'rallycheckboxfield',
+                boxLabelAlign: 'after',
+                fieldLabel: '',
+                margin: '0 0 25 200',
+                boxLabel: 'Consider Velocity<br/><span style="color:#999999;"><i>Tick to make display bars a percentage of historical velocity</i></span>'
             },
             {
                 name: 'showScopeSelector',

@@ -21,6 +21,11 @@ to "PI Scope."
 This app CAN be put onto a release scoped custom page.  If it is on a non-scoped page, the app's scope selector will show
 a dropdown for release.  Otherwise, it uses the release from the page scoping.
 
+The admin settings panel (Consider Velocity) will allow you to decide whether planned state totals are shown 
+as a percentage of the average of the team's last six iteration velocities or the states only as a total of 
+the planned total. (In the latter case, all the bars will be the full width of the chart; in the former, the 
+bars will only be as wide as the total/velocity.)  If the total planned is higher than the velocity, then the
+chart bar will be 100%.
 
 ## Development Notes
 

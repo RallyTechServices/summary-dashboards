@@ -11,13 +11,16 @@ Ext.define("TSProgressByProject", {
         defaultSettings: {
             showScopeSelector :  true,
             filterFieldName: 'Commitment for Release',
-            iterationNoEntryText: 'PI Scope'
+            iterationNoEntryText: 'PI Scope',
+            considerVelocity: true
         }
     },
     chart: null,
     
     launch: function() {
         var me = this;
+        
+        this.considerVelocity = this.getSetting('considerVelocity');
         
         Deft.Chain.sequence([
             this._getPortfolioItemTypes,
@@ -106,11 +109,15 @@ Ext.define("TSProgressByProject", {
     run: function(releaseName,iterationName) {
         this.logger.log('release/iteration', releaseName, iterationName);
         
-        var that = this;
         if ( ! Ext.isEmpty(this.chart) ) {
             this.chart.destroy();
         }
-        
+        this._findItemsAndMakeChart(releaseName,iterationName);
+
+    },
+    
+    _findItemsAndMakeChart: function(releaseName,iterationName) {
+        var that = this;
         var feature_field = this._getFeatureFieldName();
 
         var filter_values =  this.fieldValuePicker && this.fieldValuePicker.getValue() || [];
@@ -136,13 +143,117 @@ Ext.define("TSProgressByProject", {
         });
 
         pr.readProjectWorkItems(function(error, stories, projects, states) {
-            that.prepareChartData( stories, projects, states, function(error, categories, series) {
-                that.createChart( categories, series );
+            that._getVelocitiesByProjectName(projects).then({
+                success: function(velocities_by_project_name) {
+                    that.prepareChartData( stories, projects, states, velocities_by_project_name, function(error, categories, series) {
+                        that.createChart( categories, series );
+                    }); 
+                },
+                failure: function(msg) {
+                    Ext.Msg.alert("Problem gathering data", msg);
+                }
             });
+
         });
-
     },
-
+    
+    _getVelocitiesByProjectName: function(projects) {
+        var me = this, 
+            deferred = Ext.create('Deft.Deferred');
+        
+        var promises = [];
+        Ext.Array.each(projects, function(project) {
+            promises.push( function() { return me._getVelocityForProject(project); });
+        });
+        
+        Deft.Chain.sequence(promises,this).then({
+            success: function(velocities) {
+                me.logger.log("Velocities:", velocities);
+                var velocities_by_project_name = {};
+                Ext.Array.each(velocities, function(velocity,idx) {
+                    var project_name = projects[idx].get('Name');
+                    velocities_by_project_name[project_name] = velocity;
+                });
+                
+                deferred.resolve(velocities_by_project_name);
+            },
+            failure: function(msg){
+                deferred.reject(msg);
+            }
+        });
+        return deferred.promise;
+    },
+    
+    _getVelocityForProject: function(project){
+        var deferred = Ext.create('Deft.Deferred');
+        this.logger.log('_getVelocityForProject', project);
+        // get last six iterations
+        this._getLastSixIterations(project).then({
+            scope: this,
+            success: function(iterations) {
+                this.logger.log("six iterations:", iterations);
+                var filter = [];
+                Ext.Array.each(iterations, function(iteration){
+                    filter.push({property:'Iteration.Name',value: iteration.get('Name')});
+                });
+                if ( iterations.length === 0 ) { 
+                    deferred.resolve(0);
+                    return;
+                }
+                var filters = Rally.data.wsapi.Filter.or(filter);
+                
+                filters = filters.and(Ext.create('Rally.data.wsapi.Filter',{
+                    property:'AcceptedDate',
+                    operator: '!=',
+                    value: null
+                }));
+                var config = {
+                    models: ['HierarchicalRequirement','Defect','TestSet','DefectSuite'],
+                    fetch: ['PlanEstimate'],
+                    filters: filters,
+                    limit: Infinity,
+                    pageSize: 2000
+                };
+                
+                this.rallyFunctions.loadWsapiRecords(config).then({ 
+                    success: function(artifacts) {
+                        var pe = 0;
+                        Ext.Array.each(artifacts, function(artifact) {
+                            var estimate = artifact.get('PlanEstimate') || 0;
+                            pe = pe + estimate;
+                        });
+                        var average = pe / iterations.length;
+                        deferred.resolve(average);
+                    },
+                    failure: function(msg) {
+                        deferred.reject(msg);
+                    }
+                });
+            },
+            failure: function(msg) {
+                deferred.reject(msg);
+            }
+        });
+        return deferred.promise;
+    },
+    
+    _getLastSixIterations: function(project) {
+        var today_iso = Rally.util.DateTime.toIsoString(new Date());
+        var config = {
+            limit: 6,
+            pageSize: 6,
+            model:'Iteration',
+            fetch: ['Name'],
+            sorters: { property: 'EndDate', direction: 'DESC' },
+            filters: [
+                {property: 'EndDate', operator: '<', value: today_iso},
+                {property: 'Project.ObjectID', value: project.get('ObjectID') }
+            ]
+        };
+        
+        return this.rallyFunctions.loadWsapiRecords(config);
+    },
+    
     _timeboxChanged : function(timebox) {
         this.logger.log('_timeboxChanged', timebox);
         
@@ -176,9 +287,11 @@ Ext.define("TSProgressByProject", {
         }
     },
 
-    prepareChartData : function(stories, projects, states, callback) {
+    prepareChartData : function(stories, projects, states, velocities_by_project_name, callback) {
         var that = this;
 
+        this.logger.log("prepareChartData", velocities_by_project_name);
+        
         var projectKeys = _.map(projects,function(project) { return _.last(project.get("Name").split('>')); });
 
         var pointsValue = function(value) {
@@ -186,21 +299,27 @@ Ext.define("TSProgressByProject", {
         };
 
         // totals points for a set of work items based on if they are in a set of states
-        var summarize = function( workItems, states ) {
+        var summarize = function( workItems, states, past_velocity ) {
 
             // calc total points
             var total = _.reduce(workItems, function(memo,workItem) {
                     return memo + pointsValue(workItem.get("PlanEstimate"));
             },0);
+            
+            //console.log( 'total, past velocity', total, past_velocity);
 
+            var denominator = total;
+            if ( total <= past_velocity && that.considerVelocity) {
+                denominator = past_velocity;
+            }
             // totals points for a set of work items based on if they are in a set of states
             var stateTotal = _.reduce(  workItems, function(memo,workItem) {
                 return memo + ( _.indexOf(states,workItem.get("ScheduleState")) > -1 ? 
                             pointsValue(workItem.get("PlanEstimate")) : 0);
             },0);
 
-            var p = ( total > 0 ? ((stateTotal/total)*100) : 0);
-            return p;
+            var p = ( denominator > 0 ? ((stateTotal/denominator)*100) : 0);
+            return { p: p, total: total };
         };
 
         var summary = that.createSummaryRecord();
@@ -209,13 +328,33 @@ Ext.define("TSProgressByProject", {
             return {
                 name : summaryKey,
                 data : _.map( projectKeys, function( projectKey, index ) {
-                    return summarize( stories[index] , summary[summaryKey]);
+                    return  { 
+                        _total: summarize( stories[index] , summary[summaryKey], velocities_by_project_name[projectKey]).total,
+                        y: summarize( stories[index] , summary[summaryKey], velocities_by_project_name[projectKey]).p,
+                        _velocity: velocities_by_project_name[projectKey]
+                    };
                 })
             };
         });
         
         callback(null, projectKeys, seriesData );
 
+    },
+
+    formatter: function(args) {
+        return this.series.name + ': ' + Math.round(this.y) + '%' +
+            '<br/>Total: ' + Math.round(this.point._total) + ' points' +
+            '<br/>Velocity: ' + Math.round(this.point._velocity) + ' points';
+            
+//        var this_point_index = this.series.data.indexOf( this.point );
+//        var this_series_index = this.series.index;
+//        var that_series_index = this.series.index == 0 ? 1 : 0; // assuming 2 series
+//        var that_series = args.chart.series[that_series_index];
+//        var that_point = that_series.data[this_point_index];
+//        return 'Client: ' + this.point.name +
+//               '<br/>Client Health: ' + this.x +
+//               '<br/>' + this.series.name + ' Bandwidth: ' + this.y + 'Kbps' +
+//               '<br/>' + that_series.name + ' Bandwidth: ' + that_point.y + 'Kbps';
     },
 
     createChart : function(categories,seriesData,callback) {
@@ -234,11 +373,15 @@ Ext.define("TSProgressByProject", {
         // for some reason the original approach of the subclassed chart wasn't replacing
         // the plotline when destroyed and recreated
         
+        var ytext = '% of Scheduled Stories by State by Points';
+        if ( that.considerVelocity ) {
+            ytext = 'Scheduled Stories by State by Points (as a % of Average Velocity)'
+        }
         var yAxis = {
             min: 0,
             max: 100,
             title: {
-                text: '% of Scheduled Stories by State by Points'
+                text: ytext
             }
         };
         
@@ -274,14 +417,24 @@ Ext.define("TSProgressByProject", {
                             enabled: true,
                             align: 'center',
                             formatter : function() {
-                                return (this.y !== 0) ? (Math.round(this.y) + " %") : "";
+                                if ( this.y === 0 ) { return ""; }
+                                var value = Math.round(this.y);
+                                if ( this.point._total > this.point._velocity ) {
+                                    return "<span class='icon-warning'></span>" + value + " %";
+                                }
+                                return value + " %";
+                                
                             },
+                            useHTML: true,
                             color: '#FFFFFF'
                         },
                         stacking: 'normal'
                     }        
                 },
-                tooltip: { enabled: false }
+                tooltip: { 
+                    enabled: true,
+                    formatter: that.formatter
+                }
             }
         });
 
@@ -496,6 +649,14 @@ Ext.define("TSProgressByProject", {
                 labelAlign: 'left',
                 width: 250,
                 margin: 25
+            },
+            {
+                name: 'considerVelocity',
+                xtype: 'rallycheckboxfield',
+                boxLabelAlign: 'after',
+                fieldLabel: '',
+                margin: '0 0 25 200',
+                boxLabel: 'Consider Velocity<br/><span style="color:#999999;"><i>Tick to make display bars a percentage of historical velocity</i></span>'
             },
             {
                 name: 'showScopeSelector',

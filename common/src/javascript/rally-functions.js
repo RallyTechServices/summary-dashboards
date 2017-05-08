@@ -16,7 +16,37 @@ Ext.define("RallyFunctions", function() {
             this.initConfig(config);
             return this;
         },
-
+    
+    loadWsapiRecords: function(config,returnOperation){
+        var deferred = Ext.create('Deft.Deferred');
+        var me = this;
+                
+        var default_config = {
+            model: 'Defect',
+            fetch: ['ObjectID']
+        };
+        
+        var full_config =  Ext.Object.merge(default_config,config);
+        var store_class_name = 'Rally.data.wsapi.Store';
+        if ( full_config.models ) {
+            store_class_name = 'Rally.data.wsapi.artifact.Store';
+        }
+        Ext.create(store_class_name, full_config).load({
+            callback : function(records, operation, successful) {
+                if (successful){
+                    if ( returnOperation ) {
+                        deferred.resolve(operation);
+                    } else {
+                        deferred.resolve(records);
+                    }
+                } else {
+                    deferred.reject('Problem loading: ' + operation.error.errors.join('. '));
+                }
+            }
+        });
+        return deferred.promise;
+    },
+    
         _wsapiQuery : function( config , callback ) {
 
             var storeConfig = {

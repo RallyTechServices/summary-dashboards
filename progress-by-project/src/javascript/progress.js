@@ -106,11 +106,15 @@ Ext.define("TSProgressByProject", {
     run: function(releaseName,iterationName) {
         this.logger.log('release/iteration', releaseName, iterationName);
         
-        var that = this;
         if ( ! Ext.isEmpty(this.chart) ) {
             this.chart.destroy();
         }
-        
+        this._findItemsAndMakeChart(releaseName,iterationName);
+
+    },
+    
+    _findItemsAndMakeChart: function(releaseName,iterationName) {
+        var that = this;
         var feature_field = this._getFeatureFieldName();
 
         var filter_values =  this.fieldValuePicker && this.fieldValuePicker.getValue() || [];
@@ -136,13 +140,113 @@ Ext.define("TSProgressByProject", {
         });
 
         pr.readProjectWorkItems(function(error, stories, projects, states) {
-            that.prepareChartData( stories, projects, states, function(error, categories, series) {
-                that.createChart( categories, series );
+            that._getVelocitiesByProjectOid(projects).then({
+                success: function(velocities_by_project_oid) {
+                    that.prepareChartData( stories, projects, states, velocities_by_project_oid, function(error, categories, series) {
+                        that.createChart( categories, series );
+                    }); 
+                },
+                failure: function(msg) {
+                    Ext.Msg.alert("Problem gathering data", msg);
+                }
             });
+
         });
-
     },
-
+    
+    _getVelocitiesByProjectOid: function(projects) {
+        var me = this, 
+            deferred = Ext.create('Deft.Deferred');
+        
+        var promises = [];
+        Ext.Array.each(projects, function(project) {
+            promises.push( function() { return me._getVelocityForProject(project); });
+        });
+        
+        Deft.Chain.sequence(promises,this).then({
+            success: function(velocities) {
+                me.logger.log("Velocities:", velocities);
+                var velocities_by_project_oid = {};
+                Ext.Array.each(velocities, function(velocity,idx) {
+                    var project_oid = projects[idx].get('ObjectID');
+                    velocities_by_project_oid[project_oid] = velocity;
+                });
+                
+                deferred.resolve(velocities_by_project_oid);
+            },
+            failure: function(msg){
+                deferred.reject(msg);
+            }
+        });
+        return deferred.promise;
+    },
+    
+    _getVelocityForProject: function(project){
+        var deferred = Ext.create('Deft.Deferred');
+        this.logger.log('_getVelocityForProject', project);
+        // get last six iterations
+        this._getLastSixIterations(project).then({
+            scope: this,
+            success: function(iterations) {
+                this.logger.log("six iterations:", iterations);
+                var filter = [];
+                Ext.Array.each(iterations, function(iteration){
+                    filter.push({property:'Iteration.Name',value: iteration.get('Name')});
+                });
+                var filters = Rally.data.wsapi.Filter.or(filter);
+                
+                filters = filters.and(Ext.create('Rally.data.wsapi.Filter',{
+                    property:'AcceptedDate',
+                    operator: '!=',
+                    value: null
+                }));
+                var config = {
+                    models: ['HierarchicalRequirement','Defect','TestSet','DefectSuite'],
+                    fetch: ['PlanEstimate'],
+                    filters: filters,
+                    limit: Infinity,
+                    pageSize: 2000
+                };
+                
+                this.rallyFunctions.loadWsapiRecords(config).then({ 
+                    success: function(artifacts) {
+                        var pe = 0;
+                        Ext.Array.each(artifacts, function(artifact) {
+                            var estimate = artifact.get('PlanEstimate') || 0;
+                            pe = pe + estimate;
+                        });
+                        var average = pe / iterations.length;
+                        deferred.resolve(average);
+                    },
+                    failure: function(msg) {
+                        deferred.reject(msg);
+                    }
+                });
+            },
+            failure: function(msg) {
+                deferred.reject(msg);
+            }
+        });
+        return deferred.promise;
+    },
+    
+    _getLastSixIterations: function(project) {
+        var today_iso = Rally.util.DateTime.toIsoString(new Date());
+        var config = {
+            limit: 6,
+            pageSize: 6,
+            model:'Iteration',
+            fetch: ['Name'],
+            sorters: { property: 'EndDate', direction: 'DESC' },
+            filters: [
+                {property: 'EndDate', operator: '<', value: today_iso},
+                {property: 'Project.ObjectID', value: project.get('ObjectID') }
+            ]
+        };
+        
+        return this.rallyFunctions.loadWsapiRecords(config);
+    },
+    
     _timeboxChanged : function(timebox) {
         this.logger.log('_timeboxChanged', timebox);
         
@@ -176,11 +280,14 @@ Ext.define("TSProgressByProject", {
         }
     },
 
-    prepareChartData : function(stories, projects, states, callback) {
+    prepareChartData : function(stories, projects, states, velocities_by_project_oid, callback) {
         var that = this;
 
+        this.logger.log("prepareChartData", velocities_by_project_oid);
+        
         var projectKeys = _.map(projects,function(project) { return _.last(project.get("Name").split('>')); });
 
+        console.log(projectKeys);
         var pointsValue = function(value) {
             return !_.isUndefined(value) && !_.isNull(value) ? value : 0;
         };

@@ -196,6 +196,10 @@ Ext.define("TSProgressByProject", {
                 Ext.Array.each(iterations, function(iteration){
                     filter.push({property:'Iteration.Name',value: iteration.get('Name')});
                 });
+                if ( iterations.length === 0 ) { 
+                    deferred.resolve(0);
+                    return;
+                }
                 var filters = Rally.data.wsapi.Filter.or(filter);
                 
                 filters = filters.and(Ext.create('Rally.data.wsapi.Filter',{
@@ -290,7 +294,6 @@ Ext.define("TSProgressByProject", {
         
         var projectKeys = _.map(projects,function(project) { return _.last(project.get("Name").split('>')); });
 
-        console.log(projectKeys);
         var pointsValue = function(value) {
             return !_.isUndefined(value) && !_.isNull(value) ? value : 0;
         };
@@ -303,7 +306,7 @@ Ext.define("TSProgressByProject", {
                     return memo + pointsValue(workItem.get("PlanEstimate"));
             },0);
             
-            console.log( 'total, past velocity', total, past_velocity);
+            //console.log( 'total, past velocity', total, past_velocity);
 
             var denominator = total;
             if ( total <= past_velocity && that.considerVelocity) {

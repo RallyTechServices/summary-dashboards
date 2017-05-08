@@ -319,7 +319,7 @@ Ext.define("TSProgressByProject", {
             },0);
 
             var p = ( denominator > 0 ? ((stateTotal/denominator)*100) : 0);
-            return p;
+            return { p: p, total: total };
         };
 
         var summary = that.createSummaryRecord();
@@ -328,13 +328,34 @@ Ext.define("TSProgressByProject", {
             return {
                 name : summaryKey,
                 data : _.map( projectKeys, function( projectKey, index ) {
-                    return summarize( stories[index] , summary[summaryKey], velocities_by_project_name[projectKey]);
+                    return  { 
+                        _total: summarize( stories[index] , summary[summaryKey], velocities_by_project_name[projectKey]).total,
+                        y: summarize( stories[index] , summary[summaryKey], velocities_by_project_name[projectKey]).p,
+                        _velocity: velocities_by_project_name[projectKey]
+                    };
                 })
             };
         });
         
         callback(null, projectKeys, seriesData );
 
+    },
+
+    formatter: function(args) {
+        console.log('hi');
+        return this.series.name + ': ' + Math.round(this.y) + '%' +
+            '<br/>Total: ' + Math.round(this.point._total) + ' points' +
+            '<br/>Velocity: ' + Math.round(this.point._velocity) + ' points';
+            
+//        var this_point_index = this.series.data.indexOf( this.point );
+//        var this_series_index = this.series.index;
+//        var that_series_index = this.series.index == 0 ? 1 : 0; // assuming 2 series
+//        var that_series = args.chart.series[that_series_index];
+//        var that_point = that_series.data[this_point_index];
+//        return 'Client: ' + this.point.name +
+//               '<br/>Client Health: ' + this.x +
+//               '<br/>' + this.series.name + ' Bandwidth: ' + this.y + 'Kbps' +
+//               '<br/>' + that_series.name + ' Bandwidth: ' + that_point.y + 'Kbps';
     },
 
     createChart : function(categories,seriesData,callback) {
@@ -404,7 +425,10 @@ Ext.define("TSProgressByProject", {
                         stacking: 'normal'
                     }        
                 },
-                tooltip: { enabled: false }
+                tooltip: { 
+                    enabled: true,
+                    formatter: that.formatter
+                }
             }
         });
 

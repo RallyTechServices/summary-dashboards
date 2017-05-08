@@ -342,7 +342,6 @@ Ext.define("TSProgressByProject", {
     },
 
     formatter: function(args) {
-        console.log('hi');
         return this.series.name + ': ' + Math.round(this.y) + '%' +
             '<br/>Total: ' + Math.round(this.point._total) + ' points' +
             '<br/>Velocity: ' + Math.round(this.point._velocity) + ' points';
@@ -418,8 +417,15 @@ Ext.define("TSProgressByProject", {
                             enabled: true,
                             align: 'center',
                             formatter : function() {
-                                return (this.y !== 0) ? (Math.round(this.y) + " %") : "";
+                                if ( this.y === 0 ) { return ""; }
+                                var value = Math.round(this.y);
+                                if ( this.point._total > this.point._velocity ) {
+                                    return "<span class='icon-warning'></span>" + value + " %";
+                                }
+                                return value + " %";
+                                
                             },
+                            useHTML: true,
                             color: '#FFFFFF'
                         },
                         stacking: 'normal'

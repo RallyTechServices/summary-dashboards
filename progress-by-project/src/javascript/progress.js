@@ -116,8 +116,6 @@ Ext.define("TSProgressByProject", {
     },
 
     run: function(releaseName,iterationName) {
-        this.logger.log('release/iteration', releaseName, iterationName);
-
         if ( ! Ext.isEmpty(this.chart) ) {
             this.chart.destroy();
         }
@@ -133,6 +131,8 @@ Ext.define("TSProgressByProject", {
         var filter_field  = this.getSetting('filterField');
 
         this.setLoading("Loading Stories in Project...");
+
+        this.logger.log("Making filter for ", releaseName, iterationName);
 
         var filter = that.rallyFunctions.createFilter(releaseName,iterationName, feature_field);
 
@@ -177,7 +177,6 @@ Ext.define("TSProgressByProject", {
 
         Deft.Chain.sequence(promises,this).then({
             success: function(velocities) {
-                me.logger.log("Velocities:", velocities);
                 var velocities_by_project_name = {};
                 Ext.Array.each(velocities, function(velocity,idx) {
                     var project_name = projects[idx].get('Name');
@@ -195,7 +194,6 @@ Ext.define("TSProgressByProject", {
 
     _getVelocityForProject: function(project){
         var deferred = Ext.create('Deft.Deferred');
-        this.logger.log('_getVelocityForProject', project);
         // get last six iterations
         this._getLastSixIterations(project).then({
             scope: this,
@@ -217,7 +215,8 @@ Ext.define("TSProgressByProject", {
                     value: null
                 }));
                 var config = {
-                    models: ['HierarchicalRequirement','Defect','TestSet','DefectSuite'],
+                    //models: ['HierarchicalRequirement','Defect','TestSet','DefectSuite'],
+                    models: ['HierarchicalRequirement'],
                     fetch: ['PlanEstimate'],
                     filters: filters,
                     limit: Infinity,
@@ -267,7 +266,7 @@ Ext.define("TSProgressByProject", {
         this.logger.log('_timeboxChanged', timebox);
 
         if (timebox.get("_type")==='release') {
-        	this.run(timebox.get("Name"),null);
+            this.run(timebox.get("Name"),null);
         } else {
             this.run(null,timebox.get("Name"));
         }
@@ -284,8 +283,6 @@ Ext.define("TSProgressByProject", {
     },
 
     onTimeboxScopeChange: function(newTimeboxScope) {
-    	this.logger.log('onTimeboxScopeChange', newTimeboxScope);
-
         this.callParent(arguments);
         if ((newTimeboxScope) && (newTimeboxScope.getType() === 'iteration')) {
             this.run(null,newTimeboxScope.getRecord().get("Name"));
@@ -299,8 +296,6 @@ Ext.define("TSProgressByProject", {
     prepareChartData : function(stories, projects, states, velocities_by_project_name, callback) {
         var that = this;
 
-        this.logger.log("prepareChartData", velocities_by_project_name);
-
         var projectKeys = _.map(projects,function(project) { return _.last(project.get("Name").split('>')); });
 
         var pointsValue = function(value) {
@@ -309,7 +304,6 @@ Ext.define("TSProgressByProject", {
 
         // totals points for a set of work items based on if they are in a set of states
         var summarize = function( workItems, states, past_velocity ) {
-
             // calc total points
             var total = _.reduce(workItems, function(memo,workItem) {
                     return memo + pointsValue(workItem.get("PlanEstimate"));
@@ -318,7 +312,8 @@ Ext.define("TSProgressByProject", {
             //console.log( 'total, past velocity', total, past_velocity);
 
             var denominator = total;
-            if ( total <= past_velocity && that.considerVelocity) {
+            if ( total <= past_velocity && that.considerVelocity && !that.iteration ) {
+                that.logger.log('No iteration chosen');
                 denominator = past_velocity;
             }
             // totals points for a set of work items based on if they are in a set of states
@@ -328,7 +323,8 @@ Ext.define("TSProgressByProject", {
             },0);
 
             var p = ( denominator > 0 ? ((stateTotal/denominator)*100) : 0);
-            return { p: p, total: total };
+            var summary = { p: p, total: total };
+            return summary;
         };
 
         var summary = that.createSummaryRecord();
@@ -383,7 +379,7 @@ Ext.define("TSProgressByProject", {
         // the plotline when destroyed and recreated
 
         var ytext = '% of Scheduled Stories by State by Points';
-        if ( that.considerVelocity ) {
+        if ( that.considerVelocity && !that.iteration ) {
             ytext = 'Scheduled Stories by State by Points (as a % of Average Velocity)'
         }
         var yAxis = {
@@ -398,7 +394,6 @@ Ext.define("TSProgressByProject", {
             yAxis.plotLines = [timebox_progress_plotline];
         }
 
-        if ( that.chart ) { that.chart.destroy(); }
         that.chart = Ext.create('Rally.ui.chart.Chart',{
             itemId: 'rally-chart',
             chartColors : ["#ee6c19","#FAD200","#3F86C9","#8DC63F", "#888", "#222"],
@@ -447,7 +442,9 @@ Ext.define("TSProgressByProject", {
                 }
             }
         });
-
+        if ( that.down('#rally-chart') ) {
+            that.down('#rally-chart').destroy();
+        }
         that.add(that.chart);
 
         var chart = this.down("#rally-chart");

@@ -17,10 +17,7 @@ Ext.define("TSProgressByProject", {
     chart: null,
 
     launch: function() {
-        var me = this;
-
         this.considerVelocity = this.getSetting('considerVelocity');
-
         Deft.Chain.sequence([
             this._getPortfolioItemTypes,
             this._getAvailableStates
@@ -29,14 +26,10 @@ Ext.define("TSProgressByProject", {
             success: function(results) {
                 var states = results[1],
                     types = results[0];
-
                 this.bottom_type_path = types[0].get('TypePath');
-
                 this._launch(this.getSettings());
-
             }
         });
-
     },
 
     _launch: function(settings) {
@@ -94,6 +87,7 @@ Ext.define("TSProgressByProject", {
     },
 
     _changeRelease: function(release) {
+        this.logger.log("Change release", release);
         this.release = release;
         this.iteration = null;
         if ( !Ext.isEmpty(this.release) ) {
@@ -102,6 +96,7 @@ Ext.define("TSProgressByProject", {
     },
 
     _changeIteration: function(iteration) {
+        this.logger.log("Change Iteration", iteration);
         this.iteration = iteration;
         if ( !Ext.isEmpty(iteration) ) {
             if ( !Ext.isEmpty(this.release) ) {
@@ -116,11 +111,11 @@ Ext.define("TSProgressByProject", {
     },
 
     run: function(releaseName,iterationName) {
+        console.trace(releaseName);
         if ( ! Ext.isEmpty(this.chart) ) {
             this.chart.destroy();
         }
         this._findItemsAndMakeChart(releaseName,iterationName);
-
     },
 
     _findItemsAndMakeChart: function(releaseName,iterationName) {
@@ -288,7 +283,10 @@ Ext.define("TSProgressByProject", {
             this.run(null,newTimeboxScope.getRecord().get("Name"));
         } else {
             if ((newTimeboxScope) && (newTimeboxScope.getType() === 'release')) {
-                this.run(newTimeboxScope.getRecord().get("Name"),null);
+                this.release = newTimeboxScope.getRecord();
+                this.publish('timeboxReleaseChanged', this.release);
+
+                this.run(this.release.getName(),null);
             }
         }
     },
@@ -313,7 +311,6 @@ Ext.define("TSProgressByProject", {
 
             var denominator = total;
             if ( total <= past_velocity && that.considerVelocity && !that.iteration ) {
-                that.logger.log('No iteration chosen');
                 denominator = past_velocity;
             }
             // totals points for a set of work items based on if they are in a set of states

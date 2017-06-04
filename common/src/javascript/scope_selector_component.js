@@ -8,7 +8,7 @@ Ext.define('timebox-selector', {
     configs: {
     	iterationNoEntryText: 'PI Scope'
     },
-    
+
     mixins : [
         'Rally.Messageable'
     ],
@@ -21,21 +21,25 @@ Ext.define('timebox-selector', {
         this.callParent(arguments);
         this._createReleaseCombo();
         this.addEvents('releasechange','iterationchange');
-        
+
         // configured to allow others to ask what the current selection is,
         // in case they missed the initial message
+        this.subscribe(this, 'timeboxReleaseChanged', this._updateIterationCombo, this);
         this.subscribe(this, 'requestTimebox', this._requestTimebox, this);
-        
+// subscribe here so that if the release of the whole PAGE canges, want to
+// update the iteration list
     },
     _createReleaseCombo : function() {
-    	var timeboxScope = Rally.getApp().getContext().getTimeboxScope();
-    	if ( timeboxScope && timeboxScope.getType() === "release" ) {
-    		var release = timeboxScope.getRecord();
-    		this.fireEvent('releasechange',release);
-    		this.publish('timeboxReleaseChanged', release);
+        var timeboxScope = Rally.getApp().getContext().getTimeboxScope();
+        if ( timeboxScope && timeboxScope.getType() === "release" ) {
+            // the page has release selector
+            var release = timeboxScope.getRecord();
+            console.log("Page has release: ", release);
+            this.fireEvent('releasechange',release);
+            this.publish('timeboxReleaseChanged', release);
             this._updateIterationCombo(release);
-    		return;
-    	}
+            return;
+        }
         this._releaseCombo = this.add({
             xtype : 'rallyreleasecombobox',
             fieldLabel : 'Program Increment',
@@ -53,23 +57,21 @@ Ext.define('timebox-selector', {
             growToLongestValue : true,
             defaultToCurrentTimebox : true,
             listeners : {
-                change : function(t, newVal, oldVal, eOpts)
-                {
+                change : function(t, newVal, oldVal, eOpts) {
                     var release = t.getRecord();
                     this.fireEvent('releasechange',release);
-
                     this.publish('timeboxReleaseChanged', release);
-                    this._updateIterationCombo(release);
                 },
                 scope : this
             }
         });
     },
     _updateIterationCombo : function(release) {
+        console.log("Update iteration combobox");
         this.remove('globaliterationpicker');
         this.fireEvent('iterationchange',null);
         this.publish('timeboxIterationChanged', null);
-                    
+
         var endFilter = Ext.create('Rally.data.wsapi.Filter', {
             property : "EndDate",
             operator : "<=",
@@ -110,8 +112,7 @@ Ext.define('timebox-selector', {
                 filters : filters
             },
             listeners : {
-                change : function(t, newVal, oldVal, eOpts)
-                {
+                change : function(t, newVal, oldVal, eOpts) {
                     var iteration = t.getRecord();
                     this.fireEvent('iterationchange',iteration);
                     this.publish('timeboxIterationChanged', iteration);
@@ -121,11 +122,11 @@ Ext.define('timebox-selector', {
         });
     },
     _requestTimebox : function(source) {
-         var release = this.getReleaseRecord();
+        var release = this.getReleaseRecord();
         if (release) {
             this.publish('timeboxReleaseChanged', release);
-        } 
-        
+        }
+
         var iteration = this.getIterationRecord();
         if (iteration) {
             this.publish("timeboxIterationChanged",  iteration);

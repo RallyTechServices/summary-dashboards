@@ -111,7 +111,6 @@ Ext.define("TSProgressByProject", {
     },
 
     run: function(releaseName,iterationName) {
-        console.trace(releaseName);
         if ( ! Ext.isEmpty(this.chart) ) {
             this.chart.destroy();
         }
@@ -226,7 +225,8 @@ Ext.define("TSProgressByProject", {
                             pe = pe + estimate;
                         });
                         var average = pe / iterations.length;
-                        deferred.resolve(average);
+                        //deferred.resolve(average);
+                        deferred.resolve(pe);
                     },
                     failure: function(msg) {
                         deferred.reject(msg);
@@ -377,7 +377,7 @@ Ext.define("TSProgressByProject", {
 
         var ytext = '% of Scheduled Stories by State by Points';
         if ( that.considerVelocity && !that.iteration ) {
-            ytext = 'Scheduled Stories by State by Points (as a % of Average Velocity)'
+            ytext = 'Scheduled Stories by State by Points (as a % of 6 Sprint Velocity Total)'
         }
         var yAxis = {
             min: 0,

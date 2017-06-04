@@ -1,4 +1,3 @@
-
 Ext.define("TSProgressByProject", {
     extend: 'Rally.app.App',
     componentCls: 'app',
@@ -16,12 +15,9 @@ Ext.define("TSProgressByProject", {
         }
     },
     chart: null,
-    
+
     launch: function() {
-        var me = this;
-        
         this.considerVelocity = this.getSetting('considerVelocity');
-        
         Deft.Chain.sequence([
             this._getPortfolioItemTypes,
             this._getAvailableStates
@@ -30,21 +26,17 @@ Ext.define("TSProgressByProject", {
             success: function(results) {
                 var states = results[1],
                     types = results[0];
-                    
                 this.bottom_type_path = types[0].get('TypePath');
-
                 this._launch(this.getSettings());
-                
             }
         });
-        
     },
 
     _launch: function(settings) {
         var that = this;
-        
+
         that.rallyFunctions = Ext.create("RallyFunctions");
-        
+
         if ( settings.showScopeSelector === true || settings.showScopeSelector === "true" ) {
             this.down('#selector_box').add({
                 xtype : 'timebox-selector',
@@ -66,11 +58,11 @@ Ext.define("TSProgressByProject", {
             this.subscribe(this, 'timeboxIterationChanged', this._changeIteration, this);
             this.publish('requestTimebox', this);
         }
-        
+
         if ( this.getSetting('filterField') ) {
             var display_name = this.getSetting('filterFieldName') || this.getSetting('filterField');
         	var label = Ext.String.format('Restrict {0} to:', display_name);
-        	
+
             this.fieldValuePicker = this.down('#selector_box').add({
                 xtype: 'rallyfieldvaluecombobox',
                 fieldLabel: label,
@@ -95,27 +87,36 @@ Ext.define("TSProgressByProject", {
     },
 
     _changeRelease: function(release) {
+        this.logger.log("Change release", release);
         this.release = release;
-        this.run(release.get("Name"),null);
+        this.iteration = null;
+        if ( !Ext.isEmpty(this.release) ) {
+            this.run(release.get("Name"),null);
+        }
     },
 
     _changeIteration: function(iteration) {
+        this.logger.log("Change Iteration", iteration);
         this.iteration = iteration;
         if ( !Ext.isEmpty(iteration) ) {
-            this.run(null,iteration.get("Name"));
+            if ( !Ext.isEmpty(this.release) ) {
+                this.run(this.release.get('Name'), this.iteration.get('Name') );
+            } else {
+                this.run(null,iteration.get("Name"));
+            }
+            return;
+        } else if (!Ext.isEmpty(this.release) ) {
+            this.run(this.release.get('Name'),null);
         }
     },
 
     run: function(releaseName,iterationName) {
-        this.logger.log('release/iteration', releaseName, iterationName);
-        
         if ( ! Ext.isEmpty(this.chart) ) {
             this.chart.destroy();
         }
         this._findItemsAndMakeChart(releaseName,iterationName);
-
     },
-    
+
     _findItemsAndMakeChart: function(releaseName,iterationName) {
         var that = this;
         var feature_field = this._getFeatureFieldName();
@@ -124,11 +125,13 @@ Ext.define("TSProgressByProject", {
         var filter_field  = this.getSetting('filterField');
 
         this.setLoading("Loading Stories in Project...");
-        
+
+        this.logger.log("Making filter for ", releaseName, iterationName);
+
         var filter = that.rallyFunctions.createFilter(releaseName,iterationName, feature_field);
-        
+
         if ( filter_field && filter_values && filter_values.length > 0 ) {
-            
+
             var filter_ors = Ext.Array.map(filter_values, function(value){
                 if ( value == "None" ) { value = ""; }
                 return {property: feature_field + "." + filter_field, value: value};
@@ -136,7 +139,7 @@ Ext.define("TSProgressByProject", {
             var or_filter = Rally.data.wsapi.Filter.or(filter_ors);
             filter = filter.and(or_filter);
         }
-        
+
         var pr = Ext.create( "ProjectStories", {
             ctx : that.getContext(),
             filter : filter
@@ -147,7 +150,7 @@ Ext.define("TSProgressByProject", {
                 success: function(velocities_by_project_name) {
                     that.prepareChartData( stories, projects, states, velocities_by_project_name, function(error, categories, series) {
                         that.createChart( categories, series );
-                    }); 
+                    });
                 },
                 failure: function(msg) {
                     Ext.Msg.alert("Problem gathering data", msg);
@@ -156,25 +159,24 @@ Ext.define("TSProgressByProject", {
 
         });
     },
-    
+
     _getVelocitiesByProjectName: function(projects) {
-        var me = this, 
+        var me = this,
             deferred = Ext.create('Deft.Deferred');
-        
+
         var promises = [];
         Ext.Array.each(projects, function(project) {
             promises.push( function() { return me._getVelocityForProject(project); });
         });
-        
+
         Deft.Chain.sequence(promises,this).then({
             success: function(velocities) {
-                me.logger.log("Velocities:", velocities);
                 var velocities_by_project_name = {};
                 Ext.Array.each(velocities, function(velocity,idx) {
                     var project_name = projects[idx].get('Name');
                     velocities_by_project_name[project_name] = velocity;
                 });
-                
+
                 deferred.resolve(velocities_by_project_name);
             },
             failure: function(msg){
@@ -183,10 +185,9 @@ Ext.define("TSProgressByProject", {
         });
         return deferred.promise;
     },
-    
+
     _getVelocityForProject: function(project){
         var deferred = Ext.create('Deft.Deferred');
-        this.logger.log('_getVelocityForProject', project);
         // get last six iterations
         this._getLastSixIterations(project).then({
             scope: this,
@@ -196,26 +197,27 @@ Ext.define("TSProgressByProject", {
                 Ext.Array.each(iterations, function(iteration){
                     filter.push({property:'Iteration.Name',value: iteration.get('Name')});
                 });
-                if ( iterations.length === 0 ) { 
+                if ( iterations.length === 0 ) {
                     deferred.resolve(0);
                     return;
                 }
                 var filters = Rally.data.wsapi.Filter.or(filter);
-                
+
                 filters = filters.and(Ext.create('Rally.data.wsapi.Filter',{
                     property:'AcceptedDate',
                     operator: '!=',
                     value: null
                 }));
                 var config = {
-                    models: ['HierarchicalRequirement','Defect','TestSet','DefectSuite'],
+                    //models: ['HierarchicalRequirement','Defect','TestSet','DefectSuite'],
+                    models: ['HierarchicalRequirement'],
                     fetch: ['PlanEstimate'],
                     filters: filters,
                     limit: Infinity,
                     pageSize: 2000
                 };
-                
-                this.rallyFunctions.loadWsapiRecords(config).then({ 
+
+                this.rallyFunctions.loadWsapiRecords(config).then({
                     success: function(artifacts) {
                         var pe = 0;
                         Ext.Array.each(artifacts, function(artifact) {
@@ -223,7 +225,8 @@ Ext.define("TSProgressByProject", {
                             pe = pe + estimate;
                         });
                         var average = pe / iterations.length;
-                        deferred.resolve(average);
+                        //deferred.resolve(average);
+                        deferred.resolve(pe);
                     },
                     failure: function(msg) {
                         deferred.reject(msg);
@@ -236,7 +239,7 @@ Ext.define("TSProgressByProject", {
         });
         return deferred.promise;
     },
-    
+
     _getLastSixIterations: function(project) {
         var today_iso = Rally.util.DateTime.toIsoString(new Date());
         var config = {
@@ -250,15 +253,15 @@ Ext.define("TSProgressByProject", {
                 {property: 'Project.ObjectID', value: project.get('ObjectID') }
             ]
         };
-        
+
         return this.rallyFunctions.loadWsapiRecords(config);
     },
-    
+
     _timeboxChanged : function(timebox) {
         this.logger.log('_timeboxChanged', timebox);
-        
+
         if (timebox.get("_type")==='release') {
-        	this.run(timebox.get("Name"),null);
+            this.run(timebox.get("Name"),null);
         } else {
             this.run(null,timebox.get("Name"));
         }
@@ -275,14 +278,15 @@ Ext.define("TSProgressByProject", {
     },
 
     onTimeboxScopeChange: function(newTimeboxScope) {
-    	this.logger.log('onTimeboxScopeChange', newTimeboxScope);
-    	
         this.callParent(arguments);
         if ((newTimeboxScope) && (newTimeboxScope.getType() === 'iteration')) {
             this.run(null,newTimeboxScope.getRecord().get("Name"));
         } else {
             if ((newTimeboxScope) && (newTimeboxScope.getType() === 'release')) {
-                this.run(newTimeboxScope.getRecord().get("Name"),null);
+                this.release = newTimeboxScope.getRecord();
+                this.publish('timeboxReleaseChanged', this.release);
+
+                this.run(this.release.getName(),null);
             }
         }
     },
@@ -290,8 +294,6 @@ Ext.define("TSProgressByProject", {
     prepareChartData : function(stories, projects, states, velocities_by_project_name, callback) {
         var that = this;
 
-        this.logger.log("prepareChartData", velocities_by_project_name);
-        
         var projectKeys = _.map(projects,function(project) { return _.last(project.get("Name").split('>')); });
 
         var pointsValue = function(value) {
@@ -300,26 +302,26 @@ Ext.define("TSProgressByProject", {
 
         // totals points for a set of work items based on if they are in a set of states
         var summarize = function( workItems, states, past_velocity ) {
-
             // calc total points
             var total = _.reduce(workItems, function(memo,workItem) {
                     return memo + pointsValue(workItem.get("PlanEstimate"));
             },0);
-            
+
             //console.log( 'total, past velocity', total, past_velocity);
 
             var denominator = total;
-            if ( total <= past_velocity && that.considerVelocity) {
+            if ( total <= past_velocity && that.considerVelocity && !that.iteration ) {
                 denominator = past_velocity;
             }
             // totals points for a set of work items based on if they are in a set of states
             var stateTotal = _.reduce(  workItems, function(memo,workItem) {
-                return memo + ( _.indexOf(states,workItem.get("ScheduleState")) > -1 ? 
+                return memo + ( _.indexOf(states,workItem.get("ScheduleState")) > -1 ?
                             pointsValue(workItem.get("PlanEstimate")) : 0);
             },0);
 
             var p = ( denominator > 0 ? ((stateTotal/denominator)*100) : 0);
-            return { p: p, total: total };
+            var summary = { p: p, total: total };
+            return summary;
         };
 
         var summary = that.createSummaryRecord();
@@ -328,7 +330,7 @@ Ext.define("TSProgressByProject", {
             return {
                 name : summaryKey,
                 data : _.map( projectKeys, function( projectKey, index ) {
-                    return  { 
+                    return  {
                         _total: summarize( stories[index] , summary[summaryKey], velocities_by_project_name[projectKey]).total,
                         y: summarize( stories[index] , summary[summaryKey], velocities_by_project_name[projectKey]).p,
                         _velocity: velocities_by_project_name[projectKey]
@@ -336,7 +338,7 @@ Ext.define("TSProgressByProject", {
                 })
             };
         });
-        
+
         callback(null, projectKeys, seriesData );
 
     },
@@ -345,7 +347,7 @@ Ext.define("TSProgressByProject", {
         return this.series.name + ': ' + Math.round(this.y) + '%' +
             '<br/>Total: ' + Math.round(this.point._total) + ' points' +
             '<br/>Velocity: ' + Math.round(this.point._velocity) + ' points';
-            
+
 //        var this_point_index = this.series.data.indexOf( this.point );
 //        var this_series_index = this.series.index;
 //        var that_series_index = this.series.index == 0 ? 1 : 0; // assuming 2 series
@@ -362,20 +364,20 @@ Ext.define("TSProgressByProject", {
         that.setLoading(false);
 
         var timebox_progress_plotline = this._getPlotLineForCurrentPoint(this.release,this.iteration);
-        
+
 //        that.chart = Ext.create('Rally.technicalservices.progressChart', {
 //            itemId: 'rally-chart',
 //            chartData: { series : seriesData, categories : categories },
 //            title: 'Progress By Project',
 //            plotLine: timebox_progress_plotline
 //        });
-        
+
         // for some reason the original approach of the subclassed chart wasn't replacing
         // the plotline when destroyed and recreated
-        
+
         var ytext = '% of Scheduled Stories by State by Points';
-        if ( that.considerVelocity ) {
-            ytext = 'Scheduled Stories by State by Points (as a % of Average Velocity)'
+        if ( that.considerVelocity && !that.iteration ) {
+            ytext = 'Scheduled Stories by State by Points (as a % of 6 Sprint Velocity Total)'
         }
         var yAxis = {
             min: 0,
@@ -384,11 +386,11 @@ Ext.define("TSProgressByProject", {
                 text: ytext
             }
         };
-        
+
         if ( !Ext.isEmpty(timebox_progress_plotline) ) {
             yAxis.plotLines = [timebox_progress_plotline];
         }
-        
+
         that.chart = Ext.create('Rally.ui.chart.Chart',{
             itemId: 'rally-chart',
             chartColors : ["#ee6c19","#FAD200","#3F86C9","#8DC63F", "#888", "#222"],
@@ -423,46 +425,48 @@ Ext.define("TSProgressByProject", {
                                     return "<span class='icon-warning'></span>" + value + " %";
                                 }
                                 return value + " %";
-                                
+
                             },
                             useHTML: true,
                             color: '#FFFFFF'
                         },
                         stacking: 'normal'
-                    }        
+                    }
                 },
-                tooltip: { 
+                tooltip: {
                     enabled: true,
                     formatter: that.formatter
                 }
             }
         });
-
+        if ( that.down('#rally-chart') ) {
+            that.down('#rally-chart').destroy();
+        }
         that.add(that.chart);
 
         var chart = this.down("#rally-chart");
         var p = Ext.get(chart.id);
         var elems = p.query("div.x-mask");
-        _.each(elems, function(e) { 
-            if ( Ext.isIE9 ) { 
-                e.removeNode(); 
-            } else { 
-                e.remove(); 
+        _.each(elems, function(e) {
+            if ( Ext.isIE9 ) {
+                e.removeNode();
+            } else {
+                e.remove();
             }
         });
         elems = p.query("div.x-mask-msg");
-        _.each(elems, function(e) { 
-            if ( Ext.isIE9 ) { 
-                e.removeNode(); 
-            } else { 
-                e.remove(); 
+        _.each(elems, function(e) {
+            if ( Ext.isIE9 ) {
+                e.removeNode();
+            } else {
+                e.remove();
             }
         });
     },
-        
+
     _getPortfolioItemTypes: function(workspace) {
         var deferred = Ext.create('Deft.Deferred');
-                
+
         var store_config = {
             fetch: ['Name','ElementName','TypePath'],
             model: 'TypeDefinition',
@@ -489,25 +493,25 @@ Ext.define("TSProgressByProject", {
                 }
             }
         };
-        
-        if ( !Ext.isEmpty(workspace) ) {            
-            store_config.context = { 
+
+        if ( !Ext.isEmpty(workspace) ) {
+            store_config.context = {
                 project:null,
                 workspace: workspace._ref ? workspace._ref : workspace.get('_ref')
             };
         }
-                
+
         var store = Ext.create('Rally.data.wsapi.Store', store_config );
-                    
+
         return deferred.promise;
     },
-    
+
     _getAvailableStates: function() {
         var deferred = Ext.create('Deft.Deferred');
         var me = this;
-        
+
         this.scheduleStates = [];
-        
+
         Rally.data.ModelFactory.getModel({
             type: 'UserStory',
             success: function(model) {
@@ -516,7 +520,7 @@ Ext.define("TSProgressByProject", {
                         Ext.Array.each(records, function(allowedValue) {
                             me.scheduleStates.push(allowedValue.get('StringValue'));
                         });
-                        
+
                         deferred.resolve(me.scheduleStates);
                     }
                 });
@@ -525,12 +529,12 @@ Ext.define("TSProgressByProject", {
         return deferred.promise;
     },
 
-    // utilities below here ... 
-    createSummaryRecord : function() { 
+    // utilities below here ...
+    createSummaryRecord : function() {
 
         var that = this;
         var summary = {};
-        
+
         Ext.Array.each(this.scheduleStates, function(state){
             summary[state] = [ state ];
         });
@@ -545,39 +549,39 @@ Ext.define("TSProgressByProject", {
 
         return summary;
     },
-    
+
     _getPlotLineForCurrentPoint: function(release,iteration){
         if ( Ext.isEmpty(iteration) && Ext.isEmpty(release) ) {
             return null;
         }
-                
+
         var timebox_start = null;
         var timebox_end = null;
         var timebox_type = null;
-        
+
         if ( !Ext.isEmpty(release) ) {
             timebox_start = release.get('ReleaseStartDate');
             timebox_end = release.get('ReleaseDate');
             timebox_type = 'Release';
         }
-        
+
         if ( !Ext.isEmpty(iteration) && !Ext.isEmpty(iteration.get('StartDate') ) ) {
             timebox_start = iteration.get('StartDate');
             timebox_end = iteration.get('EndDate');
             timebox_type = 'Iteration';
         }
-        
+
         var today = new Date();
-        
+
         var timebox_length = Rally.util.DateTime.getDifference(timebox_end, timebox_start, 'day');
         var time_since_start = Rally.util.DateTime.getDifference(today, timebox_start, 'day');
-        
+
         var progress = time_since_start / timebox_length;
-        
+
         if ( progress < 0 || progress > 1 ) {
             return null;
         }
-        
+
         var plotline = {
             value: 100 * progress,
             color: 'green',
@@ -597,11 +601,11 @@ Ext.define("TSProgressByProject", {
         path = path.replace(/^.*\//,'');
         return path;
     },
-    
+
     getSettingsFields: function() {
         var me = this;
-        
-        return [ 
+
+        return [
         	{
             	name: 'filterFieldName',
             	xtype:'rallytextfield',
@@ -616,13 +620,13 @@ Ext.define("TSProgressByProject", {
                 width: 250,
                 margin: 25,
                 autoExpand: false,
-                alwaysExpanded: false,                
+                alwaysExpanded: false,
                 model: this.bottom_type_path,
                 _isNotHidden: function(field) {
                     if ( field.hidden ) { return false; }
                     var defn = field.attributeDefinition;
                     if ( Ext.isEmpty(defn) ) { return false; }
-                    
+
                     return ( defn.Constrained && ( defn.AttributeType == 'STRING' || defn.AttributeType == 'RATING' ));
                 },
                 listeners: {

@@ -111,15 +111,13 @@ Ext.define("TSProgressByProject", {
     },
 
     run: function(releaseName,iterationName) {
-        if ( ! Ext.isEmpty(this.chart) ) {
-            this.chart.destroy();
-        }
         this._findItemsAndMakeChart(releaseName,iterationName);
     },
 
     _findItemsAndMakeChart: function(releaseName,iterationName) {
-        var that = this;
-        var feature_field = this._getFeatureFieldName();
+        var that = this,
+            feature_field = this._getFeatureFieldName(),
+            deferred = Ext.create('Deft.Deferred');
 
         var filter_values =  this.fieldValuePicker && this.fieldValuePicker.getValue() || [];
         var filter_field  = this.getSetting('filterField');
@@ -150,14 +148,16 @@ Ext.define("TSProgressByProject", {
                 success: function(velocities_by_project_name) {
                     that.prepareChartData( stories, projects, states, velocities_by_project_name, function(error, categories, series) {
                         that.createChart( categories, series );
+                        deferred.resolve();
                     });
                 },
                 failure: function(msg) {
                     Ext.Msg.alert("Problem gathering data", msg);
+                    deferred.reject('Problem gathering data' + msg);
                 }
             });
-
         });
+        return deferred.promise;
     },
 
     _getVelocitiesByProjectName: function(projects) {
@@ -192,7 +192,7 @@ Ext.define("TSProgressByProject", {
         this._getLastSixIterations(project).then({
             scope: this,
             success: function(iterations) {
-                this.logger.log("six iterations:", iterations);
+                //this.logger.log(project.get('_refObjectName'), "six iterations:", iterations);
                 var filter = [];
                 Ext.Array.each(iterations, function(iteration){
                     filter.push({property:'Iteration.Name',value: iteration.get('Name')});
@@ -213,6 +213,11 @@ Ext.define("TSProgressByProject", {
                     models: ['HierarchicalRequirement'],
                     fetch: ['PlanEstimate'],
                     filters: filters,
+                    context: {
+                        project: { _ref: project.get('_ref') },
+                        projectScopeDown: true,
+                        projectScopeUp: false
+                    },
                     limit: Infinity,
                     pageSize: 2000
                 };

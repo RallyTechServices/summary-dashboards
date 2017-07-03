@@ -211,7 +211,7 @@ Ext.define("TSProgressByProject", {
                 var config = {
                     //models: ['HierarchicalRequirement','Defect','TestSet','DefectSuite'],
                     models: ['HierarchicalRequirement'],
-                    fetch: ['PlanEstimate'],
+                    fetch: ['PlanEstimate','FormattedID','ScheduleState','Name'],
                     filters: filters,
                     context: {
                         project: { _ref: project.get('_ref') },
@@ -338,7 +338,12 @@ Ext.define("TSProgressByProject", {
                     return  {
                         _total: summarize( stories[index] , summary[summaryKey], velocities_by_project_name[projectKey]).total,
                         y: summarize( stories[index] , summary[summaryKey], velocities_by_project_name[projectKey]).p,
-                        _velocity: velocities_by_project_name[projectKey]
+                        _velocity: velocities_by_project_name[projectKey],
+                        events: {
+                            click: function() {
+                                that._showDetailsDialog(projectKey,stories[index]);
+                            }
+                        }
                     };
                 })
             };
@@ -676,5 +681,40 @@ Ext.define("TSProgressByProject", {
                 boxLabel: 'Show Scope Selector<br/><span style="color:#999999;"><i>Tick to use this to broadcast settings.</i></span>'
             }
         ];
+    },
+
+    _showDetailsDialog: function(project,workItems){
+        console.log(project, workItems);
+        title = 'Stories for ' + project;
+        Ext.create('Rally.ui.dialog.Dialog',{
+            id: 'detail',
+            title: title,
+            width: Ext.getBody().getWidth() - 50,
+            height: Ext.getBody().getHeight() - 50,
+            closable: true,
+            layout: 'fit',
+            items: [
+                {
+                    xtype:'rallygrid',
+                    model: 'UserStory',
+                    showPagingToolbar: false,
+                    showRowActionsColumn: false,
+                    disableSelection: true,
+                    columnCfgs: [
+                        { text: 'id', dataIndex: 'FormattedID' },
+                        { text: 'Name', dataIndex: 'Name', flex: 1 },
+                        { text: 'State', dataIndex: 'ScheduleState' },
+                        { text: 'Size', dataIndex: 'PlanEstimate' },
+                        { text: 'Project', dataIndex: 'Project', renderer: function(value){ return value._refObjectName }}
+                    ],
+                    store: Ext.create('Rally.data.custom.Store',{
+                        pageSize: 100000,
+                        data: workItems,
+                        sorters: [{property:'ObjectID',direction:'ASC'}]
+                    })
+                }
+            ]
+        }).show();
     }
-});
+
+})

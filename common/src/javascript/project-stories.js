@@ -1,5 +1,5 @@
-/** this class is configured with { series : [] } where series is a single dimensional array of 
-    data values that is filled to full extent of the date range with future values filled with 
+/** this class is configured with { series : [] } where series is a single dimensional array of
+    data values that is filled to full extent of the date range with future values filled with
     nulls.
 **/
 Ext.define("ProjectStories", function() {
@@ -68,8 +68,8 @@ Ext.define("ProjectStories", function() {
             var deferred = Ext.create('Deft.Deferred');
             var me = this;
 
-            self._loadAStoreWithAPromise('Project', 
-                ["_ref","Parent","Children"], 
+            self._loadAStoreWithAPromise('Project',
+                ["_ref","Parent","Children"],
                 [
                     {property : "ObjectID" , operator : "=", value : self.ctx.getProject().ObjectID }
                 ]).then({
@@ -90,7 +90,7 @@ Ext.define("ProjectStories", function() {
                     }
             });
             return deferred.promise;
-        },    
+        },
 
         readStories : function(projects) {
             var me = this;
@@ -98,8 +98,8 @@ Ext.define("ProjectStories", function() {
             var promises = _.map(projects,function(project) {
                 var deferred = Ext.create('Deft.Deferred');
                 self._loadAStoreWithAPromise(
-                    'HierarchicalRequirement', 
-                    ["ObjectID","ScheduleState","PlanEstimate","Project"], 
+                    'HierarchicalRequirement',
+                    ["ObjectID","ScheduleState","PlanEstimate","Project","Name","FormattedID"], 
                     [self.filter],
                     {   project: project.get("_ref"),
                         projectScopeUp: false,
@@ -124,8 +124,8 @@ Ext.define("ProjectStories", function() {
             var readFeatureType = function() {
                 var deferred = Ext.create('Deft.Deferred');
                 self._loadAStoreWithAPromise(
-                    'TypeDefinition', 
-                    ["TypePath"], 
+                    'TypeDefinition',
+                    ["TypePath"],
                     [ { property:"Ordinal", operator:"=", value:0} ]
                     ).then({
                     scope: me,
@@ -141,7 +141,7 @@ Ext.define("ProjectStories", function() {
                 var promises = _.map(projects,function(project) {
                     var deferred = Ext.create('Deft.Deferred');
                     self._loadAStoreWithAPromise(
-                        type, 
+                        type,
                         ["FormattedID","Name","ObjectID","LeafStoryCount","LeafStoryPlanEstimateTotal",
                         "PreliminaryEstimate", "AcceptedLeafStoryCount", "AcceptedLeafStoryPlanEstimateTotal",
                         "PercentDoneByStoryCount","c_ValueMetricKPI","Rank","State"],
@@ -179,8 +179,8 @@ Ext.define("ProjectStories", function() {
             var promises = _.map(keys,function(key) {
                 var deferred = Ext.create('Deft.Deferred');
                 self._loadAStoreWithAPromise(
-                        "Preference", 
-                        ["Name","Value"], 
+                        "Preference",
+                        ["Name","Value"],
                         [{ property : "Name", operator : "=", value : key }]
                     ).then({
                         scope: me,
@@ -199,7 +199,7 @@ Ext.define("ProjectStories", function() {
         _loadAStoreWithAPromise: function(model_name, model_fields, filters,ctx,order){
             var deferred = Ext.create('Deft.Deferred');
             var me = this;
-              
+
             var config = {
                 model: model_name,
                 fetch: model_fields,

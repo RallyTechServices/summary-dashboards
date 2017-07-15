@@ -11,13 +11,21 @@ Ext.define("TSProgressByProject", {
             showScopeSelector :  true,
             filterFieldName: 'Commitment for Release',
             iterationNoEntryText: 'PI Scope',
-            considerVelocity: true
+            considerVelocity: true,
+            groupByFeatureInsteadOfProject: false
         }
     },
     chart: null,
 
     launch: function() {
         this.considerVelocity = this.getSetting('considerVelocity');
+        this.groupByFeatureInsteadOfProject = this.getSetting('groupByFeatureInsteadOfProject') || false;
+        if ( this.groupByFeatureInsteadOfProject ) {
+            this.considerVelocity = false;
+            this.setSetting('considerVelocity',false);
+        }
+        this.setLoading('Loading...');
+
         Deft.Chain.sequence([
             CArABU.TSUtils.getPortfolioItemTypes,
             CArABU.TSUtils.getScheduleStates
@@ -53,7 +61,6 @@ Ext.define("TSProgressByProject", {
                         this._changeIteration(iteration);
                     },
                     scope: this
-
                 }
             });
         } else {
@@ -139,22 +146,26 @@ Ext.define("TSProgressByProject", {
         var filter = this._defineFilter(releaseName,iterationName);
 
         var promises = [
-            this._getProjects,
-            function(projects) { return this._getStoriesByProject(filter,projects); },
-            function(projects_and_current_stories) {
-                var projects = projects_and_current_stories[0],
-                    current_stories = projects_and_current_stories[1];
-
-                return this._getVelocitiesByProject(projects,current_stories); }
+            this._getBuckets,
+            function(buckets) { return this._getStoriesByBucket(filter,buckets); },
+            function(buckets_and_current_stories) {
+                var buckets = buckets_and_current_stories[0],
+                    current_stories = buckets_and_current_stories[1];
+                if ( this.groupByFeatureInsteadOfProject ) {
+                    return [buckets,current_stories,{}];
+                } else {
+                    return this._getVelocitiesByProject(buckets,current_stories);
+                }
+            }
         ];
 
         Deft.Chain.pipeline(promises,this).then({
             success: function(results) {
-                var projects = results[0],
+                var buckets = results[0],
                     current_stories = results[1],
                     velocities = results[2];
 
-                var chart_data = this.prepareChartData(projects,current_stories,velocities);
+                var chart_data = this.prepareChartData(buckets,current_stories,velocities);
                 this.createChart(chart_data);
             },
             failure: function(msg) {
@@ -162,25 +173,18 @@ Ext.define("TSProgressByProject", {
             },
             scope: this
         });
-        // pr.readProjectWorkItems(function(error, stories, projects, states) {
-        //     that._getVelocitiesByProjectName(projects).then({
-        //         success: function(velocities_by_project_name) {
-        //             that.prepareChartData( stories, projects, states, velocities_by_project_name,
-        //                function(error, categories, series) {
-        //                 that.createChart( categories, series );
-        //                 deferred.resolve();
-        //             });
-        //         },
-        //         failure: function(msg) {
-        //             Ext.Msg.alert("Problem gathering data", msg);
-        //             deferred.reject('Problem gathering data' + msg);
-        //         }
-        //     });
-        // });
         return deferred.promise;
     },
 
-    // get the children projects right under the currently selected one
+    // get the appropriate buckets -- either projects right under
+    // the current project (or selected features)
+    _getBuckets: function() {
+        if ( this.groupByFeatureInsteadOfProject ) {
+            return [];
+        }
+        return this._getProjects();
+    },
+
     _getProjects: function() {
         var deferred = Ext.create('Deft.Deferred');
         var current_project_oid = this.getContext().getProject().ObjectID;
@@ -214,23 +218,26 @@ Ext.define("TSProgressByProject", {
         return deferred.promise;
     },
 
-    _getStoriesByProject: function(filter,projects) {
+    _getStoriesByBucket: function(filter,buckets) {
         var deferred = Ext.create('Deft.Deferred');
-        this.logger.log('_getStoriesByProject',filter,projects);
-        var promises = Ext.Array.map(projects, function(project){
+        this.logger.log('_getStoriesByBucket',filter,buckets);
+        var promises = Ext.Array.map(buckets, function(bucket){
             var config = {
                 model: 'HierarchicalRequirement',
                 fetch: ['ObjectID','ScheduleState','PlanEstimate','Project','Name','FormattedID' ],
                 filters: filter,
-                context: {
-                    project: project.get('_ref'),
-                    projectScopeUp: false,
-                    projectScopeDown: true
-                },
+                config: null,
                 limit: Infinity,
                 pageSize: 2000
             };
 
+            if ( buckets[0].get('_type') == "project" ) {
+                config.context = {
+                    project: bucket.get('_ref'),
+                    projectScopeUp: false,
+                    projectScopeDown: true
+                };
+            }
             return function() {
                 return CArABU.TSUtils.loadWsapiRecords(config);
             }
@@ -238,19 +245,28 @@ Ext.define("TSProgressByProject", {
 
         Deft.Chain.sequence(promises,this).then({
             success: function(stories) {
-                var stories_by_project_name = {};
-                Ext.Array.each(projects, function(project,index) {
-                    var name = project.get('_refObjectName');
-                    stories_by_project_name[name] = stories[index] || [];
-                });
-                deferred.resolve([projects,stories_by_project_name]);
+                var stories_by_bucket_id = {};
+                Ext.Array.each(buckets, function(bucket,index) {
+                    var name = bucket.get(this._getIdField());
+                    stories_by_bucket_id[name] = stories[index] || [];
+                },this);
+                deferred.resolve([buckets,stories_by_bucket_id]);
             },
             failure: function(msg) {
                 deferred.reject(msg);
-            }
+            },
+            scope: this
         });
 
         return deferred.promise;
+    },
+
+    _getIdField: function() {
+        if ( this.groupByFeatureInsteadOfProject ) {
+            return "FormattedID";
+        }
+
+        return "_refObjectName";
     },
 
     _getVelocitiesByProject: function(projects,current_stories) {
@@ -390,7 +406,6 @@ Ext.define("TSProgressByProject", {
     },
 
     getPointsByState: function(artifacts,states,past_velocity) {
-        console.log('stories count', artifacts.length);
         var total = _.reduce(artifacts, function(memo,artifact) {
             var points = artifact.get('PlanEstimate') || 0;
             return memo + points;
@@ -412,31 +427,33 @@ Ext.define("TSProgressByProject", {
         return summary;
     },
 
-    prepareChartData : function(projects, stories, velocities_by_project_name) {
+    prepareChartData : function(buckets, stories, velocities_by_project_name) {
         var states = this.states,
             me = this;
-        var projectKeys = _.map(projects,function(project) { return _.last(project.get("Name").split('>')); });
+        var bucket_keys = Ext.Array.map(buckets, function(bucket){
+            return bucket.get(this._getIdField());
+        },this);
 
         var summary = this.createSummaryRecord();
 
         var seriesData = _.map( _.keys(summary), function( summaryKey ) {
             return {
                 name : summaryKey,
-                data : _.map( projectKeys, function( projectKey, index ) {
+                data : _.map( bucket_keys, function( bucket_key, index ) {
                     return  {
-                        _total: me.getPointsByState( stories[projectKey] , summary[summaryKey], velocities_by_project_name[projectKey]).total,
-                        y: me.getPointsByState( stories[projectKey] , summary[summaryKey], velocities_by_project_name[projectKey]).p,
-                        _velocity: velocities_by_project_name[projectKey],
+                        _total: me.getPointsByState( stories[bucket_key] , summary[summaryKey], velocities_by_project_name[bucket_key]).total,
+                        y: me.getPointsByState( stories[bucket_key] , summary[summaryKey], velocities_by_project_name[bucket_key]).p,
+                        _velocity: velocities_by_project_name[bucket_key],
                         events: {
                             click: function() {
-                                me._showDetailsDialog(projectKey,stories[projectKey]);
+                                me._showDetailsDialog(bucket_key,stories[bucket_key]);
                             }
                         }
                     };
                 })
             };
         });
-        return { series: seriesData, categories: projectKeys};
+        return { series: seriesData, categories: bucket_keys};
     },
 
     formatter: function(args) {
@@ -456,6 +473,10 @@ Ext.define("TSProgressByProject", {
         var ytext = '% of Scheduled Stories by State by Points';
         if ( this.considerVelocity && !this.iteration ) {
             ytext = 'Scheduled Stories by State by Points (as a % of 6 Sprint Velocity Total)'
+        }
+        var title = "Progress by Project";
+        if ( this.groupByFeatureInsteadOfProject ) {
+            title = "Progress by " + this._getFeatureFieldName();
         }
         var yAxis = {
             min: 0,
@@ -479,7 +500,7 @@ Ext.define("TSProgressByProject", {
                     type: 'bar'
                 },
                 title: {
-                    text: 'Progress by Project'
+                    text: title
                 },
                 xAxis: {
                     tickInterval: 1,

@@ -22,7 +22,7 @@ Ext.define("TSProgressByProject", {
         this.groupByFeatureInsteadOfProject = this.getSetting('groupByFeatureInsteadOfProject') || false;
         if ( this.groupByFeatureInsteadOfProject ) {
             this.considerVelocity = false;
-            this.setSetting('considerVelocity',false);
+            this.updateSettingsValues({'considerVelocity': false});
         }
         this.setLoading('Loading...');
 
@@ -146,7 +146,7 @@ Ext.define("TSProgressByProject", {
         var filter = this._defineFilter(releaseName,iterationName);
 
         var promises = [
-            this._getBuckets,
+            function() { return this._getBuckets(releaseName,iterationName); },
             function(buckets) { return this._getStoriesByBucket(filter,buckets); },
             function(buckets_and_current_stories) {
                 var buckets = buckets_and_current_stories[0],
@@ -178,11 +178,24 @@ Ext.define("TSProgressByProject", {
 
     // get the appropriate buckets -- either projects right under
     // the current project (or selected features)
-    _getBuckets: function() {
+    _getBuckets: function(release_name) {
         if ( this.groupByFeatureInsteadOfProject ) {
-            return [];
+            return this._getFeatures(release_name);
         }
         return this._getProjects();
+    },
+
+    _getFeatures: function(release_name) {
+        var config = {
+            model: this.bottom_type_path || "PortfolioItem/Feature",
+            fetch: ['ObjectID','Name','FormattedID' ],
+            filters: [{
+                property: 'Release.Name',
+                value: release_name
+            }]
+        };
+
+        return CArABU.TSUtils.loadWsapiRecords(config);
     },
 
     _getProjects: function() {
@@ -237,11 +250,16 @@ Ext.define("TSProgressByProject", {
                     projectScopeUp: false,
                     projectScopeDown: true
                 };
+            } else {
+                config.filters = filter.and({
+                    property:this._getFeatureFieldName() + ".FormattedID",
+                    value: bucket.get('FormattedID')
+                });
             }
             return function() {
                 return CArABU.TSUtils.loadWsapiRecords(config);
             }
-        });
+        },this);
 
         Deft.Chain.sequence(promises,this).then({
             success: function(stories) {
@@ -457,9 +475,14 @@ Ext.define("TSProgressByProject", {
     },
 
     formatter: function(args) {
-        return this.series.name + ': ' + Math.round(this.y) + '%' +
-            '<br/>Total: ' + Math.round(this.point._total) + ' points' +
-            '<br/>Velocity: ' + Math.round(this.point._velocity) + ' points';
+        var format = this.series.name + ': ' + Math.round(this.y) + '%' +
+            '<br/>Total: ' + Math.round(this.point._total) + ' points';
+
+        if (this.considerVelocity) {
+            format = format + '<br/>Velocity: ' + Math.round(this.point._velocity) + ' points';
+        }
+
+        return format;
     },
 
     createChart : function(chart_data) {
@@ -676,6 +699,14 @@ Ext.define("TSProgressByProject", {
                 fieldLabel: '',
                 margin: '0 0 25 200',
                 boxLabel: 'Consider Velocity<br/><span style="color:#999999;"><i>Tick to make display bars a percentage of historical velocity</i></span>'
+            },
+            {
+                name: 'groupByFeatureInsteadOfProject',
+                xtype: 'rallycheckboxfield',
+                boxLabelAlign: 'after',
+                fieldLabel: '',
+                margin: '0 0 25 200',
+                boxLabel: 'Group by Feature<br/><span style="color:#999999;"><i>Tick to display bars for each lowest-level PI instead of each project</i></span>'
             },
             {
                 name: 'showScopeSelector',

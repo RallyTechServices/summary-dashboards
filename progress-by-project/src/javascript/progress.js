@@ -11,35 +11,46 @@ Ext.define("TSProgressByProject", {
             showScopeSelector :  true,
             filterFieldName: 'Commitment for Release',
             iterationNoEntryText: 'PI Scope',
-            considerVelocity: true
+            considerVelocity: true,
+            groupByFeatureInsteadOfProject: false
         }
     },
     chart: null,
 
     launch: function() {
         this.considerVelocity = this.getSetting('considerVelocity');
+        this.groupByFeatureInsteadOfProject = this.getSetting('groupByFeatureInsteadOfProject') || false;
+        if ( this.groupByFeatureInsteadOfProject ) {
+            this.considerVelocity = false;
+            this.updateSettingsValues({'considerVelocity': false});
+        }
+        this.setLoading('Loading...');
+
         Deft.Chain.sequence([
-            this._getPortfolioItemTypes,
-            this._getAvailableStates
+            CArABU.TSUtils.getPortfolioItemTypes,
+            CArABU.TSUtils.getScheduleStates
         ],this).then({
             scope: this,
             success: function(results) {
-                var states = results[1],
-                    types = results[0];
-                this.bottom_type_path = types[0].get('TypePath');
-                this._launch(this.getSettings());
+                this.states = results[1];
+                this.types = results[0];
+                this.logger.log("Found states/types", this.states, this.types);
+
+                var settings = this.getSettings();
+                this.bottom_type_path = this.types[0].get('TypePath');
+                this.show_scope_selector = false;
+                if ( settings.showScopeSelector === true || settings.showScopeSelector === "true" ) {
+                    this.show_scope_selector = true;
+                }
+                this._prepareSelectors();
             }
         });
     },
 
-    _launch: function(settings) {
-        var that = this;
-
-        that.rallyFunctions = Ext.create("RallyFunctions");
-
-        if ( settings.showScopeSelector === true || settings.showScopeSelector === "true" ) {
+    _prepareSelectors: function() {
+        if ( this.show_scope_selector ) {
             this.down('#selector_box').add({
-                xtype : 'timebox-selector',
+                xtype : 'tstimeboxselector',
                 context : this.getContext(),
                 iterationNoEntryText: this.getSetting('iterationNoEntryText'),
                 listeners: {
@@ -50,7 +61,6 @@ Ext.define("TSProgressByProject", {
                         this._changeIteration(iteration);
                     },
                     scope: this
-
                 }
             });
         } else {
@@ -61,7 +71,7 @@ Ext.define("TSProgressByProject", {
 
         if ( this.getSetting('filterField') ) {
             var display_name = this.getSetting('filterFieldName') || this.getSetting('filterField');
-        	var label = Ext.String.format('Restrict {0} to:', display_name);
+            var label = Ext.String.format('Restrict {0} to:', display_name);
 
             this.fieldValuePicker = this.down('#selector_box').add({
                 xtype: 'rallyfieldvaluecombobox',
@@ -79,7 +89,7 @@ Ext.define("TSProgressByProject", {
                 listeners: {
                     scope: this,
                     blur: function() {
-                        this.run(this.release && this.release.get('Name'),this.iteration && this.iteration.get('Name'));
+                        this._findItemsAndMakeChart(this.release && this.release.get('Name'),this.iteration && this.iteration.get('Name'));
                     }
                 }
             });
@@ -91,7 +101,7 @@ Ext.define("TSProgressByProject", {
         this.release = release;
         this.iteration = null;
         if ( !Ext.isEmpty(this.release) ) {
-            this.run(release.get("Name"),null);
+            this._findItemsAndMakeChart(release.get("Name"),null);
         }
     },
 
@@ -100,36 +110,24 @@ Ext.define("TSProgressByProject", {
         this.iteration = iteration;
         if ( !Ext.isEmpty(iteration) ) {
             if ( !Ext.isEmpty(this.release) ) {
-                this.run(this.release.get('Name'), this.iteration.get('Name') );
+                this._findItemsAndMakeChart(this.release.get('Name'), this.iteration.get('Name') );
             } else {
-                this.run(null,iteration.get("Name"));
+                this._findItemsAndMakeChart(null,iteration.get("Name"));
             }
             return;
         } else if (!Ext.isEmpty(this.release) ) {
-            this.run(this.release.get('Name'),null);
+            this._findItemsAndMakeChart(this.release.get('Name'),null);
         }
     },
 
-    run: function(releaseName,iterationName) {
-        this._findItemsAndMakeChart(releaseName,iterationName);
-    },
-
-    _findItemsAndMakeChart: function(releaseName,iterationName) {
-        var that = this,
-            feature_field = this._getFeatureFieldName(),
-            deferred = Ext.create('Deft.Deferred');
-
+    _defineFilter: function(releaseName,iterationName) {
+        this.logger.log("Making filter for ", releaseName, iterationName);
+        var feature_field = this._getFeatureFieldName();
         var filter_values =  this.fieldValuePicker && this.fieldValuePicker.getValue() || [];
         var filter_field  = this.getSetting('filterField');
-
-        this.setLoading("Loading Stories in Project...");
-
-        this.logger.log("Making filter for ", releaseName, iterationName);
-
-        var filter = that.rallyFunctions.createFilter(releaseName,iterationName, feature_field);
+        var filter = CArABU.TSUtils.createFilter(releaseName,iterationName, feature_field);
 
         if ( filter_field && filter_values && filter_values.length > 0 ) {
-
             var filter_ors = Ext.Array.map(filter_values, function(value){
                 if ( value == "None" ) { value = ""; }
                 return {property: feature_field + "." + filter_field, value: value};
@@ -137,30 +135,159 @@ Ext.define("TSProgressByProject", {
             var or_filter = Rally.data.wsapi.Filter.or(filter_ors);
             filter = filter.and(or_filter);
         }
+        this.logger.log('filter:', filter);
+        return filter;
+    },
 
-        var pr = Ext.create( "ProjectStories", {
-            ctx : that.getContext(),
-            filter : filter
-        });
+    _findItemsAndMakeChart: function(releaseName,iterationName) {
+        var that = this,
+            deferred = Ext.create('Deft.Deferred');
 
-        pr.readProjectWorkItems(function(error, stories, projects, states) {
-            that._getVelocitiesByProjectName(projects).then({
-                success: function(velocities_by_project_name) {
-                    that.prepareChartData( stories, projects, states, velocities_by_project_name, function(error, categories, series) {
-                        that.createChart( categories, series );
-                        deferred.resolve();
-                    });
-                },
-                failure: function(msg) {
-                    Ext.Msg.alert("Problem gathering data", msg);
-                    deferred.reject('Problem gathering data' + msg);
+        var filter = this._defineFilter(releaseName,iterationName);
+
+        var promises = [
+            function() { return this._getBuckets(releaseName,iterationName); },
+            function(buckets) { return this._getStoriesByBucket(filter,buckets); },
+            function(buckets_and_current_stories) {
+                var buckets = buckets_and_current_stories[0],
+                    current_stories = buckets_and_current_stories[1];
+                if ( this.groupByFeatureInsteadOfProject ) {
+                    return [buckets,current_stories,{}];
+                } else {
+                    return this._getVelocitiesByProject(buckets,current_stories);
                 }
-            });
+            }
+        ];
+
+        Deft.Chain.pipeline(promises,this).then({
+            success: function(results) {
+                var buckets = results[0],
+                    current_stories = results[1],
+                    velocities = results[2];
+
+                var chart_data = this.prepareChartData(buckets,current_stories,velocities);
+                this.createChart(chart_data);
+            },
+            failure: function(msg) {
+                deferred.reject(msg);
+            },
+            scope: this
         });
         return deferred.promise;
     },
 
-    _getVelocitiesByProjectName: function(projects) {
+    // get the appropriate buckets -- either projects right under
+    // the current project (or selected features)
+    _getBuckets: function(release_name) {
+        if ( this.groupByFeatureInsteadOfProject ) {
+            return this._getFeatures(release_name);
+        }
+        return this._getProjects();
+    },
+
+    _getFeatures: function(release_name) {
+        var config = {
+            model: this.bottom_type_path || "PortfolioItem/Feature",
+            fetch: ['ObjectID','Name','FormattedID' ],
+            filters: [{
+                property: 'Release.Name',
+                value: release_name
+            }]
+        };
+
+        return CArABU.TSUtils.loadWsapiRecords(config);
+    },
+
+    _getProjects: function() {
+        var deferred = Ext.create('Deft.Deferred');
+        var current_project_oid = this.getContext().getProject().ObjectID;
+        Rally.data.ModelFactory.getModel({
+            type: 'Project',
+            success: function(model) {
+                model.load(current_project_oid, {
+                    fetch: ["_ref","Parent","Children"],
+                    callback: function(project, operation) {
+                        if(!operation.wasSuccessful()) {
+                            deferred.reject(operation);
+                        }
+                        // if the current project is a leaf just use it
+                        if (project.get('Children').Count === 0){
+                            deferred.resolve([project]);
+                        } else {
+                            project.getCollection('Children').load({
+                                fetch : ["ObjectID","Name","_ref","Parent","State"],
+                                callback: function(records, operation, success) {
+                                    var projects = Ext.Array.filter(records, function(r){
+                                        return r.get('State') !== 'Closed';
+                                    });
+                                    deferred.resolve(projects);
+                                }
+                            });
+                        }
+                    }
+                });
+            }
+        });
+        return deferred.promise;
+    },
+
+    _getStoriesByBucket: function(filter,buckets) {
+        var deferred = Ext.create('Deft.Deferred');
+        this.logger.log('_getStoriesByBucket',filter,buckets);
+        var promises = Ext.Array.map(buckets, function(bucket){
+            var config = {
+                model: 'HierarchicalRequirement',
+                fetch: ['ObjectID','ScheduleState','PlanEstimate','Project','Name','FormattedID' ],
+                filters: filter,
+                config: null,
+                limit: Infinity,
+                pageSize: 2000
+            };
+
+            if ( buckets[0].get('_type') == "project" ) {
+                config.context = {
+                    project: bucket.get('_ref'),
+                    projectScopeUp: false,
+                    projectScopeDown: true
+                };
+            } else {
+                config.filters = filter.and({
+                    property:this._getFeatureFieldName() + ".FormattedID",
+                    value: bucket.get('FormattedID')
+                });
+            }
+            return function() {
+                return CArABU.TSUtils.loadWsapiRecords(config);
+            }
+        },this);
+
+        Deft.Chain.sequence(promises,this).then({
+            success: function(stories) {
+                var stories_by_bucket_id = {};
+                Ext.Array.each(buckets, function(bucket,index) {
+                    var name = bucket.get(this._getIdField());
+                    stories_by_bucket_id[name] = stories[index] || [];
+                },this);
+                deferred.resolve([buckets,stories_by_bucket_id]);
+            },
+            failure: function(msg) {
+                deferred.reject(msg);
+            },
+            scope: this
+        });
+
+        return deferred.promise;
+    },
+
+    _getIdField: function() {
+        if ( this.groupByFeatureInsteadOfProject ) {
+            return "FormattedID";
+        }
+
+        return "_refObjectName";
+    },
+
+    _getVelocitiesByProject: function(projects,current_stories) {
         var me = this,
             deferred = Ext.create('Deft.Deferred');
 
@@ -177,7 +304,7 @@ Ext.define("TSProgressByProject", {
                     velocities_by_project_name[project_name] = velocity;
                 });
 
-                deferred.resolve(velocities_by_project_name);
+                deferred.resolve([projects,current_stories,velocities_by_project_name]);
             },
             failure: function(msg){
                 deferred.reject(msg);
@@ -222,7 +349,7 @@ Ext.define("TSProgressByProject", {
                     pageSize: 2000
                 };
 
-                this.rallyFunctions.loadWsapiRecords(config).then({
+                CArABU.TSUtils.loadWsapiRecords(config).then({
                     success: function(artifacts) {
                         var pe = 0;
                         Ext.Array.each(artifacts, function(artifact) {
@@ -259,16 +386,16 @@ Ext.define("TSProgressByProject", {
             ]
         };
 
-        return this.rallyFunctions.loadWsapiRecords(config);
+        return CArABU.TSUtils.loadWsapiRecords(config);
     },
 
     _timeboxChanged : function(timebox) {
         this.logger.log('_timeboxChanged', timebox);
 
         if (timebox.get("_type")==='release') {
-            this.run(timebox.get("Name"),null);
+            this._findItemsAndMakeChart(timebox.get("Name"),null);
         } else {
-            this.run(null,timebox.get("Name"));
+            this._findItemsAndMakeChart(null,timebox.get("Name"));
         }
     },
 
@@ -285,109 +412,94 @@ Ext.define("TSProgressByProject", {
     onTimeboxScopeChange: function(newTimeboxScope) {
         this.callParent(arguments);
         if ((newTimeboxScope) && (newTimeboxScope.getType() === 'iteration')) {
-            this.run(null,newTimeboxScope.getRecord().get("Name"));
+            this._findItemsAndMakeChart(null,newTimeboxScope.getRecord().get("Name"));
         } else {
             if ((newTimeboxScope) && (newTimeboxScope.getType() === 'release')) {
                 this.release = newTimeboxScope.getRecord();
                 this.publish('timeboxReleaseChanged', this.release);
 
-                this.run(this.release.getName(),null);
+                this._findItemsAndMakeChart(this.release.getName(),null);
             }
         }
     },
 
-    prepareChartData : function(stories, projects, states, velocities_by_project_name, callback) {
-        var that = this;
+    getPointsByState: function(artifacts,states,past_velocity) {
+        var total = _.reduce(artifacts, function(memo,artifact) {
+            var points = artifact.get('PlanEstimate') || 0;
+            return memo + points;
+        },0);
 
-        var projectKeys = _.map(projects,function(project) { return _.last(project.get("Name").split('>')); });
-
-        var pointsValue = function(value) {
-            return !_.isUndefined(value) && !_.isNull(value) ? value : 0;
-        };
+        var denominator = total;
+        if ( total <= past_velocity && this.considerVelocity && !this.iteration ) {
+            denominator = past_velocity;
+        }
 
         // totals points for a set of work items based on if they are in a set of states
-        var summarize = function( workItems, states, past_velocity ) {
-            // calc total points
-            var total = _.reduce(workItems, function(memo,workItem) {
-                    return memo + pointsValue(workItem.get("PlanEstimate"));
-            },0);
+        var stateTotal = _.reduce(artifacts, function(memo,artifact) {
+            var points = artifact.get('PlanEstimate') || 0;
+            return memo + ( _.indexOf(states,artifact.get("ScheduleState")) > -1 ? points : 0);
+        },0);
 
-            //console.log( 'total, past velocity', total, past_velocity);
+        var p = ( denominator > 0 ? ((stateTotal/denominator)*100) : 0);
+        var summary = { p: p, total: total };
+        return summary;
+    },
 
-            var denominator = total;
-            if ( total <= past_velocity && that.considerVelocity && !that.iteration ) {
-                denominator = past_velocity;
-            }
-            // totals points for a set of work items based on if they are in a set of states
-            var stateTotal = _.reduce(  workItems, function(memo,workItem) {
-                return memo + ( _.indexOf(states,workItem.get("ScheduleState")) > -1 ?
-                            pointsValue(workItem.get("PlanEstimate")) : 0);
-            },0);
+    prepareChartData : function(buckets, stories, velocities_by_project_name) {
+        var states = this.states,
+            me = this;
+        var bucket_keys = Ext.Array.map(buckets, function(bucket){
+            return bucket.get(this._getIdField());
+        },this);
 
-            var p = ( denominator > 0 ? ((stateTotal/denominator)*100) : 0);
-            var summary = { p: p, total: total };
-            return summary;
-        };
-
-        var summary = that.createSummaryRecord();
+        var summary = this.createSummaryRecord();
 
         var seriesData = _.map( _.keys(summary), function( summaryKey ) {
             return {
                 name : summaryKey,
-                data : _.map( projectKeys, function( projectKey, index ) {
+                data : _.map( bucket_keys, function( bucket_key, index ) {
                     return  {
-                        _total: summarize( stories[index] , summary[summaryKey], velocities_by_project_name[projectKey]).total,
-                        y: summarize( stories[index] , summary[summaryKey], velocities_by_project_name[projectKey]).p,
-                        _velocity: velocities_by_project_name[projectKey],
+                        _total: me.getPointsByState( stories[bucket_key] , summary[summaryKey], velocities_by_project_name[bucket_key]).total,
+                        y: me.getPointsByState( stories[bucket_key] , summary[summaryKey], velocities_by_project_name[bucket_key]).p,
+                        _velocity: velocities_by_project_name[bucket_key],
                         events: {
                             click: function() {
-                                that._showDetailsDialog(projectKey,stories[index]);
+                                me._showDetailsDialog(bucket_key,stories[bucket_key],summaryKey);
                             }
                         }
                     };
                 })
             };
         });
-
-        callback(null, projectKeys, seriesData );
-
+        return { series: seriesData, categories: bucket_keys};
     },
 
     formatter: function(args) {
-        return this.series.name + ': ' + Math.round(this.y) + '%' +
-            '<br/>Total: ' + Math.round(this.point._total) + ' points' +
-            '<br/>Velocity: ' + Math.round(this.point._velocity) + ' points';
+        var format = this.series.name + ': ' + Math.round(this.y) + '%' +
+            '<br/>Total: ' + Math.round(this.point._total) + ' points';
 
-//        var this_point_index = this.series.data.indexOf( this.point );
-//        var this_series_index = this.series.index;
-//        var that_series_index = this.series.index == 0 ? 1 : 0; // assuming 2 series
-//        var that_series = args.chart.series[that_series_index];
-//        var that_point = that_series.data[this_point_index];
-//        return 'Client: ' + this.point.name +
-//               '<br/>Client Health: ' + this.x +
-//               '<br/>' + this.series.name + ' Bandwidth: ' + this.y + 'Kbps' +
-//               '<br/>' + that_series.name + ' Bandwidth: ' + that_point.y + 'Kbps';
+        if (this.considerVelocity) {
+            format = format + '<br/>Velocity: ' + Math.round(this.point._velocity) + ' points';
+        }
+
+        return format;
     },
 
-    createChart : function(categories,seriesData,callback) {
-        var that = this;
-        that.setLoading(false);
+    createChart : function(chart_data) {
+        this.setLoading(false);
 
         var timebox_progress_plotline = this._getPlotLineForCurrentPoint(this.release,this.iteration);
-
-//        that.chart = Ext.create('Rally.technicalservices.progressChart', {
-//            itemId: 'rally-chart',
-//            chartData: { series : seriesData, categories : categories },
-//            title: 'Progress By Project',
-//            plotLine: timebox_progress_plotline
-//        });
 
         // for some reason the original approach of the subclassed chart wasn't replacing
         // the plotline when destroyed and recreated
 
         var ytext = '% of Scheduled Stories by State by Points';
-        if ( that.considerVelocity && !that.iteration ) {
+        if ( this.considerVelocity && !this.iteration ) {
             ytext = 'Scheduled Stories by State by Points (as a % of 6 Sprint Velocity Total)'
+        }
+        var title = "Progress by Project";
+        if ( this.groupByFeatureInsteadOfProject ) {
+            title = "Progress by " + this._getFeatureFieldName();
         }
         var yAxis = {
             min: 0,
@@ -401,17 +513,17 @@ Ext.define("TSProgressByProject", {
             yAxis.plotLines = [timebox_progress_plotline];
         }
 
-        that.chart = Ext.create('Rally.ui.chart.Chart',{
+        this.chart = Ext.create('Rally.ui.chart.Chart',{
             itemId: 'rally-chart',
             chartColors : ["#ee6c19","#FAD200","#3F86C9","#8DC63F", "#888", "#222"],
-            chartData: { series : seriesData, categories : categories },
+            chartData: chart_data,
             chartConfig: {
                 colors : ["#ee6c19","#FAD200","#3F86C9","#8DC63F", "#888", "#222"],
                 chart: {
                     type: 'bar'
                 },
                 title: {
-                    text: 'Progress by Project'
+                    text: title
                 },
                 xAxis: {
                     tickInterval: 1,
@@ -445,98 +557,14 @@ Ext.define("TSProgressByProject", {
                 },
                 tooltip: {
                     enabled: true,
-                    formatter: that.formatter
+                    formatter: this.formatter
                 }
             }
         });
-        if ( that.down('#rally-chart') ) {
-            that.down('#rally-chart').destroy();
+        if ( this.down('#rally-chart') ) {
+            this.down('#rally-chart').destroy();
         }
-        that.add(that.chart);
-
-        var chart = this.down("#rally-chart");
-        var p = Ext.get(chart.id);
-        var elems = p.query("div.x-mask");
-        _.each(elems, function(e) {
-            if ( Ext.isIE9 ) {
-                e.removeNode();
-            } else {
-                e.remove();
-            }
-        });
-        elems = p.query("div.x-mask-msg");
-        _.each(elems, function(e) {
-            if ( Ext.isIE9 ) {
-                e.removeNode();
-            } else {
-                e.remove();
-            }
-        });
-    },
-
-    _getPortfolioItemTypes: function(workspace) {
-        var deferred = Ext.create('Deft.Deferred');
-
-        var store_config = {
-            fetch: ['Name','ElementName','TypePath'],
-            model: 'TypeDefinition',
-            filters: [
-                {
-                    property: 'Parent.Name',
-                    operator: '=',
-                    value: 'Portfolio Item'
-                },
-                {
-                    property: 'Creatable',
-                    operator: '=',
-                    value: 'true'
-                }
-            ],
-            autoLoad: true,
-            listeners: {
-                load: function(store, records, successful) {
-                    if (successful){
-                        deferred.resolve(records);
-                    } else {
-                        deferred.reject('Failed to load types');
-                    }
-                }
-            }
-        };
-
-        if ( !Ext.isEmpty(workspace) ) {
-            store_config.context = {
-                project:null,
-                workspace: workspace._ref ? workspace._ref : workspace.get('_ref')
-            };
-        }
-
-        var store = Ext.create('Rally.data.wsapi.Store', store_config );
-
-        return deferred.promise;
-    },
-
-    _getAvailableStates: function() {
-        var deferred = Ext.create('Deft.Deferred');
-        var me = this;
-
-        this.scheduleStates = [];
-
-        Rally.data.ModelFactory.getModel({
-            type: 'UserStory',
-            success: function(model) {
-                model.getField('ScheduleState').getAllowedValueStore().load({
-                    callback: function(records, operation, success) {
-                        Ext.Array.each(records, function(allowedValue) {
-                            me.scheduleStates.push(allowedValue.get('StringValue'));
-                        });
-
-                        deferred.resolve(me.scheduleStates);
-                    }
-                });
-            }
-        });
-        return deferred.promise;
+        this.add(this.chart);
     },
 
     // utilities below here ...
@@ -545,17 +573,17 @@ Ext.define("TSProgressByProject", {
         var that = this;
         var summary = {};
 
-        Ext.Array.each(this.scheduleStates, function(state){
+        Ext.Array.each(this.states, function(state){
             summary[state] = [ state ];
         });
 
         // add initial and last states if necessary
-        var first = _.first(that.scheduleStates);
-        var last = _.last(that.scheduleStates);
+        var first = _.first(this.states);
+        var last = _.last(this.states);
         if (_.indexOf(summary[_.first(_.keys(summary))],first)===-1)
-            summary[_.first(_.keys(summary))].push(_.first(that.scheduleStates));
+            summary[_.first(_.keys(summary))].push(_.first(this.states));
         if (_.indexOf(summary[_.last(_.keys(summary))],last)===-1)
-            summary[_.last(_.keys(summary))].push(_.last(that.scheduleStates));
+            summary[_.last(_.keys(summary))].push(_.last(this.states));
 
         return summary;
     },
@@ -616,10 +644,10 @@ Ext.define("TSProgressByProject", {
         var me = this;
 
         return [
-        	{
-            	name: 'filterFieldName',
-            	xtype:'rallytextfield',
-            	hidden: true
+            {
+                name: 'filterFieldName',
+                xtype:'rallytextfield',
+                hidden: true
             },
             {
                 name: 'filterField',
@@ -640,19 +668,19 @@ Ext.define("TSProgressByProject", {
                     return ( defn.Constrained && ( defn.AttributeType == 'STRING' || defn.AttributeType == 'RATING' ));
                 },
                 listeners: {
-                	change: function(cb) {
-                		var display_name = "";
-                		var field = cb.getRecord();
-                		if ( field ) {
-                			name = field.get('name');
-                		}
-                		var name_holders = Ext.ComponentQuery.query('[name=filterFieldName]');
-                		if ( name_holders && name_holders[0] ) {
-                			name_holders[0].setValue(name);
-                		} else {
-                			console.log('nope');
-                		}
-                	}
+                    change: function(cb) {
+                        var display_name = "";
+                        var field = cb.getRecord();
+                        if ( field ) {
+                            name = field.get('name');
+                        }
+                        var name_holders = Ext.ComponentQuery.query('[name=filterFieldName]');
+                        if ( name_holders && name_holders[0] ) {
+                            name_holders[0].setValue(name);
+                        } else {
+                            console.log('nope');
+                        }
+                    }
                 }
             },
             {
@@ -673,6 +701,14 @@ Ext.define("TSProgressByProject", {
                 boxLabel: 'Consider Velocity<br/><span style="color:#999999;"><i>Tick to make display bars a percentage of historical velocity</i></span>'
             },
             {
+                name: 'groupByFeatureInsteadOfProject',
+                xtype: 'rallycheckboxfield',
+                boxLabelAlign: 'after',
+                fieldLabel: '',
+                margin: '0 0 25 200',
+                boxLabel: 'Group by Feature<br/><span style="color:#999999;"><i>Tick to display bars for each lowest-level PI instead of each project</i></span>'
+            },
+            {
                 name: 'showScopeSelector',
                 xtype: 'rallycheckboxfield',
                 boxLabelAlign: 'after',
@@ -683,9 +719,9 @@ Ext.define("TSProgressByProject", {
         ];
     },
 
-    _showDetailsDialog: function(project,workItems){
-        console.log(project, workItems);
-        title = 'Stories for ' + project;
+    _showDetailsDialog: function(project,workItems,state){
+        var title = Ext.String.format('Stories for {0} ({1})',project,state);
+
         Ext.create('Rally.ui.dialog.Dialog',{
             id: 'detail',
             title: title,
@@ -710,7 +746,8 @@ Ext.define("TSProgressByProject", {
                     store: Ext.create('Rally.data.custom.Store',{
                         pageSize: 100000,
                         data: workItems,
-                        sorters: [{property:'ObjectID',direction:'ASC'}]
+                        sorters: [{property:'ObjectID',direction:'ASC'}],
+                        filters: [{property:'ScheduleState',value:state}]
                     })
                 }
             ]

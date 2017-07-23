@@ -2,12 +2,5 @@
     "name": "Progress by Project",
     "className": "TSProgressByProject",
     "sdk": "2.1",
-    "story": "...US1237",
-    "javascript": [
-        "src/javascript/__ts-logger.js", 
-        "src/javascript/progress.js",
-        "../common/src/javascript/project-stories.js",
-        "../common/src/javascript/rally-functions.js",
-        "../common/src/javascript/scope_selector_component.js"
-    ]
+    "story": "...US1237"
 }

@@ -464,7 +464,7 @@ Ext.define("TSProgressByProject", {
                         _velocity: velocities_by_project_name[bucket_key],
                         events: {
                             click: function() {
-                                me._showDetailsDialog(bucket_key,stories[bucket_key]);
+                                me._showDetailsDialog(bucket_key,stories[bucket_key],summaryKey);
                             }
                         }
                     };
@@ -719,8 +719,9 @@ Ext.define("TSProgressByProject", {
         ];
     },
 
-    _showDetailsDialog: function(project,workItems){
-        title = 'Stories for ' + project;
+    _showDetailsDialog: function(project,workItems,state){
+        var title = Ext.String.format('Stories for {0} ({1})',project,state);
+
         Ext.create('Rally.ui.dialog.Dialog',{
             id: 'detail',
             title: title,
@@ -745,7 +746,8 @@ Ext.define("TSProgressByProject", {
                     store: Ext.create('Rally.data.custom.Store',{
                         pageSize: 100000,
                         data: workItems,
-                        sorters: [{property:'ObjectID',direction:'ASC'}]
+                        sorters: [{property:'ObjectID',direction:'ASC'}],
+                        filters: [{property:'ScheduleState',value:state}]
                     })
                 }
             ]

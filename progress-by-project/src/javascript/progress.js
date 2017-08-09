@@ -322,6 +322,7 @@ Ext.define("TSProgressByProject", {
                 //this.logger.log(project.get('_refObjectName'), "six iterations:", iterations);
                 var filter = [];
                 Ext.Array.each(iterations, function(iteration){
+                    console.log('--', iteration.get('Name'), iteration.get('EndDate'));
                     filter.push({property:'Iteration.Name',value: iteration.get('Name')});
                 });
                 if ( iterations.length === 0 ) {
@@ -335,6 +336,7 @@ Ext.define("TSProgressByProject", {
                     operator: '!=',
                     value: null
                 }));
+
                 var config = {
                     //models: ['HierarchicalRequirement','Defect','TestSet','DefectSuite'],
                     models: ['HierarchicalRequirement'],
@@ -373,18 +375,21 @@ Ext.define("TSProgressByProject", {
     },
 
     _getLastSixIterations: function(project) {
-        var today_iso = Rally.util.DateTime.toIsoString(new Date());
+        var today_iso = Rally.util.DateTime.toUtcIsoString(new Date());
+        var filters = Rally.data.wsapi.Filter.and([
+            {property: 'EndDate', operator: '<=', value: today_iso},
+            {property: 'Project.ObjectID', value: project.get('ObjectID') }
+        ]);
         var config = {
             limit: 6,
             pageSize: 6,
             model:'Iteration',
-            fetch: ['Name'],
+            fetch: ['Name','EndDate'],
             sorters: { property: 'EndDate', direction: 'DESC' },
-            filters: [
-                {property: 'EndDate', operator: '<', value: today_iso},
-                {property: 'Project.ObjectID', value: project.get('ObjectID') }
-            ]
+            filters: filters
         };
+        this.logger.log("Get Last Six Iterations using query: ", filters.toString());
+
 
         return CArABU.TSUtils.loadWsapiRecords(config);
     },
@@ -474,19 +479,9 @@ Ext.define("TSProgressByProject", {
         return { series: seriesData, categories: bucket_keys};
     },
 
-    formatter: function(args) {
-        var format = this.series.name + ': ' + Math.round(this.y) + '%' +
-            '<br/>Total: ' + Math.round(this.point._total) + ' points';
-
-        if (this.considerVelocity) {
-            format = format + '<br/>Velocity: ' + Math.round(this.point._velocity) + ' points';
-        }
-
-        return format;
-    },
-
     createChart : function(chart_data) {
         this.setLoading(false);
+        var me = this;
 
         var timebox_progress_plotline = this._getPlotLineForCurrentPoint(this.release,this.iteration);
 
@@ -557,7 +552,15 @@ Ext.define("TSProgressByProject", {
                 },
                 tooltip: {
                     enabled: true,
-                    formatter: this.formatter
+                    formatter: function(args) {
+                        var format = this.series.name + ': ' + Math.round(this.y) + '%' +
+                            '<br/>Total: ' + Math.round(this.point._total) + ' points';
+
+                            if (me.considerVelocity) {
+                                format = format + '<br/>Velocity: ' + Math.round(this.point._velocity) + ' points';
+                            }
+                            return format;
+                        },
                 }
             }
         });

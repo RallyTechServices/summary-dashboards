@@ -166,6 +166,7 @@ Ext.define("TSProgressByProject", {
                     velocities = results[2];
 
                 var chart_data = this.prepareChartData(buckets,current_stories,velocities);
+                console.log('chart data:', chart_data);
                 this.createChart(chart_data);
             },
             failure: function(msg) {
@@ -300,10 +301,10 @@ Ext.define("TSProgressByProject", {
             success: function(velocities) {
                 var velocities_by_project_name = {};
                 Ext.Array.each(velocities, function(velocity,idx) {
-                    var project_name = projects[idx].get('Name');
+                    var project_name = projects[idx].get('_refObjectName');
                     velocities_by_project_name[project_name] = velocity;
                 });
-
+                console.log(velocities_by_project_name);
                 deferred.resolve([projects,current_stories,velocities_by_project_name]);
             },
             failure: function(msg){
@@ -319,10 +320,9 @@ Ext.define("TSProgressByProject", {
         this._getLastSixIterations(project).then({
             scope: this,
             success: function(iterations) {
-                //this.logger.log(project.get('_refObjectName'), "six iterations:", iterations);
                 var filter = [];
                 Ext.Array.each(iterations, function(iteration){
-                    console.log('--', iteration.get('Name'), iteration.get('EndDate'));
+                    console.log('    iteration: ', iteration.get('Name'), iteration.get('EndDate'));
                     filter.push({property:'Iteration.Name',value: iteration.get('Name')});
                 });
                 if ( iterations.length === 0 ) {
@@ -358,7 +358,7 @@ Ext.define("TSProgressByProject", {
                             var estimate = artifact.get('PlanEstimate') || 0;
                             pe = pe + estimate;
                         });
-                        var average = pe / iterations.length;
+                        //var average = pe / iterations.length;
                         //deferred.resolve(average);
                         deferred.resolve(pe);
                     },
@@ -375,6 +375,7 @@ Ext.define("TSProgressByProject", {
     },
 
     _getLastSixIterations: function(project) {
+        this.logger.log("Get Last Six Iterations for ", project.get('_refObjectName'));
         var today_iso = Rally.util.DateTime.toUtcIsoString(new Date());
         var filters = Rally.data.wsapi.Filter.and([
             {property: 'EndDate', operator: '<=', value: today_iso},

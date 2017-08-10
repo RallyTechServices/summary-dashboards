@@ -240,7 +240,7 @@ Ext.define("TSProgressByProject", {
                 model: 'HierarchicalRequirement',
                 fetch: ['ObjectID','ScheduleState','PlanEstimate','Project','Name','FormattedID' ],
                 filters: filter,
-                config: null,
+                context: { project: null },
                 limit: Infinity,
                 pageSize: 2000
             };
@@ -378,13 +378,17 @@ Ext.define("TSProgressByProject", {
         this.logger.log("Get Last Six Iterations for ", project.get('_refObjectName'));
         var today_iso = Rally.util.DateTime.toUtcIsoString(new Date());
         var filters = Rally.data.wsapi.Filter.and([
-            {property: 'EndDate', operator: '<=', value: today_iso},
-            {property: 'Project.ObjectID', value: project.get('ObjectID') }
+            {property: 'EndDate', operator: '<=', value: today_iso}
         ]);
         var config = {
             limit: 6,
             pageSize: 6,
             model:'Iteration',
+            context: {
+                project: { _ref: project.get('_ref') },
+                projectScopeDown: true,
+                projectScopeUp: false
+            },
             fetch: ['Name','EndDate'],
             sorters: { property: 'EndDate', direction: 'DESC' },
             filters: filters

@@ -166,7 +166,6 @@ Ext.define("TSProgressByProject", {
                     velocities = results[2];
 
                 var chart_data = this.prepareChartData(buckets,current_stories,velocities);
-                console.log('chart data:', chart_data);
                 this.createChart(chart_data);
             },
             failure: function(msg) {
@@ -187,13 +186,26 @@ Ext.define("TSProgressByProject", {
     },
 
     _getFeatures: function(release_name) {
+        var filter = Rally.data.wsapi.Filter.and([{
+            property: 'Release.Name',
+            value: release_name
+        }]);
+
+        var filter_values =  this.fieldValuePicker && this.fieldValuePicker.getValue() || [];
+        var filter_field  = this.getSetting('filterField');
+
+        if ( filter_field && filter_values && filter_values.length > 0 ) {
+            var filter_ors = Ext.Array.map(filter_values, function(value){
+                if ( value == "None" ) { value = ""; }
+                return {property: filter_field, value: value};
+            });
+            var or_filter = Rally.data.wsapi.Filter.or(filter_ors);
+            filter = filter.and(or_filter);
+        }
         var config = {
             model: this.bottom_type_path || "PortfolioItem/Feature",
             fetch: ['ObjectID','Name','FormattedID' ],
-            filters: [{
-                property: 'Release.Name',
-                value: release_name
-            }]
+            filters: filter
         };
 
         return CArABU.TSUtils.loadWsapiRecords(config);
@@ -304,7 +316,6 @@ Ext.define("TSProgressByProject", {
                     var project_name = projects[idx].get('_refObjectName');
                     velocities_by_project_name[project_name] = velocity;
                 });
-                console.log(velocities_by_project_name);
                 deferred.resolve([projects,current_stories,velocities_by_project_name]);
             },
             failure: function(msg){
@@ -322,7 +333,6 @@ Ext.define("TSProgressByProject", {
             success: function(iterations) {
                 var filter = [];
                 Ext.Array.each(iterations, function(iteration){
-                    console.log('    iteration: ', iteration.get('Name'), iteration.get('EndDate'));
                     filter.push({property:'Iteration.Name',value: iteration.get('Name')});
                 });
                 if ( iterations.length === 0 ) {
@@ -457,9 +467,13 @@ Ext.define("TSProgressByProject", {
 
     prepareChartData : function(buckets, stories, velocities_by_project_name) {
         var states = this.states,
-            me = this;
+            me = this,
+            buckets_by_key = {};
+
         var bucket_keys = Ext.Array.map(buckets, function(bucket){
-            return bucket.get(this._getIdField());
+            var id = bucket.get(this._getIdField());
+            buckets_by_key[id] = bucket.getData();
+            return id;
         },this);
 
         var summary = this.createSummaryRecord();
@@ -468,13 +482,15 @@ Ext.define("TSProgressByProject", {
             return {
                 name : summaryKey,
                 data : _.map( bucket_keys, function( bucket_key, index ) {
+
                     return  {
+                        _bucket: buckets_by_key[bucket_key],
                         _total: me.getPointsByState( stories[bucket_key] , summary[summaryKey], velocities_by_project_name[bucket_key]).total,
                         y: me.getPointsByState( stories[bucket_key] , summary[summaryKey], velocities_by_project_name[bucket_key]).p,
                         _velocity: velocities_by_project_name[bucket_key],
                         events: {
                             click: function() {
-                                me._showDetailsDialog(bucket_key,stories[bucket_key],summaryKey);
+                                me._showDetailsDialog(bucket_key,buckets_by_key,stories[bucket_key],summaryKey);
                             }
                         }
                     };
@@ -558,7 +574,13 @@ Ext.define("TSProgressByProject", {
                 tooltip: {
                     enabled: true,
                     formatter: function(args) {
-                        var format = this.series.name + ': ' + Math.round(this.y) + '%' +
+                        //console.log(this.point);
+                        var title = '<b>' + this.point.category + '</b><br/>';
+                        if ( this.point._bucket._type != "project" ) {
+                            title = '<b>' + this.point.category + ' :' + this.point._bucket.Name + '</b><br/>';
+                        }
+                        var format = title +
+                            this.series.name + ': ' + Math.round(this.y) + '%' +
                             '<br/>Total: ' + Math.round(this.point._total) + ' points';
 
                             if (me.considerVelocity) {
@@ -727,8 +749,21 @@ Ext.define("TSProgressByProject", {
         ];
     },
 
-    _showDetailsDialog: function(project,workItems,state){
-        var title = Ext.String.format('Stories for {0} ({1})',project,state);
+    _showDetailsDialog: function(bucket_key,buckets_by_key,workItems,state){
+        this.logger.log('_showDetailsDialog');
+        var title = Ext.String.format('Stories for {0} ({1})',bucket_key,state);
+        var bucket = buckets_by_key[bucket_key];
+
+        if ( bucket._type != "project" ) {
+            var url = Rally.nav.Manager.getDetailUrl(bucket);
+
+            title = Ext.String.format('Stories for <a href="{0}" target="_blank">{1}: {2}</a> ({3})',
+                url,
+                bucket_key,
+                bucket.Name,
+                state
+            );
+        }
 
         Ext.create('Rally.ui.dialog.Dialog',{
             id: 'detail',

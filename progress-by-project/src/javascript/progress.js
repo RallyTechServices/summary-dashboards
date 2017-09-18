@@ -186,13 +186,26 @@ Ext.define("TSProgressByProject", {
     },
 
     _getFeatures: function(release_name) {
+        var filter = Rally.data.wsapi.Filter.and([{
+            property: 'Release.Name',
+            value: release_name
+        }]);
+
+        var filter_values =  this.fieldValuePicker && this.fieldValuePicker.getValue() || [];
+        var filter_field  = this.getSetting('filterField');
+
+        if ( filter_field && filter_values && filter_values.length > 0 ) {
+            var filter_ors = Ext.Array.map(filter_values, function(value){
+                if ( value == "None" ) { value = ""; }
+                return {property: filter_field, value: value};
+            });
+            var or_filter = Rally.data.wsapi.Filter.or(filter_ors);
+            filter = filter.and(or_filter);
+        }
         var config = {
             model: this.bottom_type_path || "PortfolioItem/Feature",
             fetch: ['ObjectID','Name','FormattedID' ],
-            filters: [{
-                property: 'Release.Name',
-                value: release_name
-            }]
+            filters: filter
         };
 
         return CArABU.TSUtils.loadWsapiRecords(config);

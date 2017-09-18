@@ -741,7 +741,7 @@ Ext.define("TSProgressByProject", {
         var title = Ext.String.format('Stories for {0} ({1})',bucket_key,state);
         var bucket = buckets_by_key[bucket_key];
 
-        if ( bucket._type != "_project" ) {
+        if ( bucket._type != "project" ) {
             var url = Rally.nav.Manager.getDetailUrl(bucket);
 
             title = Ext.String.format('Stories for <a href="{0}" target="_blank">{1}: {2}</a> ({3})',
